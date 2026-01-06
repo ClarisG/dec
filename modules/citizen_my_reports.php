@@ -55,17 +55,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['enter_pin'])) {
         $report_stmt->execute([':id' => $report_id, ':user_id' => $user_id]);
         $report = $report_stmt->fetch(PDO::FETCH_ASSOC);
         
-        if ($report) {
-            // Check PIN
-            if ($report['pin_code'] == $pin_code) {
-                $_SESSION['decrypted_reports'][$report_id] = true;
-                $success = "PIN verified. You can now view the decrypted files.";
-            } else {
-                $error = "Incorrect PIN. Please try again.";
-            }
-        } else {
-            $error = "Report not found or is not anonymous.";
-        }
     } catch(PDOException $e) {
         $error = "Database error: " . $e->getMessage();
     }
@@ -418,7 +407,8 @@ try {
                                     <i class="fas fa-history mr-1"></i> Timeline
                                 </button>
                                 <button onclick="printReport(<?php echo $report['id']; ?>); return false;" 
-                                        class="flex-1 px-3 py-1.5 bg-green-50 text-green-700 rounded text-xs hover:bg-green-100 permanent-print-btn print-btn-always-visible">
+                                        class="flex-1 px-3 py-1.5 bg-green-50 text-green-700 rounded text-xs hover:bg-green-100 print-btn"
+                                        style="display: inline-block !important; visibility: visible !important; opacity: 1 !important;">
                                     <i class="fas fa-print mr-1"></i> Print
                                 </button>
                             </div>
@@ -544,7 +534,8 @@ try {
                                             <i class="fas fa-history mr-1"></i> Timeline
                                         </button>
                                         <button onclick="printReport(<?php echo $report['id']; ?>); return false;" 
-                                                class="px-3 py-1.5 bg-green-50 text-green-700 rounded text-xs hover:bg-green-100 transition-colors permanent-print-btn print-btn-always-visible">
+                                                class="px-3 py-1.5 bg-green-50 text-green-700 rounded text-xs hover:bg-green-100 transition-colors print-btn"
+                                                style="display: inline-block !important; visibility: visible !important; opacity: 1 !important;">
                                             <i class="fas fa-print mr-1"></i> Print
                                         </button>
                                     </div>
@@ -567,7 +558,7 @@ try {
             </div>
             <div class="flex space-x-3">
                 <button type="button" onclick="printAllReports()"
-                        class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center text-sm transition-colors permanent-print-btn print-btn-always-visible">
+                        class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center text-sm transition-colors">
                     <i class="fas fa-print mr-2"></i> Print All Filtered Reports
                 </button>
             </div>
@@ -606,9 +597,7 @@ try {
         </div>
         
         <!-- Modal Content -->
-        <div class="mb-4">
-            <p class="text-sm text-gray-600 mb-3">This report was submitted anonymously. Please enter your 4-digit PIN to view encrypted files.</p>
-            
+        <div class="mb-4">            
             <form id="pinForm" method="POST" action="">
                 <input type="hidden" id="pinReportId" name="report_id">
                 
@@ -619,7 +608,7 @@ try {
                             <input type="password" name="pin_code[]" 
                                    maxlength="1" 
                                    oninput="handleModalPinInput(this, <?php echo $i + 1; ?>)" 
-                                   onkeydown="handleModalPinKeydown(event, <?php echo $i + 1; ?>)" 
+                                   onkeydown="handleModalPinKeydown(event, <?php echo $i + 1; ?>)"
                                    class="pin-input w-12 h-12 text-center text-xl font-bold border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-1 focus:ring-blue-200 outline-none transition-colors"
                                    autocomplete="off">
                         <?php endfor; ?>
@@ -645,9 +634,6 @@ try {
 </div>
 
 <script>
-// Define base URL for AJAX calls
-const BASE_URL = '<?php echo defined("BASE_URL") ? BASE_URL : ""; ?>';
-
 // View Report Details
 function viewReportDetails(reportId) {
     // Show loading
@@ -695,7 +681,7 @@ function viewReportTimeline(reportId) {
     
     document.getElementById('reportDetailsModal').classList.remove('hidden');
     
-    const url = BASE_URL ? `${BASE_URL}/ajax/get_report_timeline.php?id=${reportId}` : `../ajax/get_report_timeline.php?id=${reportId}`;
+    const url = `../ajax/get_report_timeline.php?id=${reportId}`;
     
     fetch(url)
         .then(response => {
@@ -721,13 +707,17 @@ function viewReportTimeline(reportId) {
 
 // Print Report - Fixed to keep the print window open
 function printReport(reportId) {
+    // Show toast notification
     showToast('Opening print preview...', 'info');
-    const url = BASE_URL ? `${BASE_URL}/ajax/download_report.php?id=${reportId}&format=print` : `../ajax/download_report.php?id=${reportId}&format=print`;
     
-    // Open in new tab and focus
+    // Open print window
+    const url = `../ajax/download_report.php?id=${reportId}&format=print`;
     const printWindow = window.open(url, '_blank', 'width=800,height=600,scrollbars=yes,resizable=yes');
+    
     if (printWindow) {
         printWindow.focus();
+    } else {
+        showToast('Please allow popups to print', 'warning');
     }
 }
 
@@ -736,7 +726,7 @@ function printAllReports() {
     showToast('Preparing to print all reports...', 'info');
     
     // Build base URL
-    let url = BASE_URL ? `${BASE_URL}/ajax/export_reports.php?format=print` : `../ajax/export_reports.php?format=print`;
+    let url = `../ajax/export_reports.php?format=print`;
     
     // Add current filter parameters
     const status = document.querySelector('select[name="status"]').value;
@@ -753,6 +743,8 @@ function printAllReports() {
     const printWindow = window.open(url, '_blank', 'width=900,height=700,scrollbars=yes,resizable=yes');
     if (printWindow) {
         printWindow.focus();
+    } else {
+        showToast('Please allow popups to print', 'warning');
     }
 }
 
@@ -935,78 +927,37 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
     
-    // Force print buttons to be ALWAYS visible with multiple selectors
-    const printButtons = document.querySelectorAll('.print-btn, .print-permanent, .permanent-print-btn, .print-btn-always-visible');
-    printButtons.forEach(btn => {
-        btn.style.display = 'inline-block';
-        btn.style.visibility = 'visible';
-        btn.style.opacity = '1';
-        btn.style.position = 'static';
-        btn.style.zIndex = '10';
-        btn.style.pointerEvents = 'auto';
-        btn.style.cursor = 'pointer';
-        btn.classList.add('permanent-print-btn', 'print-btn-always-visible');
-    });
-    
-    // Add permanent visibility CSS that CANNOT be overridden
+    // Ensure print buttons are ALWAYS visible
     const style = document.createElement('style');
     style.textContent = `
-        /* PERMANENT PRINT BUTTONS - CANNOT BE OVERRIDDEN */
-        .permanent-print-btn,
-        .print-btn-always-visible,
-        button[onclick*="printReport"],
-        button[onclick*="printAllReports"],
-        .print-btn,
-        .print-permanent {
+        /* Print button permanent visibility */
+        .print-btn {
             display: inline-block !important;
             visibility: visible !important;
             opacity: 1 !important;
             position: static !important;
-            z-index: 10 !important;
-            pointer-events: auto !important;
-            cursor: pointer !important;
         }
         
-        /* Ensure no media query can hide print buttons */
-        @media print,
-               screen,
-               (max-width: 768px),
-               (max-width: 1024px),
-               (min-width: 320px) and (max-width: 480px),
-               (min-width: 481px) and (max-width: 768px),
-               (min-width: 769px) and (max-width: 1024px),
-               (min-width: 1025px) {
-            .permanent-print-btn,
-            .print-btn-always-visible,
-            button[onclick*="printReport"],
-            button[onclick*="printAllReports"],
-            .print-btn,
-            .print-permanent {
-                display: inline-block !important;
-                visibility: visible !important;
-                opacity: 1 !important;
-                position: static !important;
-            }
-        }
-        
-        /* Override any potential hiding */
-        .hidden,
-        .d-none,
-        [style*="display: none"],
-        [style*="visibility: hidden"],
-        [style*="opacity: 0"] {
+        /* Ensure buttons in table are visible */
+        table .print-btn {
             display: inline-block !important;
             visibility: visible !important;
             opacity: 1 !important;
         }
         
-        .permanent-print-btn.hidden,
-        .print-btn-always-visible.hidden,
-        .print-btn.hidden,
-        .print-permanent.hidden {
+        /* Ensure buttons in flex containers are visible */
+        .flex .print-btn {
             display: inline-block !important;
             visibility: visible !important;
             opacity: 1 !important;
+        }
+        
+        /* Override any Tailwind or other CSS that might hide buttons */
+        button.print-btn {
+            display: inline-block !important;
+            visibility: visible !important;
+            opacity: 1 !important;
+            position: static !important;
         }
     `;
     document.head.appendChild(style);
@@ -1036,56 +987,12 @@ document.addEventListener('DOMContentLoaded', function() {
 .status-referred { background-color: #ffedd5; color: #9a3412; }
 .status-closed { background-color: #f3f4f6; color: #374151; }
 
-/* PERMANENT PRINT BUTTON STYLES - MUST ALWAYS BE VISIBLE */
-.permanent-print-btn,
-.print-btn-always-visible,
-button[onclick*="printReport"],
-button[onclick*="printAllReports"],
-.print-btn,
-.print-permanent {
+/* Print button permanent visibility - HIGHEST PRIORITY */
+.print-btn {
     display: inline-block !important;
     visibility: visible !important;
     opacity: 1 !important;
     position: static !important;
-    z-index: 10 !important;
-    pointer-events: auto !important;
-    cursor: pointer !important;
-}
-
-/* Ensure these buttons are never hidden by any CSS */
-@media print,
-       screen,
-       (max-width: 768px),
-       (max-width: 1024px),
-       (min-width: 320px) and (max-width: 480px),
-       (min-width: 481px) and (max-width: 768px),
-       (min-width: 769px) and (max-width: 1024px),
-       (min-width: 1025px) {
-    .permanent-print-btn,
-    .print-btn-always-visible,
-    button[onclick*="printReport"],
-    button[onclick*="printAllReports"],
-    .print-btn,
-    .print-permanent {
-        display: inline-block !important;
-        visibility: visible !important;
-        opacity: 1 !important;
-        position: static !important;
-    }
-}
-
-/* Override any potential hiding classes */
-.hidden.permanent-print-btn,
-.hidden.print-btn-always-visible,
-.hidden.print-btn,
-.hidden.print-permanent,
-.d-none.permanent-print-btn,
-.d-none.print-btn-always-visible,
-.d-none.print-btn,
-.d-none.print-permanent {
-    display: inline-block !important;
-    visibility: visible !important;
-    opacity: 1 !important;
 }
 
 /* Animations */
@@ -1165,28 +1072,11 @@ button[onclick*="printAllReports"],
     .hidden.md\:block {
         display: none;
     }
-    
-    /* Print button in mobile view - MUST BE VISIBLE */
-    .permanent-print-btn,
-    .print-btn-always-visible {
-        display: inline-block !important;
-        visibility: visible !important;
-        width: 100% !important;
-        max-width: 100% !important;
-        margin: 2px 0 !important;
-    }
 }
 
 /* Print styles */
 @media print {
     .no-print {
-        display: none !important;
-    }
-    
-    .permanent-print-btn,
-    .print-btn-always-visible,
-    .print-btn,
-    .print-permanent {
         display: none !important;
     }
 }
@@ -1260,34 +1150,20 @@ button:hover {
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
-/* Print button hover - MUST STAY VISIBLE */
-.permanent-print-btn:hover,
-.print-btn-always-visible:hover,
-.print-btn:hover,
-.print-permanent:hover {
-    opacity: 0.9 !important;
-    transform: translateY(-1px) !important;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1) !important;
-}
-
-/* Force permanent visibility with high specificity */
-.permanent-print-btn,
-.permanent-print-btn.permanent-print-btn,
-body .permanent-print-btn,
-html body .permanent-print-btn,
-#content .permanent-print-btn,
-[class*="permanent-print-btn"] {
+/* Print button permanent visibility - FORCE VISIBLE */
+.print-btn {
     display: inline-block !important;
     visibility: visible !important;
     opacity: 1 !important;
     position: static !important;
 }
 
-/* Add visual indicator for permanent buttons */
-.permanent-print-btn::after,
-.print-btn-always-visible::after {
-    content: '🖨️';
-    margin-left: 2px;
-    font-size: 0.8em;
+/* Override any potential hiding */
+button.print-btn[style*="display: none"],
+button.print-btn[style*="visibility: hidden"],
+button.print-btn[style*="opacity: 0"] {
+    display: inline-block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
 }
 </style>

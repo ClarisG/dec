@@ -66,21 +66,25 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['submit_report'])) {
             
             // Handle PIN as single field or array
             $pin_code = '';
-            if (isset($_POST['pin_code'])) {
-                if (is_array($_POST['pin_code'])) {
-                    $pin_code = implode('', $_POST['pin_code']);
-                } else {
-                    $pin_code = trim($_POST['pin_code']);
+            $is_anonymous = isset($_POST['is_anonymous']) ? 1 : 0;
+            
+            // Only require PIN if not anonymous
+            if (!$is_anonymous) {
+                if (isset($_POST['pin_code'])) {
+                    if (is_array($_POST['pin_code'])) {
+                        $pin_code = implode('', $_POST['pin_code']);
+                    } else {
+                        $pin_code = trim($_POST['pin_code']);
+                    }
                 }
             }
             
-            $is_anonymous = isset($_POST['is_anonymous']) ? 1 : 0;
             $category = $_POST['category'] ?? 'incident';
             
             // Validate required fields
             if (empty($title) || empty($description) || empty($location) || empty($incident_date)) {
                 $error = "Please fill all required fields.";
-            } elseif (empty($pin_code) || strlen($pin_code) != 4 || !is_numeric($pin_code)) {
+            } elseif (!$is_anonymous && (empty($pin_code) || strlen($pin_code) != 4 || !is_numeric($pin_code))) {
                 $error = "PIN code must be 4 digits.";
             } elseif (empty($report_type_id)) {
                 $error = "Please select a report classification.";
@@ -116,37 +120,51 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['submit_report'])) {
                                     $_FILES['evidence_files']['size'][$i] <= 10 * 1024 * 1024) {
                                     
                                     if (move_uploaded_file($_FILES['evidence_files']['tmp_name'][$i], $file_path)) {
-                                        // Generate strong encryption key from PIN
-                                        $encryption_key = hash_pbkdf2("sha256", $pin_code, "LEIR_SALT", 10000, 32);
-                                        $iv = openssl_random_pseudo_bytes(16);
-                                        
-                                        // Encrypt file content
-                                        $file_content = file_get_contents($file_path);
-                                        $encrypted_content = openssl_encrypt(
-                                            $file_content,
-                                            'AES-256-CBC',
-                                            $encryption_key,
-                                            OPENSSL_RAW_DATA,
-                                            $iv
-                                        );
-                                        
-                                        // Save encrypted file
-                                        $encrypted_file_path = $upload_dir . 'encrypted_' . $file_name;
-                                        file_put_contents($encrypted_file_path, $encrypted_content . $iv);
-                                        
-                                        // Delete original unencrypted file
-                                        unlink($file_path);
-                                        
-                                        // Store file metadata
-                                        $evidence_files[] = [
-                                            'original_name' => $original_name,
-                                            'encrypted_name' => basename($encrypted_file_path),
-                                            'file_type' => $file_extension,
-                                            'file_size' => $_FILES['evidence_files']['size'][$i],
-                                            'encryption_key_hash' => hash('sha256', $encryption_key),
-                                            'original_hash' => hash('sha256', file_get_contents($_FILES['evidence_files']['tmp_name'][$i])),
-                                            'iv' => bin2hex($iv)
-                                        ];
+                                        // Only encrypt if not anonymous and PIN provided
+                                        if (!$is_anonymous && !empty($pin_code)) {
+                                            // Generate strong encryption key from PIN
+                                            $encryption_key = hash_pbkdf2("sha256", $pin_code, "LEIR_SALT", 10000, 32);
+                                            $iv = openssl_random_pseudo_bytes(16);
+                                            
+                                            // Encrypt file content
+                                            $file_content = file_get_contents($file_path);
+                                            $encrypted_content = openssl_encrypt(
+                                                $file_content,
+                                                'AES-256-CBC',
+                                                $encryption_key,
+                                                OPENSSL_RAW_DATA,
+                                                $iv
+                                            );
+                                            
+                                            // Save encrypted file
+                                            $encrypted_file_path = $upload_dir . 'encrypted_' . $file_name;
+                                            file_put_contents($encrypted_file_path, $encrypted_content . $iv);
+                                            
+                                            // Delete original unencrypted file
+                                            unlink($file_path);
+                                            
+                                            // Store file metadata
+                                            $evidence_files[] = [
+                                                'original_name' => $original_name,
+                                                'encrypted_name' => basename($encrypted_file_path),
+                                                'file_type' => $file_extension,
+                                                'file_size' => $_FILES['evidence_files']['size'][$i],
+                                                'encryption_key_hash' => hash('sha256', $encryption_key),
+                                                'original_hash' => hash('sha256', file_get_contents($_FILES['evidence_files']['tmp_name'][$i])),
+                                                'iv' => bin2hex($iv)
+                                            ];
+                                        } else {
+                                            // For anonymous reports, don't encrypt
+                                            $evidence_files[] = [
+                                                'original_name' => $original_name,
+                                                'encrypted_name' => basename($file_path),
+                                                'file_type' => $file_extension,
+                                                'file_size' => $_FILES['evidence_files']['size'][$i],
+                                                'encryption_key_hash' => null,
+                                                'original_hash' => hash('sha256', file_get_contents($file_path)),
+                                                'iv' => null
+                                            ];
+                                        }
                                     }
                                 } else {
                                     $error = "File '{$original_name}' is not allowed or too large (max 10MB).";
@@ -240,10 +258,15 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['submit_report'])) {
                         $history_stmt = $conn->prepare($history_query);
                         $history_stmt->execute([':report_id' => $report_id]);
                         
-                        $success = "Report submitted successfully!<br>
-                                    <strong>Report Number:</strong> $report_number<br>
-                                    <strong>PIN Code:</strong> $pin_code (Keep this safe for accessing encrypted files)<br>
-                                    <a href='?module=my-reports' class='text-blue-600 hover:underline'>View in My Reports</a>";
+                        if ($is_anonymous) {
+                            $success = "Report submitted successfully!<br>
+                                        <strong>Report Number:</strong> $report_number<br>
+                                        <a href='?module=my-reports' class='text-blue-600 hover:underline'>View in My Reports</a>";
+                        } else {
+                            $success = "Report submitted successfully!<br>
+                                        <strong>Report Number:</strong> $report_number<br>
+                                        <a href='?module=my-reports' class='text-blue-600 hover:underline'>View in My Reports</a>";
+                        }
                         
                         // Clear form
                         $_POST = array();
@@ -498,36 +521,14 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['submit_report'])) {
                     <div>
                         <div class="flex items-center">
                             <input type="checkbox" id="incident_is_anonymous" name="is_anonymous" value="1" 
-                                   class="h-5 w-5 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                                   class="h-5 w-5 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                                   onchange="togglePinCodeVisibility('incident', this.checked)">
                             <label for="incident_is_anonymous" class="ml-3 block text-sm font-medium text-gray-700">
                                 Submit anonymously
                             </label>
                         </div>
                         <p class="text-sm text-gray-500 mt-2 ml-8">
-                            Your name will not be visible to the public.
-                        </p>
-                    </div>
-                    
-                    <!-- PIN Code -->
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">
-                            <span class="text-red-500">*</span> 4-Digit Security PIN
-                        </label>
-                        <p class="text-sm text-gray-500 mb-3">This PIN will be used to encrypt your files.</p>
-                        
-                        <div class="flex space-x-3 mb-3">
-                            <?php for ($i = 0; $i < 4; $i++): ?>
-                                <input type="password" name="pin_code[]" 
-                                       maxlength="1" 
-                                       oninput="handlePinInput(this, <?php echo $i + 1; ?>)" 
-                                       onkeydown="handlePinKeydown(event, <?php echo $i + 1; ?>)" 
-                                       onpaste="handlePinPaste(event)"
-                                       class="pin-input w-14 h-14 text-center text-2xl font-bold border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none"
-                                       autocomplete="off" required>
-                            <?php endfor; ?>
-                        </div>
-                        <p class="text-xs text-gray-500 text-center">
-                            Enter a 4-digit PIN. You'll need this to access your encrypted files.
+                            Your name will not be visible to the public. PIN code not required.
                         </p>
                     </div>
                 </div>
@@ -690,43 +691,21 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['submit_report'])) {
                 </div>
             </div>
             
-            <!-- Anonymous Option & PIN -->
+            <!-- Anonymous Option -->
             <div class="bg-gray-50 rounded-xl p-6 mb-6">
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <!-- Anonymous Option -->
                     <div>
                         <div class="flex items-center">
                             <input type="checkbox" id="complaint_is_anonymous" name="is_anonymous" value="1" 
-                                   class="h-5 w-5 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                                   class="h-5 w-5 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                                   onchange="togglePinCodeVisibility('complaint', this.checked)">
                             <label for="complaint_is_anonymous" class="ml-3 block text-sm font-medium text-gray-700">
                                 Submit anonymously
                             </label>
                         </div>
                         <p class="text-sm text-gray-500 mt-2 ml-8">
-                            Your name will not be visible to the public.
-                        </p>
-                    </div>
-                    
-                    <!-- PIN Code -->
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">
-                            <span class="text-red-500">*</span> 4-Digit Security PIN
-                        </label>
-                        <p class="text-sm text-gray-500 mb-3">This PIN will be used to encrypt your files.</p>
-                        
-                        <div class="flex space-x-3 mb-3">
-                            <?php for ($i = 0; $i < 4; $i++): ?>
-                                <input type="password" name="pin_code[]" 
-                                       maxlength="1" 
-                                       oninput="handlePinInput(this, <?php echo $i + 1; ?>)" 
-                                       onkeydown="handlePinKeydown(event, <?php echo $i + 1; ?>)" 
-                                       onpaste="handlePinPaste(event)"
-                                       class="pin-input w-14 h-14 text-center text-2xl font-bold border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none"
-                                       autocomplete="off" required>
-                            <?php endfor; ?>
-                        </div>
-                        <p class="text-xs text-gray-500 text-center">
-                            Enter a 4-digit PIN. You'll need this to access your encrypted files.
+                            Your name will not be visible to the public. PIN code not required.
                         </p>
                     </div>
                 </div>
@@ -889,14 +868,15 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['submit_report'])) {
                 </div>
             </div>
             
-            <!-- Anonymous Option & PIN -->
+            <!-- Anonymous Option -->
             <div class="bg-gray-50 rounded-xl p-6 mb-6">
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <!-- Anonymous Option -->
                     <div>
                         <div class="flex items-center">
                             <input type="checkbox" id="blotter_is_anonymous" name="is_anonymous" value="1" 
-                                   class="h-5 w-5 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                                   class="h-5 w-5 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                                   onchange="togglePinCodeVisibility('blotter', this.checked)">
                             <label for="blotter_is_anonymous" class="ml-3 block text-sm font-medium text-gray-700">
                                 Submit anonymously
                             </label>
@@ -906,28 +886,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['submit_report'])) {
                         </p>
                     </div>
                     
-                    <!-- PIN Code -->
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">
-                            <span class="text-red-500">*</span> 4-Digit Security PIN
-                        </label>
-                        <p class="text-sm text-gray-500 mb-3">This PIN will be used to encrypt your files.</p>
-                        
-                        <div class="flex space-x-3 mb-3">
-                            <?php for ($i = 0; $i < 4; $i++): ?>
-                                <input type="password" name="pin_code[]" 
-                                       maxlength="1" 
-                                       oninput="handlePinInput(this, <?php echo $i + 1; ?>)" 
-                                       onkeydown="handlePinKeydown(event, <?php echo $i + 1; ?>)" 
-                                       onpaste="handlePinPaste(event)"
-                                       class="pin-input w-14 h-14 text-center text-2xl font-bold border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none"
-                                       autocomplete="off" required>
-                            <?php endfor; ?>
-                        </div>
-                        <p class="text-xs text-gray-500 text-center">
-                            Enter a 4-digit PIN. You'll need this to access your encrypted files.
-                        </p>
-                    </div>
                 </div>
             </div>
             
@@ -1051,6 +1009,29 @@ tabs.forEach(tab => {
         }
     });
 });
+
+// Toggle PIN code visibility based on anonymous checkbox
+function togglePinCodeVisibility(formType, isAnonymous) {
+    const pinSection = document.getElementById(formType + 'PinSection');
+    const pinInputs = document.querySelectorAll(`#${formType}Form .pin-input`);
+    
+    if (pinSection) {
+        if (isAnonymous) {
+            pinSection.classList.add('hidden');
+            // Clear PIN inputs
+            pinInputs.forEach(input => {
+                input.value = '';
+                input.required = false;
+            });
+        } else {
+            pinSection.classList.remove('hidden');
+            // Require PIN inputs
+            pinInputs.forEach(input => {
+                input.required = true;
+            });
+        }
+    }
+}
 
 // AI Analysis Functions
 let analysisTimeouts = {};
@@ -1820,16 +1801,22 @@ function handlePinPaste(event) {
 // Form validation
 document.querySelectorAll('form').forEach(form => {
     form.addEventListener('submit', function(e) {
-        // Validate PIN
-        const pinInputs = this.querySelectorAll('input[name="pin_code[]"]');
-        let fullPin = '';
-        pinInputs.forEach(input => fullPin += input.value);
+        // Check if anonymous
+        const anonymousCheckbox = this.querySelector('input[name="is_anonymous"]');
+        const isAnonymous = anonymousCheckbox ? anonymousCheckbox.checked : false;
         
-        if (fullPin.length !== 4 || !/^\d{4}$/.test(fullPin)) {
-            e.preventDefault();
-            showToast('Please enter a valid 4-digit PIN code.', 'error');
-            pinInputs[0].focus();
-            return;
+        // Validate PIN only if not anonymous
+        if (!isAnonymous) {
+            const pinInputs = this.querySelectorAll('input[name="pin_code[]"]');
+            let fullPin = '';
+            pinInputs.forEach(input => fullPin += input.value);
+            
+            if (fullPin.length !== 4 || !/^\d{4}$/.test(fullPin)) {
+                e.preventDefault();
+                showToast('Please enter a valid 4-digit PIN code.', 'error');
+                pinInputs[0].focus();
+                return;
+            }
         }
         
         // Validate report type is selected
@@ -1903,6 +1890,14 @@ document.addEventListener('DOMContentLoaded', function() {
                 charCount.textContent = this.value.length;
             });
         }
+    });
+    
+    // Initialize anonymous checkbox listeners
+    document.querySelectorAll('input[name="is_anonymous"]').forEach(checkbox => {
+        const formType = checkbox.id.replace('_is_anonymous', '').toLowerCase();
+        checkbox.addEventListener('change', function() {
+            togglePinCodeVisibility(formType, this.checked);
+        });
     });
 });
 </script>
