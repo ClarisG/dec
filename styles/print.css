@@ -1,0 +1,114 @@
+@media print {
+    @page {
+        margin: 0.5in;
+        size: portrait;
+    }
+    
+    body {
+        font-family: "Times New Roman", Times, serif;
+        line-height: 1.4;
+        color: #000;
+        background: #fff;
+    }
+    
+    .print-header {
+        background: linear-gradient(to right, #1e40af, #3b82f6);
+        color: white;
+        padding: 20px;
+        border-radius: 8px;
+        margin-bottom: 30px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .header-title {
+        font-size: 28px;
+        font-weight: bold;
+        margin: 0;
+        letter-spacing: 1px;
+    }
+    
+    .header-subtitle {
+        font-size: 18px;
+        margin: 5px 0 0 0;
+        opacity: 0.9;
+    }
+    
+    .info-row {
+        display: flex;
+        margin-bottom: 8px;
+        align-items: baseline;
+    }
+    
+    .info-label {
+        font-weight: bold;
+        min-width: 150px;
+        color: #1e40af;
+    }
+    
+    .info-value {
+        flex: 1;
+        border-bottom: 1px dotted #ccc;
+        padding-bottom: 2px;
+    }
+    
+    .section-title {
+        background: linear-gradient(to right, #f3f4f6, #e5e7eb);
+        padding: 10px 15px;
+        font-weight: bold;
+        color: #1e40af;
+        border-left: 4px solid #1e40af;
+        margin: 20px 0 15px 0;
+        border-radius: 4px;
+    }
+    
+    .attachment-item {
+        break-inside: avoid;
+        margin-bottom: 15px;
+    }
+    
+    .attachment-preview {
+        max-width: 100%;
+        height: auto;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+    }
+    
+    .timeline-item {
+        break-inside: avoid;
+        margin-bottom: 20px;
+        padding-left: 20px;
+        border-left: 3px solid #3b82f6;
+        position: relative;
+    }
+    
+    .timeline-item::before {
+        content: "";
+        position: absolute;
+        left: -8px;
+        top: 0;
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        background: #3b82f6;
+        border: 3px solid white;
+        box-shadow: 0 0 0 3px #3b82f6;
+    }
+    
+    .no-print {
+        display: none !important;
+    }
+    
+    a {
+        color: #000 !important;
+        text-decoration: none !important;
+    }
+    
+    img {
+        max-width: 100% !important;
+        height: auto !important;
+    }
+    
+    .page-break {
+        page-break-before: always;
+    }
+}

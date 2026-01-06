@@ -1,0 +1,5 @@
+# .htaccess in ajax directory
+<Files "get_ai_suggestions.php">
+    Order Allow,Deny
+    Allow from all
+</Files>
