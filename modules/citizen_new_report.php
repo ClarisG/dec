@@ -84,8 +84,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['submit_report'])) {
             // Validate required fields
             if (empty($title) || empty($description) || empty($location) || empty($incident_date)) {
                 $error = "Please fill all required fields.";
-            } elseif (!$is_anonymous && (empty($pin_code) || strlen($pin_code) != 4 || !is_numeric($pin_code))) {
-                $error = "PIN code must be 4 digits.";
             } elseif (empty($report_type_id)) {
                 $error = "Please select a report classification.";
             } else {
@@ -528,8 +526,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['submit_report'])) {
                             </label>
                         </div>
                         <p class="text-sm text-gray-500 mt-2 ml-8">
-                            Your name will not be visible to the public. PIN code not required.
-                        </p>
+                            Your name will not be visible to the public.
                     </div>
                 </div>
             </div>
@@ -705,7 +702,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['submit_report'])) {
                             </label>
                         </div>
                         <p class="text-sm text-gray-500 mt-2 ml-8">
-                            Your name will not be visible to the public. PIN code not required.
+                            Your name will not be visible to the public.
                         </p>
                     </div>
                 </div>
@@ -1810,13 +1807,6 @@ document.querySelectorAll('form').forEach(form => {
             const pinInputs = this.querySelectorAll('input[name="pin_code[]"]');
             let fullPin = '';
             pinInputs.forEach(input => fullPin += input.value);
-            
-            if (fullPin.length !== 4 || !/^\d{4}$/.test(fullPin)) {
-                e.preventDefault();
-                showToast('Please enter a valid 4-digit PIN code.', 'error');
-                pinInputs[0].focus();
-                return;
-            }
         }
         
         // Validate report type is selected

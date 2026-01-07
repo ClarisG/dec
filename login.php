@@ -9,7 +9,7 @@ require_once 'config/database.php';
 function redirectUser($role) {
     switch($role) {
         case 'citizen': header("Location: citizen_dashboard.php"); exit;
-        case 'tanod': header("Location: tanod_dashboard.php"); exit;
+        case 'tanod': header("Location: tanod/tanod_dashboard.php"); exit;
         case 'secretary': header("Location: sec/secretary_dashboard.php"); exit;
         case 'captain': header("Location: captain/captain_dashboard.php"); exit;
         case 'admin': header("Location: admin/admin_dashboard.php"); exit;
@@ -27,21 +27,35 @@ $error = '';
 $success = '';
 $showPinModal = false;
 
+// Debug: Check what's in POST
+error_log("=== LOGIN DEBUG START ===");
+error_log("POST data: " . print_r($_POST, true));
+error_log("SERVER REQUEST METHOD: " . $_SERVER['REQUEST_METHOD']);
+error_log("=== LOGIN DEBUG END ===");
+
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
+    error_log("Processing POST request");
+    
     try {
         $conn = getDbConnection();
         
-        if (isset($_POST['verify_pin'])) {
+        // Check if this is a PIN verification request
+        if (isset($_POST['verify_pin']) && $_POST['verify_pin'] == '1') {
+            error_log("Processing PIN verification");
             // Master code verification process
             $entered_code = isset($_POST['pin']) ? trim($_POST['pin']) : '';
             $tempUserId = isset($_POST['temp_user_id']) ? $_POST['temp_user_id'] : '';
             
+            error_log("Entered PIN: $entered_code, Temp User ID: $tempUserId");
+            
             if (empty($entered_code)) {
                 $error = "Please enter your 4-digit Master Code.";
                 $showPinModal = true;
+                error_log("PIN is empty");
             } else if (strlen($entered_code) != 4 || !is_numeric($entered_code)) {
                 $error = "Master Code must be a 4-digit number.";
                 $showPinModal = true;
+                error_log("Invalid PIN format: $entered_code");
             } else {
                 // Get user data from database to verify master code
                 $query = "SELECT * FROM users WHERE id = :id";
@@ -52,9 +66,15 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 if ($stmt->rowCount() == 1) {
                     $user = $stmt->fetch(PDO::FETCH_ASSOC);
                     
-                    // Verify master code
-                    if (!empty($user['master_code']) && $entered_code === $user['master_code']) {
+                    error_log("User found for PIN verification: " . $user['username']);
+                    error_log("Stored master code: " . $user['master_code']);
+                    error_log("Master code used status: " . $user['is_master_code_used']);
+                    
+                    // Verify master code - use loose comparison
+                    if (!empty($user['master_code']) && $entered_code == $user['master_code']) {
                         // Master code is correct
+                        error_log("PIN verification successful!");
+                        
                         $_SESSION['user_id'] = $user['id'];
                         $_SESSION['username'] = $user['username'];
                         $_SESSION['email'] = $user['email'];
@@ -75,13 +95,17 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                         $update_stmt->bindParam(':id', $user['id']);
                         $update_stmt->execute();
                         
-                        // Also update barangay_personnel_registrations
-                        $update_reg_query = "UPDATE barangay_personnel_registrations 
-                                            SET master_code_used = 1, master_code_used_at = NOW() 
-                                            WHERE user_id = :user_id";
-                        $update_reg_stmt = $conn->prepare($update_reg_query);
-                        $update_reg_stmt->bindParam(':user_id', $user['id']);
-                        $update_reg_stmt->execute();
+                        // Also update barangay_personnel_registrations if exists
+                        try {
+                            $update_reg_query = "UPDATE barangay_personnel_registrations 
+                                                SET master_code_used = 1, master_code_used_at = NOW() 
+                                                WHERE user_id = :user_id";
+                            $update_reg_stmt = $conn->prepare($update_reg_query);
+                            $update_reg_stmt->bindParam(':user_id', $user['id']);
+                            $update_reg_stmt->execute();
+                        } catch(Exception $e) {
+                            error_log("Could not update barangay_personnel_registrations: " . $e->getMessage());
+                        }
                         
                         // Redirect to appropriate dashboard
                         redirectUser($user['role']);
@@ -89,46 +113,99 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                         $error = "Invalid Master Code. Please try again.";
                         $showPinModal = true;
                         $_SESSION['temp_user_id'] = $tempUserId;
+                        error_log("Invalid PIN entered");
                     }
                 } else {
                     $error = "User not found. Please login again.";
                     unset($_SESSION['temp_user_id']);
+                    error_log("User not found for ID: $tempUserId");
                 }
             }
         } else {
-            // Regular login process - FIXED: Check if fields exist
+            // Regular login process
+            error_log("Processing regular login");
+            
+            // Get username/email and password from POST
             $username = isset($_POST['username']) ? trim($_POST['username']) : '';
             $password = isset($_POST['password']) ? trim($_POST['password']) : '';
             
+            error_log("Username input: " . ($username ?: 'EMPTY'));
+            error_log("Password input: " . ($password ? 'PROVIDED' : 'EMPTY'));
+            
+            // Basic validation
             if (empty($username) || empty($password)) {
-                $error = "Please enter both username and password.";
+                $error = "Please enter both username/email and password.";
+                error_log("Validation failed - empty fields");
             } else {
-                // FIXED: Use different parameter names for username and email
+                // Check if user exists with username or email
                 $query = "SELECT * FROM users WHERE (username = :username OR email = :email)";
                 $stmt = $conn->prepare($query);
                 $stmt->bindParam(':username', $username);
-                $stmt->bindParam(':email', $username); // Same value for both
+                $stmt->bindParam(':email', $username);
                 
                 if ($stmt->execute()) {
+                    error_log("Query executed successfully");
+                    
                     if ($stmt->rowCount() == 1) {
                         $user = $stmt->fetch(PDO::FETCH_ASSOC);
                         
+                        error_log("User found: ID=" . $user['id'] . ", Username=" . $user['username'] . ", Email=" . $user['email'] . ", Role=" . $user['role'] . ", Status=" . $user['status']);
+                        error_log("User password hash: " . $user['password']);
+                        
                         // Verify password
                         if (password_verify($password, $user['password'])) {
-                            // FIXED: Allow both 'active' and 'pending' status for personnel
+                            error_log("Password verification successful!");
+                            
+                            // Allow both 'active' and 'pending' status for personnel
                             if ($user['is_active'] && ($user['status'] == 'active' || $user['status'] == 'pending')) {
                                 // Check if user is personnel (requires master code)
                                 $personnel_roles = ['tanod', 'secretary', 'admin', 'captain'];
                                 
                                 if (in_array($user['role'], $personnel_roles)) {
-                                    // Store user data temporarily for master code verification
-                                    $_SESSION['temp_user_id'] = $user['id'];
-                                    $_SESSION['temp_role'] = $user['role'];
-                                    $_SESSION['temp_username'] = $user['username'];
-                                    $_SESSION['temp_name'] = $user['first_name'] . ' ' . $user['last_name'];
-                                    $showPinModal = true;
+                                    error_log("User is personnel with role: " . $user['role']);
+                                    error_log("Master code in DB: " . ($user['master_code'] ?: 'NOT SET'));
+                                    error_log("Master code used: " . $user['is_master_code_used']);
+                                    
+                                    // Check if user has a master code and hasn't used it yet
+                                    if (!empty($user['master_code']) && $user['is_master_code_used'] == 0) {
+                                        // Store user data temporarily for master code verification
+                                        $_SESSION['temp_user_id'] = $user['id'];
+                                        $_SESSION['temp_role'] = $user['role'];
+                                        $_SESSION['temp_username'] = $user['username'];
+                                        $_SESSION['temp_name'] = $user['first_name'] . ' ' . $user['last_name'];
+                                        $showPinModal = true;
+                                        error_log("Showing PIN modal for personnel");
+                                    } else if (!empty($user['master_code']) && $user['is_master_code_used'] == 1) {
+                                        // Master code already used, proceed to login
+                                        error_log("Master code already used, logging in directly");
+                                        
+                                        $_SESSION['user_id'] = $user['id'];
+                                        $_SESSION['username'] = $user['username'];
+                                        $_SESSION['email'] = $user['email'];
+                                        $_SESSION['first_name'] = $user['first_name'];
+                                        $_SESSION['last_name'] = $user['last_name'];
+                                        $_SESSION['role'] = $user['role'];
+                                        $_SESSION['barangay'] = $user['barangay'];
+                                        $_SESSION['phone'] = $user['contact_number'];
+                                        $_SESSION['master_code_verified'] = true;
+                                        
+                                        // Update last login
+                                        $update_query = "UPDATE users SET last_login = NOW() WHERE id = :id";
+                                        $update_stmt = $conn->prepare($update_query);
+                                        $update_stmt->bindParam(':id', $user['id']);
+                                        $update_stmt->execute();
+                                        
+                                        // Redirect based on role
+                                        redirectUser($user['role']);
+                                    } else {
+                                        // No master code set
+                                        $error = "No master code assigned. Please contact administrator.";
+                                        error_log("No master code assigned for personnel");
+                                    }
                                 } else {
                                     // Set session variables for citizens (no master code required)
+                                    error_log("User is citizen, logging in directly");
+                                    
                                     $_SESSION['user_id'] = $user['id'];
                                     $_SESSION['username'] = $user['username'];
                                     $_SESSION['email'] = $user['email'];
@@ -148,7 +225,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                                     redirectUser($user['role']);
                                 }
                             } else {
-                                // Provide more specific error message
+                                // Account is not active or pending
                                 if (!$user['is_active']) {
                                     $error = "Your account is deactivated. Please contact the administrator.";
                                 } elseif ($user['status'] != 'active' && $user['status'] != 'pending') {
@@ -156,15 +233,19 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                                 } else {
                                     $error = "Your account is not active. Please contact the administrator.";
                                 }
+                                error_log("Account not active: is_active=" . $user['is_active'] . ", status=" . $user['status']);
                             }
                         } else {
-                            $error = "Invalid username or password.";
+                            $error = "Invalid username/email or password.";
+                            error_log("Password verification failed");
                         }
                     } else {
-                        $error = "Invalid username or password.";
+                        $error = "Invalid username/email or password.";
+                        error_log("No user found with username/email: $username");
                     }
                 } else {
                     $error = "Something went wrong. Please try again.";
+                    error_log("Database query execution failed");
                 }
             }
         }
@@ -174,6 +255,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         error_log("Login Error: " . $e->getMessage());
     }
 }
+
+// If we get here, show the login form
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -827,6 +910,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             
             <form id="pinForm" method="POST" action="">
                 <input type="hidden" name="temp_user_id" value="<?php echo isset($_SESSION['temp_user_id']) ? $_SESSION['temp_user_id'] : ''; ?>">
+                <input type="hidden" name="verify_pin" value="1">
                 
                 <div class="pin-input-group">
                     <input type="text" name="pin[]" class="pin-input" maxlength="1" pattern="[0-9]" inputmode="numeric" required autofocus>
@@ -844,7 +928,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     </div>
                 <?php endif; ?>
                 
-                <button type="submit" name="verify_pin" class="btn-pin">
+                <button type="submit" class="btn-pin">
                     <i class="fas fa-lock"></i> Verify Master Code
                 </button>
                 

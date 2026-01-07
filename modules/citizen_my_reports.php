@@ -9,19 +9,17 @@ if (session_status() === PHP_SESSION_NONE) {
 require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/../config/functions.php';
 
-// Get base URL without redefining it
+// Get base URL
 if (!defined('BASE_URL')) {
-    if (file_exists(__DIR__ . '/../config/base_url.php')) {
-        require_once __DIR__ . '/../config/base_url.php';
-    } else {
-        // Fallback base URL
-        $protocol = isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" : "http";
-        $host = $_SERVER['HTTP_HOST'];
-        $base_path = rtrim(dirname($_SERVER['SCRIPT_NAME']), '/');
-        $base_url = $protocol . "://" . $host . $base_path;
-        define('BASE_URL', rtrim($base_url, '/'));
-    }
+    $protocol = isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" : "http";
+    $host = $_SERVER['HTTP_HOST'];
+    $script_path = dirname($_SERVER['SCRIPT_NAME']);
+    $base_path = rtrim(str_replace('/modules', '', $script_path), '/');
+    define('BASE_URL', $protocol . "://" . $host . $base_path);
 }
+
+// Define AJAX URL
+define('AJAX_URL', BASE_URL . '/ajax/');
 
 $user_id = $_SESSION['user_id'] ?? null;
 if (!$user_id) {
@@ -55,6 +53,17 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['enter_pin'])) {
         $report_stmt->execute([':id' => $report_id, ':user_id' => $user_id]);
         $report = $report_stmt->fetch(PDO::FETCH_ASSOC);
         
+        if ($report) {
+            // Check PIN
+            if ($report['pin_code'] == $pin_code) {
+                $_SESSION['decrypted_reports'][$report_id] = true;
+                $success = "PIN verified. You can now view the decrypted files.";
+            } else {
+                $error = "Incorrect PIN. Please try again.";
+            }
+        } else {
+            $error = "Report not found or is not anonymous.";
+        }
     } catch(PDOException $e) {
         $error = "Database error: " . $e->getMessage();
     }
@@ -350,7 +359,7 @@ try {
             <!-- Reports List - Mobile View -->
             <div class="md:hidden">
                 <div class="divide-y divide-gray-200">
-                    <?php foreach ($reports as $report): ?>
+                    <?php foreach ($reports as $index => $report): ?>
                         <?php
                         // Determine status colors
                         $status_colors = [
@@ -368,7 +377,7 @@ try {
                         $created_date = date('M d, Y', strtotime($report['created_at']));
                         ?>
                         
-                        <div class="p-4">
+                        <div class="p-4" data-report-id="<?php echo $report['id']; ?>">
                             <div class="flex justify-between items-start mb-2">
                                 <div class="flex-1">
                                     <h4 class="font-medium text-gray-900 text-sm">
@@ -396,19 +405,18 @@ try {
                                 </div>
                             </div>
                             
-                            <!-- Mobile Actions -->
+                            <!-- Mobile Actions - PRINT BUTTON ALWAYS VISIBLE -->
                             <div class="flex space-x-2">
                                 <button onclick="viewReportDetails(<?php echo $report['id']; ?>); return false;" 
-                                        class="flex-1 px-3 py-1.5 bg-blue-50 text-blue-700 rounded text-xs hover:bg-blue-100">
+                                        class="flex-1 px-3 py-1.5 bg-blue-50 text-blue-700 rounded text-xs hover:bg-blue-100 print-action-btn">
                                     <i class="fas fa-eye mr-1"></i> View
                                 </button>
                                 <button onclick="viewReportTimeline(<?php echo $report['id']; ?>); return false;" 
-                                        class="flex-1 px-3 py-1.5 bg-gray-50 text-gray-700 rounded text-xs hover:bg-gray-100">
+                                        class="flex-1 px-3 py-1.5 bg-gray-50 text-gray-700 rounded text-xs hover:bg-gray-100 print-action-btn">
                                     <i class="fas fa-history mr-1"></i> Timeline
                                 </button>
                                 <button onclick="printReport(<?php echo $report['id']; ?>); return false;" 
-                                        class="flex-1 px-3 py-1.5 bg-green-50 text-green-700 rounded text-xs hover:bg-green-100 print-btn"
-                                        style="display: inline-block !important; visibility: visible !important; opacity: 1 !important;">
+                                        class="flex-1 px-3 py-1.5 bg-green-500 text-white rounded text-xs hover:bg-green-600 print-action-btn print-permanent print-button-fixed">
                                     <i class="fas fa-print mr-1"></i> Print
                                 </button>
                             </div>
@@ -429,7 +437,7 @@ try {
                         </tr>
                     </thead>
                     <tbody class="bg-white divide-y divide-gray-200">
-                        <?php foreach ($reports as $report): ?>
+                        <?php foreach ($reports as $index => $report): ?>
                             <?php
                             // Determine status colors
                             $status_colors = [
@@ -522,20 +530,19 @@ try {
                                     <div class="text-xs text-gray-500"><?php echo $created_time; ?></div>
                                 </td>
                                 
-                                <!-- Actions -->
+                                <!-- Actions - PRINT BUTTON ALWAYS VISIBLE -->
                                 <td class="px-4 py-4 whitespace-nowrap text-sm font-medium">
                                     <div class="flex space-x-2">
                                         <button onclick="viewReportDetails(<?php echo $report['id']; ?>); return false;" 
-                                                class="px-3 py-1.5 bg-blue-50 text-blue-700 rounded text-xs hover:bg-blue-100 transition-colors">
+                                                class="px-3 py-1.5 bg-blue-50 text-blue-700 rounded text-xs hover:bg-blue-100 transition-colors print-action-btn">
                                             <i class="fas fa-eye mr-1"></i> View
                                         </button>
                                         <button onclick="viewReportTimeline(<?php echo $report['id']; ?>); return false;" 
-                                                class="px-3 py-1.5 bg-gray-50 text-gray-700 rounded text-xs hover:bg-gray-100 transition-colors">
+                                                class="px-3 py-1.5 bg-gray-50 text-gray-700 rounded text-xs hover:bg-gray-100 transition-colors print-action-btn">
                                             <i class="fas fa-history mr-1"></i> Timeline
                                         </button>
                                         <button onclick="printReport(<?php echo $report['id']; ?>); return false;" 
-                                                class="px-3 py-1.5 bg-green-50 text-green-700 rounded text-xs hover:bg-green-100 transition-colors print-btn"
-                                                style="display: inline-block !important; visibility: visible !important; opacity: 1 !important;">
+                                                class="px-3 py-1.5 bg-green-500 text-white rounded text-xs hover:bg-green-600 transition-colors print-action-btn print-permanent print-button-fixed">
                                             <i class="fas fa-print mr-1"></i> Print
                                         </button>
                                     </div>
@@ -558,7 +565,7 @@ try {
             </div>
             <div class="flex space-x-3">
                 <button type="button" onclick="printAllReports()"
-                        class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center text-sm transition-colors">
+                        class="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 flex items-center text-sm transition-colors print-action-btn print-button-fixed">
                     <i class="fas fa-print mr-2"></i> Print All Filtered Reports
                 </button>
             </div>
@@ -597,7 +604,9 @@ try {
         </div>
         
         <!-- Modal Content -->
-        <div class="mb-4">            
+        <div class="mb-4">
+            <p class="text-sm text-gray-600 mb-3">This report was submitted anonymously. Please enter your 4-digit PIN to view encrypted files.</p>
+            
             <form id="pinForm" method="POST" action="">
                 <input type="hidden" id="pinReportId" name="report_id">
                 
@@ -634,38 +643,49 @@ try {
 </div>
 
 <script>
+// Global variables
+const BASE_URL = "<?php echo BASE_URL; ?>";
+const AJAX_URL = "<?php echo AJAX_URL; ?>";
+
 // View Report Details
 function viewReportDetails(reportId) {
     // Show loading
     document.getElementById('modalContent').innerHTML = `
         <div class="flex justify-center items-center h-48">
             <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600"></div>
+            <span class="ml-3 text-gray-600">Loading report details...</span>
         </div>
     `;
     
     // Show modal
     document.getElementById('reportDetailsModal').classList.remove('hidden');
+    document.getElementById('modalTitle').textContent = 'Report Details';
     
     // Load report details via AJAX
-    const url = `../ajax/get_report_details.php?id=${reportId}`;
+    const url = `${AJAX_URL}get_report_details.php?id=${reportId}`;
     
     fetch(url)
         .then(response => {
             if (!response.ok) {
-                throw new Error('Network response was not ok');
+                throw new Error(`HTTP error! Status: ${response.status}`);
             }
             return response.text();
         })
         .then(html => {
             document.getElementById('modalContent').innerHTML = html;
+            // Initialize any interactive elements in the loaded content
+            initModalContent();
         })
         .catch(error => {
-            console.error('Error:', error);
+            console.error('Error loading report details:', error);
             document.getElementById('modalContent').innerHTML = `
                 <div class="text-center p-6">
                     <i class="fas fa-exclamation-circle text-red-500 text-3xl mb-3"></i>
                     <p class="text-gray-700">Error loading report details. Please try again.</p>
                     <p class="text-sm text-gray-500 mt-1">${error.message}</p>
+                    <button onclick="viewReportDetails(${reportId})" class="mt-3 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+                        Retry
+                    </button>
                 </div>
             `;
         });
@@ -676,17 +696,19 @@ function viewReportTimeline(reportId) {
     document.getElementById('modalContent').innerHTML = `
         <div class="flex justify-center items-center h-48">
             <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600"></div>
+            <span class="ml-3 text-gray-600">Loading timeline...</span>
         </div>
     `;
     
     document.getElementById('reportDetailsModal').classList.remove('hidden');
+    document.getElementById('modalTitle').textContent = 'Report Timeline';
     
-    const url = `../ajax/get_report_timeline.php?id=${reportId}`;
+    const url = `${AJAX_URL}get_report_timeline.php?id=${reportId}`;
     
     fetch(url)
         .then(response => {
             if (!response.ok) {
-                throw new Error('Network response was not ok');
+                throw new Error(`HTTP error! Status: ${response.status}`);
             }
             return response.text();
         })
@@ -694,63 +716,151 @@ function viewReportTimeline(reportId) {
             document.getElementById('modalContent').innerHTML = html;
         })
         .catch(error => {
-            console.error('Error:', error);
+            console.error('Error loading timeline:', error);
             document.getElementById('modalContent').innerHTML = `
                 <div class="text-center p-6">
                     <i class="fas fa-exclamation-circle text-red-500 text-3xl mb-3"></i>
                     <p class="text-gray-700">Error loading timeline.</p>
                     <p class="text-sm text-gray-500 mt-1">${error.message}</p>
+                    <button onclick="viewReportTimeline(${reportId})" class="mt-3 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+                        Retry
+                    </button>
                 </div>
             `;
         });
 }
 
-// Print Report - Fixed to keep the print window open
+// Print Report - Enhanced with multiple fallbacks
 function printReport(reportId) {
     // Show toast notification
     showToast('Opening print preview...', 'info');
     
-    // Open print window
-    const url = `../ajax/download_report.php?id=${reportId}&format=print`;
-    const printWindow = window.open(url, '_blank', 'width=800,height=600,scrollbars=yes,resizable=yes');
+    // Store current scroll position
+    const scrollPosition = window.pageYOffset;
     
-    if (printWindow) {
-        printWindow.focus();
-    } else {
-        showToast('Please allow popups to print', 'warning');
+    // Method 1: Try to open in new window first
+    const url = `${AJAX_URL}download_report.php?id=${reportId}&format=print&_=${Date.now()}`;
+    
+    try {
+        // First check if popups are allowed
+        const printWindow = window.open('', '_blank', 'width=1200,height=800');
+        
+        if (printWindow) {
+            printWindow.location.href = url;
+            printWindow.focus();
+            
+            // Add event listener to handle when the print window closes
+            const checkWindow = setInterval(() => {
+                try {
+                    if (printWindow.closed) {
+                        clearInterval(checkWindow);
+                        showToast('Print window closed', 'info');
+                        window.focus();
+                        if (scrollPosition) window.scrollTo(0, scrollPosition);
+                    }
+                } catch (e) {
+                    clearInterval(checkWindow);
+                }
+            }, 500);
+        } else {
+            // Method 2: If popup blocked, try iframe
+            printUsingIframe(reportId);
+        }
+    } catch (error) {
+        console.error('Print error:', error);
+        // Method 3: Last resort - direct navigation
+        showToast('Opening print in current window...', 'warning');
+        window.open(url, '_self');
     }
+}
+
+// Iframe fallback method
+function printUsingIframe(reportId) {
+    const iframe = document.createElement('iframe');
+    iframe.style.cssText = 'position:fixed;width:100%;height:100%;top:0;left:0;border:none;z-index:999999;display:none;';
+    iframe.src = `${AJAX_URL}download_report.php?id=${reportId}&format=print&_=${Date.now()}`;
+    
+    document.body.appendChild(iframe);
+    
+    iframe.onload = function() {
+        try {
+            iframe.contentWindow.focus();
+            iframe.contentWindow.print();
+            // Remove iframe after printing
+            setTimeout(() => {
+                if (iframe && iframe.parentNode) {
+                    document.body.removeChild(iframe);
+                }
+            }, 3000);
+        } catch (e) {
+            console.error('Iframe print failed:', e);
+            showToast('Print failed. Please try the direct link.', 'error');
+            if (iframe && iframe.parentNode) {
+                document.body.removeChild(iframe);
+            }
+        }
+    };
+    
+    // Make iframe visible for debugging
+    setTimeout(() => {
+        iframe.style.display = 'block';
+    }, 100);
 }
 
 // Print All Reports
 function printAllReports() {
     showToast('Preparing to print all reports...', 'info');
     
+    // Store current scroll position
+    const scrollPosition = window.pageYOffset;
+    
     // Build base URL
-    let url = `../ajax/export_reports.php?format=print`;
+    let url = `${AJAX_URL}export_reports.php?format=print&_=${Date.now()}`;
     
     // Add current filter parameters
-    const status = document.querySelector('select[name="status"]').value;
-    const category = document.querySelector('select[name="category"]').value;
-    const dateFrom = document.querySelector('input[name="date_from"]').value;
-    const dateTo = document.querySelector('input[name="date_to"]').value;
+    const status = document.querySelector('select[name="status"]')?.value || 'all';
+    const category = document.querySelector('select[name="category"]')?.value || 'all';
+    const dateFrom = document.querySelector('input[name="date_from"]')?.value || '';
+    const dateTo = document.querySelector('input[name="date_to"]')?.value || '';
     
     if (status && status !== 'all') url += `&status=${status}`;
     if (category && category !== 'all') url += `&category=${category}`;
     if (dateFrom) url += `&date_from=${dateFrom}`;
     if (dateTo) url += `&date_to=${dateTo}`;
     
-    // Open in new tab and focus
-    const printWindow = window.open(url, '_blank', 'width=900,height=700,scrollbars=yes,resizable=yes');
-    if (printWindow) {
-        printWindow.focus();
-    } else {
-        showToast('Please allow popups to print', 'warning');
+    try {
+        const printWindow = window.open('', '_blank', 'width=1200,height=800');
+        if (printWindow) {
+            printWindow.location.href = url;
+            printWindow.focus();
+            
+            // Restore scroll position when window closes
+            const checkWindow = setInterval(() => {
+                try {
+                    if (printWindow.closed) {
+                        clearInterval(checkWindow);
+                        window.focus();
+                        if (scrollPosition) window.scrollTo(0, scrollPosition);
+                        showToast('Print window closed', 'info');
+                    }
+                } catch (e) {
+                    clearInterval(checkWindow);
+                }
+            }, 500);
+        } else {
+            showToast('Please allow popups to print multiple reports', 'warning');
+            // Fallback: open in current window
+            window.open(url, '_self');
+        }
+    } catch (error) {
+        showToast('Error opening print. Please try again.', 'error');
     }
 }
 
 // Close Modal
 function closeModal() {
     document.getElementById('reportDetailsModal').classList.add('hidden');
+    document.getElementById('modalContent').innerHTML = '';
 }
 
 // Open PIN Modal
@@ -801,21 +911,32 @@ function handleModalPinKeydown(event, index) {
         // If current input is empty and backspace pressed, go to previous input
         if (pinInputs[index - 1].value === '' && index > 1) {
             setTimeout(() => {
-                pinInputs[index - 2].focus();
-                pinInputs[index - 2].select();
+                if (pinInputs[index - 2]) {
+                    pinInputs[index - 2].focus();
+                    pinInputs[index - 2].select();
+                }
             }, 10);
         }
     }
     
     // Arrow key navigation
-    if (key === 'ArrowLeft' && index > 1) {
+    if (key === 'ArrowLeft' && index > 1 && pinInputs[index - 2]) {
         pinInputs[index - 2].focus();
         pinInputs[index - 2].select();
     }
-    if (key === 'ArrowRight' && index < 4) {
+    if (key === 'ArrowRight' && index < 4 && pinInputs[index]) {
         pinInputs[index].focus();
         pinInputs[index].select();
     }
+}
+
+// Initialize modal content after loading
+function initModalContent() {
+    // Add any initialization for loaded modal content here
+    const printButtons = document.querySelectorAll('#modalContent button[onclick*="printReport"]');
+    printButtons.forEach(btn => {
+        btn.classList.add('print-permanent', 'print-button-fixed');
+    });
 }
 
 // Toast notification
@@ -851,10 +972,12 @@ function showToast(message, type = 'info') {
 
 // Form Validation for Date Range
 function validateDateRange() {
-    const dateFrom = document.querySelector('input[name="date_from"]').value;
-    const dateTo = document.querySelector('input[name="date_to"]').value;
+    const dateFrom = document.querySelector('input[name="date_from"]');
+    const dateTo = document.querySelector('input[name="date_to"]');
     
-    if (dateFrom && dateTo && new Date(dateFrom) > new Date(dateTo)) {
+    if (!dateFrom || !dateTo) return true;
+    
+    if (dateFrom.value && dateTo.value && new Date(dateFrom.value) > new Date(dateTo.value)) {
         showToast('From date cannot be after To date', 'warning');
         return false;
     }
@@ -862,8 +985,70 @@ function validateDateRange() {
     return true;
 }
 
-// Initialize
+// ENSURE PRINT BUTTONS ARE ALWAYS VISIBLE - FIXED VERSION
+function ensurePrintButtonsVisible() {
+    const printButtons = document.querySelectorAll('.print-action-btn, .print-permanent, .print-button-fixed, button[onclick*="printReport"], button[onclick*="printAllReports"]');
+    
+    printButtons.forEach(btn => {
+        // Force visibility with highest priority using inline styles
+        btn.style.setProperty('display', 'inline-block', 'important');
+        btn.style.setProperty('visibility', 'visible', 'important');
+        btn.style.setProperty('opacity', '1', 'important');
+        btn.style.setProperty('position', 'static', 'important');
+        btn.style.setProperty('z-index', '9999', 'important');
+        btn.style.setProperty('pointer-events', 'auto', 'important');
+        
+        // Make sure print buttons are green and stand out
+        if (btn.onclick && btn.onclick.toString().includes('printReport') || 
+            btn.onclick && btn.onclick.toString().includes('printAllReports') ||
+            btn.getAttribute('onclick') && btn.getAttribute('onclick').includes('print')) {
+            btn.style.setProperty('background-color', '#10b981', 'important');
+            btn.style.setProperty('color', 'white', 'important');
+            btn.style.setProperty('border-color', '#10b981', 'important');
+            btn.style.setProperty('font-weight', 'bold', 'important');
+        }
+        
+        // Remove any hiding classes
+        btn.classList.remove('hidden', 'invisible', 'opacity-0');
+        btn.classList.add('print-permanent', 'print-button-fixed');
+    });
+}
+
+// Initialize - FIXED VERSION
 document.addEventListener('DOMContentLoaded', function() {
+    console.log('My Reports module loaded - PRINT BUTTONS SECURED');
+    
+    // Run immediately and multiple times to catch all buttons
+    ensurePrintButtonsVisible();
+    setTimeout(ensurePrintButtonsVisible, 100);
+    setTimeout(ensurePrintButtonsVisible, 500);
+    setTimeout(ensurePrintButtonsVisible, 1000);
+    
+    // Set up a mutation observer to watch for DOM changes
+    const observer = new MutationObserver(function(mutations) {
+        mutations.forEach(function(mutation) {
+            if (mutation.type === 'childList' || mutation.type === 'attributes') {
+                ensurePrintButtonsVisible();
+            }
+        });
+    });
+    
+    // Start observing
+    observer.observe(document.body, { 
+        childList: true, 
+        subtree: true,
+        attributes: true,
+        attributeFilter: ['style', 'class', 'onclick']
+    });
+    
+    // Also run on user interaction
+    document.addEventListener('click', ensurePrintButtonsVisible);
+    document.addEventListener('mouseover', ensurePrintButtonsVisible);
+    document.addEventListener('scroll', ensurePrintButtonsVisible);
+    
+    // Keep checking every 2 seconds (reduced frequency)
+    const printButtonInterval = setInterval(ensurePrintButtonsVisible, 2000);
+    
     // Add event listener for PIN form submission
     const pinForm = document.getElementById('pinForm');
     if (pinForm) {
@@ -927,40 +1112,10 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
     
-    // Ensure print buttons are ALWAYS visible
-    const style = document.createElement('style');
-    style.textContent = `
-        /* Print button permanent visibility */
-        .print-btn {
-            display: inline-block !important;
-            visibility: visible !important;
-            opacity: 1 !important;
-            position: static !important;
-        }
-        
-        /* Ensure buttons in table are visible */
-        table .print-btn {
-            display: inline-block !important;
-            visibility: visible !important;
-            opacity: 1 !important;
-        }
-        
-        /* Ensure buttons in flex containers are visible */
-        .flex .print-btn {
-            display: inline-block !important;
-            visibility: visible !important;
-            opacity: 1 !important;
-        }
-        
-        /* Override any Tailwind or other CSS that might hide buttons */
-        button.print-btn {
-            display: inline-block !important;
-            visibility: visible !important;
-            opacity: 1 !important;
-            position: static !important;
-        }
-    `;
-    document.head.appendChild(style);
+    // Final check - make absolutely sure print buttons are visible
+    window.addEventListener('load', function() {
+        setTimeout(ensurePrintButtonsVisible, 2000);
+    });
 });
 </script>
 
@@ -987,12 +1142,61 @@ document.addEventListener('DOMContentLoaded', function() {
 .status-referred { background-color: #ffedd5; color: #9a3412; }
 .status-closed { background-color: #f3f4f6; color: #374151; }
 
-/* Print button permanent visibility - HIGHEST PRIORITY */
-.print-btn {
+/* PRINT BUTTONS - PERMANENTLY VISIBLE - HIGHEST PRIORITY */
+.print-permanent,
+.print-action-btn,
+.print-button-fixed,
+button.print-permanent,
+button.print-action-btn,
+button.print-button-fixed,
+button[onclick*="printReport"],
+button[onclick*="printAllReports"] {
     display: inline-block !important;
     visibility: visible !important;
     opacity: 1 !important;
     position: static !important;
+    z-index: 9999 !important;
+    pointer-events: auto !important;
+    cursor: pointer !important;
+}
+
+/* Override ANY style that tries to hide print buttons */
+.print-permanent[style*="display: none"],
+.print-action-btn[style*="display: none"],
+.print-button-fixed[style*="display: none"],
+.print-permanent[style*="visibility: hidden"],
+.print-action-btn[style*="visibility: hidden"],
+.print-button-fixed[style*="visibility: hidden"],
+.print-permanent[style*="opacity: 0"],
+.print-action-btn[style*="opacity: 0"],
+.print-button-fixed[style*="opacity: 0"] {
+    display: inline-block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+}
+
+/* Make sure print buttons have clear, prominent styling */
+button[onclick*="printReport"],
+button[onclick*="printAllReports"],
+.print-button-fixed[onclick*="print"],
+button.bg-green-500,
+button.bg-green-600 {
+    background-color: #10b981 !important;
+    color: white !important;
+    border: 2px solid #10b981 !important;
+    font-weight: bold !important;
+    box-shadow: 0 2px 4px rgba(16, 185, 129, 0.3) !important;
+}
+
+button[onclick*="printReport"]:hover,
+button[onclick*="printAllReports"]:hover,
+.print-button-fixed:hover,
+button.bg-green-500:hover,
+button.bg-green-600:hover {
+    background-color: #059669 !important;
+    border-color: #059669 !important;
+    transform: translateY(-1px) !important;
+    box-shadow: 0 4px 6px rgba(5, 150, 105, 0.4) !important;
 }
 
 /* Animations */
@@ -1072,6 +1276,13 @@ document.addEventListener('DOMContentLoaded', function() {
     .hidden.md\:block {
         display: none;
     }
+    
+    /* Ensure print buttons are larger on mobile */
+    .print-button-fixed {
+        min-width: 70px !important;
+        padding: 10px 5px !important;
+        font-size: 11px !important;
+    }
 }
 
 /* Print styles */
@@ -1150,20 +1361,69 @@ button:hover {
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
-/* Print button permanent visibility - FORCE VISIBLE */
-.print-btn {
-    display: inline-block !important;
-    visibility: visible !important;
-    opacity: 1 !important;
-    position: static !important;
+/* Ensure all action buttons have good contrast */
+.print-action-btn {
+    border: 1px solid transparent !important;
 }
 
-/* Override any potential hiding */
-button.print-btn[style*="display: none"],
-button.print-btn[style*="visibility: hidden"],
-button.print-btn[style*="opacity: 0"] {
-    display: inline-block !important;
-    visibility: visible !important;
-    opacity: 1 !important;
+.print-action-btn:hover {
+    border-color: currentColor !important;
+}
+
+/* PRINT BUTTON SPECIAL STYLING */
+.print-button-fixed {
+    animation: pulse-green 2s infinite;
+    position: relative;
+    overflow: hidden;
+}
+
+.print-button-fixed::after {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: linear-gradient(
+        to bottom right,
+        rgba(255, 255, 255, 0) 0%,
+        rgba(255, 255, 255, 0.1) 50%,
+        rgba(255, 255, 255, 0) 100%
+    );
+    transform: rotate(30deg);
+    animation: shine 3s infinite;
+}
+
+@keyframes pulse-green {
+    0% {
+        box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+    }
+    70% {
+        box-shadow: 0 0 0 10px rgba(16, 185, 129, 0);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+    }
+}
+
+@keyframes shine {
+    0% {
+        transform: translateX(-100%) translateY(-100%) rotate(30deg);
+    }
+    100% {
+        transform: translateX(100%) translateY(100%) rotate(30deg);
+    }
+}
+
+/* Force print button container to not hide buttons */
+td.whitespace-nowrap,
+td.px-4.py-4 {
+    position: relative;
+    z-index: 1;
+}
+
+/* Make sure nothing overlays print buttons */
+button.print-button-fixed {
+    z-index: 99999 !important;
 }
 </style>

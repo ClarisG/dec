@@ -1,0 +1,1122 @@
+-- phpMyAdmin SQL Dump
+-- version 5.2.1
+-- https://www.phpmyadmin.net/
+--
+-- Host: localhost:3307
+-- Generation Time: Jan 06, 2026 at 06:02 PM
+-- Server version: 10.4.32-MariaDB
+-- PHP Version: 8.2.12
+
+SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
+START TRANSACTION;
+SET time_zone = "+00:00";
+
+
+/*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
+/*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
+/*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;
+/*!40101 SET NAMES utf8mb4 */;
+
+--
+-- Database: `leir_db`
+--
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `activity_logs`
+--
+
+CREATE TABLE `activity_logs` (
+  `id` int(11) NOT NULL,
+  `user_id` int(11) DEFAULT NULL,
+  `action` varchar(100) NOT NULL,
+  `description` text NOT NULL,
+  `ip_address` varchar(45) DEFAULT NULL,
+  `user_agent` text DEFAULT NULL,
+  `affected_id` int(11) DEFAULT NULL,
+  `affected_type` varchar(50) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `ai_classification_logs`
+--
+
+CREATE TABLE `ai_classification_logs` (
+  `id` int(11) NOT NULL,
+  `report_id` int(11) DEFAULT NULL,
+  `input_text` text NOT NULL,
+  `predicted_jurisdiction` enum('barangay','police','uncertain') NOT NULL,
+  `confidence_score` decimal(5,4) DEFAULT NULL,
+  `keywords_found` text DEFAULT NULL,
+  `reasoning` text DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `announcements`
+--
+
+CREATE TABLE `announcements` (
+  `id` int(11) NOT NULL,
+  `title` varchar(255) NOT NULL,
+  `content` text NOT NULL,
+  `priority` enum('low','medium','high') DEFAULT 'low',
+  `target_role` enum('citizen','tanod','secretary','captain','admin','all') DEFAULT 'citizen',
+  `barangay` varchar(100) NOT NULL,
+  `is_emergency` tinyint(1) DEFAULT 0,
+  `is_pinned` tinyint(1) DEFAULT 0,
+  `is_active` tinyint(1) DEFAULT 1,
+  `attachment` varchar(255) DEFAULT NULL,
+  `posted_by` varchar(100) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `barangay_personnel_master_codes`
+--
+
+CREATE TABLE `barangay_personnel_master_codes` (
+  `id` int(11) NOT NULL,
+  `admin_id` int(11) NOT NULL,
+  `master_code` varchar(12) NOT NULL,
+  `generated_for_email` varchar(100) DEFAULT NULL,
+  `generated_for_name` varchar(100) DEFAULT NULL,
+  `assigned_to` int(11) DEFAULT NULL,
+  `purpose` enum('registration','password_reset','master_code_reset') DEFAULT 'registration',
+  `is_used` tinyint(1) DEFAULT 0,
+  `used_at` timestamp NULL DEFAULT NULL,
+  `expires_at` timestamp NULL DEFAULT NULL,
+  `is_active` tinyint(1) DEFAULT 1,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `barangay_personnel_registrations`
+--
+
+CREATE TABLE `barangay_personnel_registrations` (
+  `id` int(11) NOT NULL,
+  `user_id` int(11) DEFAULT NULL,
+  `admin_id` int(11) NOT NULL,
+  `master_code` varchar(255) NOT NULL,
+  `master_code_used` tinyint(1) DEFAULT 0,
+  `master_code_used_at` timestamp NULL DEFAULT NULL,
+  `is_active` tinyint(1) DEFAULT 1,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Dumping data for table `barangay_personnel_registrations`
+--
+
+INSERT INTO `barangay_personnel_registrations` (`id`, `user_id`, `admin_id`, `master_code`, `master_code_used`, `master_code_used_at`, `is_active`, `created_at`, `updated_at`) VALUES
+(1, 1007, 1001, '5981', 0, NULL, 1, '2026-01-03 17:32:35', '2026-01-03 17:32:35'),
+(2, 1008, 1001, '4939', 0, NULL, 1, '2026-01-03 17:51:52', '2026-01-03 17:51:52');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `barangay_positions`
+--
+
+CREATE TABLE `barangay_positions` (
+  `id` int(11) NOT NULL,
+  `position_name` varchar(50) NOT NULL,
+  `role_id` int(11) NOT NULL,
+  `description` text DEFAULT NULL,
+  `permissions` text DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Dumping data for table `barangay_positions`
+--
+
+INSERT INTO `barangay_positions` (`id`, `position_name`, `role_id`, `description`, `permissions`, `created_at`) VALUES
+(1, 'Barangay Administrator', 1, 'System administrator', 'all', '2025-12-07 08:00:00'),
+(2, 'Barangay Captain', 2, 'Head of the barangay', 'manage_reports,view_reports,manage_users,manage_announcements,manage_personnel', '2025-12-07 15:14:50'),
+(3, 'Barangay Secretary', 3, 'Barangay records keeper', 'manage_reports,view_reports,manage_announcements', '2025-12-07 15:14:50'),
+(4, 'Barangay Tanod', 5, 'Barangay security and peacekeeper', 'view_reports,update_reports_status', '2025-12-07 15:14:50'),
+(5, 'Lupon Member', 4, 'Member of the Lupong Tagapamayapa', 'view_reports,manage_reports', '2025-12-07 15:14:50'),
+(6, 'SK Chairman', 3, 'Sangguniang Kabataan Chairman', NULL, '2025-12-07 15:14:50'),
+(7, 'Treasurer', 3, 'Barangay Treasurer', NULL, '2025-12-07 15:14:50');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `file_encryption_logs`
+--
+
+CREATE TABLE `file_encryption_logs` (
+  `id` int(11) NOT NULL,
+  `report_id` int(11) NOT NULL,
+  `file_path` varchar(255) NOT NULL,
+  `original_name` varchar(255) NOT NULL,
+  `encryption_key` varchar(255) NOT NULL,
+  `encrypted_path` varchar(255) NOT NULL,
+  `decryption_count` int(11) DEFAULT 0,
+  `last_decrypted` timestamp NULL DEFAULT NULL,
+  `last_decrypted_by` int(11) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `lost_found_items`
+--
+
+CREATE TABLE `lost_found_items` (
+  `id` int(11) NOT NULL,
+  `item_name` varchar(255) NOT NULL,
+  `description` text NOT NULL,
+  `item_type` enum('lost','found') NOT NULL,
+  `location` varchar(255) DEFAULT NULL,
+  `contact_person` varchar(100) DEFAULT NULL,
+  `contact_number` varchar(20) DEFAULT NULL,
+  `barangay` varchar(100) NOT NULL,
+  `status` enum('active','claimed','resolved') DEFAULT 'active',
+  `image_path` varchar(255) DEFAULT NULL,
+  `created_by` int(11) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `messages`
+--
+
+CREATE TABLE `messages` (
+  `id` int(11) NOT NULL,
+  `report_id` int(11) NOT NULL,
+  `sender_id` int(11) NOT NULL,
+  `receiver_id` int(11) DEFAULT NULL,
+  `message` text NOT NULL,
+  `is_read` tinyint(1) DEFAULT 0,
+  `attachment` varchar(255) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `notifications`
+--
+
+CREATE TABLE `notifications` (
+  `id` int(11) NOT NULL,
+  `user_id` int(11) NOT NULL,
+  `title` varchar(255) NOT NULL,
+  `message` text NOT NULL,
+  `type` enum('info','success','warning','error') DEFAULT 'info',
+  `is_read` tinyint(1) DEFAULT 0,
+  `related_id` int(11) DEFAULT NULL,
+  `related_type` varchar(50) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `reports`
+--
+
+CREATE TABLE `reports` (
+  `id` int(11) NOT NULL,
+  `report_number` varchar(50) NOT NULL,
+  `user_id` int(11) NOT NULL,
+  `report_type_id` int(11) NOT NULL,
+  `title` varchar(255) NOT NULL,
+  `description` text NOT NULL,
+  `location` text NOT NULL,
+  `incident_date` datetime NOT NULL,
+  `report_date` datetime NOT NULL DEFAULT current_timestamp(),
+  `involved_persons` text DEFAULT NULL,
+  `witnesses` text DEFAULT NULL,
+  `category` enum('incident','complaint','blotter') DEFAULT 'incident',
+  `evidence_files` text DEFAULT NULL,
+  `status` enum('pending','assigned','investigating','resolved','referred','closed') DEFAULT 'pending',
+  `priority` enum('low','medium','high','critical') DEFAULT 'medium',
+  `assigned_to` int(11) DEFAULT NULL,
+  `resolution` text DEFAULT NULL,
+  `resolution_date` datetime DEFAULT NULL,
+  `referred_to` varchar(100) DEFAULT NULL,
+  `pin_code` varchar(4) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  `submitted_by` int(11) DEFAULT NULL,
+  `barangay` varchar(100) DEFAULT NULL,
+  `latitude` decimal(10,8) DEFAULT NULL,
+  `longitude` decimal(11,8) DEFAULT NULL,
+  `is_anonymous` tinyint(1) DEFAULT 0,
+  `allow_public` tinyint(1) DEFAULT 0,
+  `escalation_level` int(11) DEFAULT 0
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Dumping data for table `reports`
+--
+
+INSERT INTO `reports` (`id`, `report_number`, `user_id`, `report_type_id`, `title`, `description`, `location`, `incident_date`, `report_date`, `involved_persons`, `witnesses`, `category`, `evidence_files`, `status`, `priority`, `assigned_to`, `resolution`, `resolution_date`, `referred_to`, `pin_code`, `created_at`, `updated_at`, `submitted_by`, `barangay`, `latitude`, `longitude`, `is_anonymous`, `allow_public`, `escalation_level`) VALUES
+(10001, 'RPT-20260104-C43F37', 1003, 6, 'fire wiwiwwiwi', 'may sunog na nangyari kaninang alas sais ng umaga.', 'dyan', '2026-01-04 17:19:00', '2026-01-05 00:19:59', '', '', 'incident', NULL, 'pending', 'high', NULL, NULL, NULL, NULL, '1234', '2026-01-04 16:19:59', '2026-01-04 16:19:59', NULL, 'Block 8 lot 2 6D Towerville', NULL, NULL, 1, 0, 0),
+(10002, 'RPT-20260104-50A765', 1003, 164, 'ysa', 'mga basura nag kalat.', 'ghgc', '2026-01-04 17:29:00', '2026-01-05 00:30:05', '', '', 'complaint', NULL, 'pending', 'medium', NULL, NULL, NULL, NULL, '1234', '2026-01-04 16:30:05', '2026-01-04 16:30:05', NULL, 'Block 8 lot 2 6D Towerville', NULL, NULL, 1, 0, 0),
+(10004, 'RPT-20260104-4DC6B2', 1003, 164, 'Basura', 'basura nag kakalat', 'ggd', '2026-01-04 18:01:00', '2026-01-05 01:02:23', '', '', 'complaint', NULL, 'pending', 'medium', NULL, NULL, NULL, NULL, '2456', '2026-01-04 17:02:23', '2026-01-04 17:02:23', NULL, 'Block 8 lot 2 6D Towerville', NULL, NULL, 0, 0, 0),
+(10005, 'RPT-20260105-9B0B25', 1003, 11, 'Ingay', 'Itong kapit bahay namin na si Jeff Paray, 11:52 pm na nagkakantahan o videoke pa rin sila, napaka ingay. Sinaway na ni Hanah pero pinakyuhan lang siya ni Jeff.', 'Silang', '2026-01-05 23:59:00', '2026-01-06 00:00:28', '', '', 'complaint', NULL, 'pending', 'low', NULL, NULL, NULL, NULL, '1234', '2026-01-05 16:00:28', '2026-01-05 16:00:28', NULL, 'Block 8 lot 2 6D Towerville', NULL, NULL, 0, 0, 0),
+(10006, 'RPT-20260105-A63CBA', 1003, 72, 'yay', 'may saksakan na nangyari', 'jjkjhk', '2026-01-05 19:56:00', '2026-01-06 02:57:08', '', '', 'incident', '[{\"original_name\":\"Blue and White Simple Corporate Letterhead.png\",\"encrypted_name\":\"encrypted_1767639428_695c098414075_Blue and White Simple Corporate Letterhead.png\",\"file_type\":\"png\",\"file_size\":102358,\"encryption_key_hash\":\"dd5aaf0ba30faee45db2b88214916c4e5b5717d5c5872e6df695c63fffa7ca16\",\"original_hash\":\"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855\",\"iv\":\"f23c1baeacf99860d3d27a176ccb9acc\"}]', 'pending', 'high', NULL, NULL, NULL, NULL, '1234', '2026-01-05 18:57:08', '2026-01-05 18:57:08', NULL, 'Block 8 lot 2 6D Towerville', NULL, NULL, 0, 0, 0),
+(10007, 'RPT-20260106-F95802', 1003, 7, 'Theft Report', 'may nag nakaw ng mga alahas', 'aS', '2026-01-06 10:35:00', '2026-01-06 17:35:32', '', '', 'incident', NULL, 'pending', 'high', NULL, NULL, NULL, NULL, '', '2026-01-06 09:35:32', '2026-01-06 09:35:32', NULL, 'Block 8 lot 2 6D Towerville', NULL, NULL, 1, 0, 0),
+(10008, 'RPT-20260106-21CF9A', 1003, 72, 'Stabbing Report', 'may nag saksakan', 'aa', '2026-01-06 10:37:00', '2026-01-06 17:38:02', '', '', 'incident', NULL, 'pending', 'high', NULL, NULL, NULL, NULL, '', '2026-01-06 09:38:02', '2026-01-06 09:38:02', NULL, 'Block 8 lot 2 6D Towerville', NULL, NULL, 1, 0, 0);
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `report_attachments`
+--
+
+CREATE TABLE `report_attachments` (
+  `id` int(11) NOT NULL,
+  `report_id` int(11) NOT NULL,
+  `file_name` varchar(255) DEFAULT NULL,
+  `original_name` varchar(255) DEFAULT NULL,
+  `file_type` varchar(100) DEFAULT NULL,
+  `file_size` int(11) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `report_status_history`
+--
+
+CREATE TABLE `report_status_history` (
+  `id` int(11) NOT NULL,
+  `report_id` int(11) NOT NULL,
+  `status` enum('pending','assigned','investigating','resolved','referred','closed') NOT NULL,
+  `updated_by` int(11) DEFAULT NULL,
+  `notes` text DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `officer_notes` text DEFAULT NULL,
+  `next_action` varchar(255) DEFAULT NULL,
+  `estimated_completion` date DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Dumping data for table `report_status_history`
+--
+
+INSERT INTO `report_status_history` (`id`, `report_id`, `status`, `updated_by`, `notes`, `created_at`, `officer_notes`, `next_action`, `estimated_completion`) VALUES
+(1, 10001, 'pending', NULL, 'Report submitted by citizen', '2026-01-04 16:19:59', NULL, NULL, NULL),
+(2, 10002, 'pending', NULL, 'Report submitted by citizen', '2026-01-04 16:30:05', NULL, NULL, NULL),
+(4, 10004, 'pending', NULL, 'Report submitted by citizen', '2026-01-04 17:02:23', NULL, NULL, NULL),
+(5, 10005, 'pending', NULL, 'Report submitted by citizen', '2026-01-05 16:00:28', NULL, NULL, NULL),
+(6, 10006, 'pending', NULL, 'Report submitted by citizen', '2026-01-05 18:57:08', NULL, NULL, NULL),
+(7, 10007, 'pending', NULL, 'Report submitted by citizen', '2026-01-06 09:35:32', NULL, NULL, NULL),
+(8, 10008, 'pending', NULL, 'Report submitted by citizen', '2026-01-06 09:38:02', NULL, NULL, NULL);
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `report_timeline`
+--
+
+CREATE TABLE `report_timeline` (
+  `id` int(11) NOT NULL,
+  `report_id` int(11) NOT NULL,
+  `description` text NOT NULL,
+  `created_by` int(11) NOT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `report_types`
+--
+
+CREATE TABLE `report_types` (
+  `id` int(11) NOT NULL,
+  `type_name` varchar(100) NOT NULL,
+  `category` enum('incident','complaint','blotter') NOT NULL,
+  `description` text DEFAULT NULL,
+  `keywords` text DEFAULT NULL,
+  `jurisdiction` enum('barangay','police') NOT NULL,
+  `severity_level` enum('low','medium','high','critical') DEFAULT 'medium',
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Dumping data for table `report_types`
+--
+
+INSERT INTO `report_types` (`id`, `type_name`, `category`, `description`, `keywords`, `jurisdiction`, `severity_level`, `created_at`) VALUES
+(1, 'Public Disturbance / Gulo sa Publiko', 'incident', 'Noise complaints, public altercations', 'gulo,disturbance,noise,argument,alitan,away', 'barangay', 'low', '2025-12-06 05:28:32'),
+(2, 'Property Damage / Pinsala sa Ari-arian', 'incident', 'Vandalism, property destruction', 'vandalism,property damage,pinsala,basag,basag na bintana', 'barangay', 'medium', '2025-12-06 05:28:32'),
+(3, 'Illegal Gambling / Iligal na Sugal', 'incident', 'Illegal gambling activities', 'sugal,gambling,baraha,jueteng,card game', 'police', 'medium', '2025-12-06 05:28:32'),
+(4, 'Drug-related Activity / Aktibidad na May Kinalaman sa Droga', 'incident', 'Suspected drug use or sale', 'drugs,shabu,marijuana,drug,stoned', 'police', 'high', '2025-12-06 05:28:32'),
+(5, 'Traffic Accident / Aksidente sa Trapiko', 'incident', 'Vehicular accidents', 'accident,bangga,salpok,vehicle,collision', 'police', 'medium', '2025-12-06 05:28:32'),
+(6, 'Fire Incident / Sunog', 'incident', 'Fire emergencies', 'fire,sunog,smoke,flames,emergency', 'police', 'high', '2025-12-06 05:28:32'),
+(7, 'Theft / Pagnanakaw', 'incident', 'Robbery, burglary, theft', 'theft,nakaw,robbery,steal,magnanakaw', 'police', 'high', '2025-12-06 05:28:32'),
+(8, 'Assault / Pag-assalto', 'incident', 'Physical assault, battery', 'assault,bugbog,attack,physical,force', 'police', 'high', '2025-12-06 05:28:32'),
+(9, 'Missing Person / Nawawalang Tao', 'incident', 'Missing individuals', 'missing,nawawala,person,lost,tao', 'police', 'critical', '2025-12-06 05:28:32'),
+(10, 'Domestic Violence / Karahasan sa Tahanan', 'incident', 'Violence within households', 'domestic,violence,karahasan,tahanan,family', 'police', 'high', '2025-12-06 05:28:32'),
+(11, 'Noise Complaint / Reklamo sa Ingay', 'complaint', 'Excessive noise complaints', NULL, 'barangay', 'low', '2025-12-06 05:28:32'),
+(12, 'Sanitation Issue / Isyu sa Kalinisan', 'complaint', 'Garbage, unsanitary conditions', NULL, 'barangay', 'low', '2025-12-06 05:28:32'),
+(13, 'Animal Nuisance / Abala mula sa Hayop', 'complaint', 'Stray animals, animal disturbances', NULL, 'barangay', 'low', '2025-12-06 05:28:32'),
+(14, 'Boundary Dispute / Hidwaan sa Hangganan', 'complaint', 'Property boundary conflicts', NULL, 'barangay', 'medium', '2025-12-06 05:28:32'),
+(15, 'Neighbor Dispute / Alitan ng Kapitbahay', 'complaint', 'Disputes between neighbors', NULL, 'barangay', 'medium', '2025-12-06 05:28:32'),
+(16, 'Illegal Construction / Iligal na Konstruksyon', 'complaint', 'Unauthorized construction', NULL, 'barangay', 'medium', '2025-12-06 05:28:32'),
+(17, 'Business Violation / Paglabag sa Negosyo', 'complaint', 'Unlicensed business operations', NULL, 'barangay', 'medium', '2025-12-06 05:28:32'),
+(18, 'Water Issue / Problema sa Tubig', 'complaint', 'Water supply problems', NULL, 'barangay', 'low', '2025-12-06 05:28:32'),
+(19, 'Electricity Issue / Problema sa Kuryente', 'complaint', 'Electrical supply problems', NULL, 'barangay', 'low', '2025-12-06 05:28:32'),
+(20, 'Road Issue / Problema sa Kalsada', 'complaint', 'Road damage, obstructions', NULL, 'barangay', 'low', '2025-12-06 05:28:32'),
+(21, 'Verbal Altercation / Alitan sa Salita', 'blotter', 'Arguments without physical contact', NULL, 'barangay', 'low', '2025-12-06 05:28:32'),
+(22, 'Physical Altercation / Alitan na Pisikal', 'blotter', 'Physical fights', NULL, 'barangay', 'medium', '2025-12-06 05:28:32'),
+(23, 'Harassment / Pangha-harass', 'blotter', 'Harassment cases', NULL, 'barangay', 'medium', '2025-12-06 05:28:32'),
+(24, 'Trespassing / Pagpasok nang Walang Pahintulot', 'blotter', 'Unauthorized entry', NULL, 'barangay', 'medium', '2025-12-06 05:28:32'),
+(25, 'Debt-related Issue / Isyu tungkol sa Utang', 'blotter', 'Disputes over debts', NULL, 'barangay', 'low', '2025-12-06 05:28:32'),
+(26, 'Child-related Issue / Isyu tungkol sa Bata', 'blotter', 'Issues involving minors', NULL, 'barangay', 'high', '2025-12-06 05:28:32'),
+(27, 'Elderly Abuse / Pang-aabuso sa Matanda', 'blotter', 'Abuse of elderly persons', NULL, 'police', 'high', '2025-12-06 05:28:32'),
+(28, 'Slander / Paninirang Puri', 'blotter', 'Defamation, libel, slander', NULL, 'barangay', 'low', '2025-12-06 05:28:32'),
+(29, 'Breach of Contract / Paglabag sa Kontrata', 'blotter', 'Contract violations', NULL, 'barangay', 'medium', '2025-12-06 05:28:32'),
+(30, 'Property Dispute / Hidwaan sa Ari-arian', 'blotter', 'Disputes over property', NULL, 'barangay', 'medium', '2025-12-06 05:28:32'),
+(31, 'Theft/Robbery', 'incident', 'Stolen property, robbery, burglary', 'theft,robbery,burglary,nakaw,magnanakaw', 'police', 'high', '2025-12-08 15:52:07'),
+(32, 'Assault', 'incident', 'Physical attack, battery, fight', 'assault,attack,physical,force,bugbog', 'police', 'critical', '2025-12-08 15:52:07'),
+(33, 'Drug-related Activity', 'incident', 'Illegal drug use, possession, or distribution', 'drug,shabu,marijuana,illegal,substance', 'police', 'critical', '2025-12-08 15:52:07'),
+(34, 'Traffic Accident', 'incident', 'Vehicle collision, road accident', 'accident,vehicle,crash,bangga,trapiko', 'police', 'medium', '2025-12-08 15:52:07'),
+(35, 'Missing Person', 'incident', 'Missing individual, especially minors', 'missing,person,nawawala,lost,tao', 'police', 'high', '2025-12-08 15:52:07'),
+(36, 'Fire Incident', 'incident', 'Fire outbreak, arson', 'fire,sunog,emergency,flames,smoke', 'police', 'critical', '2025-12-08 15:52:07'),
+(37, 'Public Disturbance', 'incident', 'Disturbance of public peace', NULL, 'barangay', 'medium', '2025-12-08 15:52:07'),
+(38, 'Noise Complaint', 'complaint', 'Excessive noise from neighbors or establishments', NULL, 'barangay', 'low', '2025-12-08 15:52:07'),
+(39, 'Garbage/Sanitation', 'complaint', 'Improper waste disposal, sanitation issues', NULL, 'barangay', 'medium', '2025-12-08 15:52:07'),
+(40, 'Animal Nuisance', 'complaint', 'Stray animals, animal-related issues', NULL, 'barangay', 'low', '2025-12-08 15:52:07'),
+(41, 'Illegal Construction', 'complaint', 'Unauthorized construction work', NULL, 'barangay', 'medium', '2025-12-08 15:52:07'),
+(42, 'Business Violation', 'complaint', 'Unauthorized business operations', NULL, 'barangay', 'medium', '2025-12-08 15:52:07'),
+(43, 'Water/Electricity Issue', 'complaint', 'Utility-related complaints', NULL, 'barangay', 'medium', '2025-12-08 15:52:07'),
+(44, 'Neighbor Dispute', 'blotter', 'Arguments or conflicts between neighbors', NULL, 'barangay', 'low', '2025-12-08 15:52:07'),
+(45, 'Family Conflict', 'blotter', 'Family disputes requiring mediation', NULL, 'barangay', 'medium', '2025-12-08 15:52:07'),
+(46, 'Property Boundary', 'blotter', 'Land or property boundary disputes', NULL, 'barangay', 'medium', '2025-12-08 15:52:07'),
+(47, 'Debt/Financial Dispute', 'blotter', 'Money-related conflicts', NULL, 'barangay', 'medium', '2025-12-08 15:52:07'),
+(48, 'Harassment', 'blotter', 'Verbal or psychological harassment', NULL, 'barangay', 'high', '2025-12-08 15:52:07'),
+(49, 'Documentation Request', 'blotter', 'Request for barangay clearance or certification', NULL, 'barangay', 'low', '2025-12-08 15:52:07'),
+(50, 'Theft/Pickpocketing', 'incident', 'Stolen property, pickpocketing', 'nanakawan,nadukutan,wallet stolen,cellphone stolen,pitaka,pickpocket', 'police', 'medium', '2025-12-28 09:50:01'),
+(51, 'Robbery/Hold-up', 'incident', 'Armed robbery, hold-up', 'holdap,armed robbery,binunot ng baril,kinuha pera,gunpoint', 'police', 'high', '2025-12-28 09:50:01'),
+(52, 'Burglary/Akyat-bahay', 'incident', 'Break-in, home burglary', 'akwat-bahay,pumasok sa bahay,break in,forced entry,ninakawan habang wala', 'police', 'high', '2025-12-28 09:50:01'),
+(53, 'Carnapping/Vehicle Theft', 'incident', 'Stolen vehicles', 'carnapping,vehicle theft,ninakaw ang kotse,ninakaw ang motor,stolen car', 'police', 'high', '2025-12-28 09:50:01'),
+(54, 'Snatching/Dukot', 'incident', 'Snatching of items', 'snatched,dinukot,hinablot,bigla kinain,cellphone snatched', 'police', 'medium', '2025-12-28 09:50:01'),
+(55, 'Arson/Malicious Burning', 'incident', 'Intentional fire setting', 'arson,sinadyang sunog,intentional fire,nagpaputok,malicious burning', 'police', 'critical', '2025-12-28 09:50:01'),
+(56, 'Homicide/Murder', 'incident', 'Killing incidents', 'pinatay,patay,murder,homicide,namatay,killed,dead body', 'police', 'critical', '2025-12-28 09:50:01'),
+(57, 'Sexual Assault/Rape', 'incident', 'Sexual assault cases', 'ginahasa,rape,sexual assault,panggagahasa,rape victim', 'police', 'critical', '2025-12-28 09:50:01'),
+(58, 'Sexual Harassment', 'incident', 'Unwanted sexual advances', 'hinipuan,catcalling,bastos,manyak,sexual harassment', 'police', 'high', '2025-12-28 09:50:01'),
+(59, 'Abduction/Kidnapping', 'incident', 'Kidnapping cases', 'dinukot,kidnapping,ransom,hostage,abduction', 'police', 'critical', '2025-12-28 09:50:01'),
+(60, 'Stalking', 'incident', 'Stalking behavior', 'stalking,sinusundan,stalker,sumusunod,pinagmamasdan', 'police', 'medium', '2025-12-28 09:50:01'),
+(61, 'Found Person/Amnesia', 'incident', 'Found disoriented person', 'natagpuang lito,found wandering,amnesia,hindi maalala,disoriented', 'barangay', 'medium', '2025-12-28 09:50:01'),
+(62, 'Hit and Run', 'incident', 'Fleeing after accident', 'hit and run,tinakbuhan,tumakbo pagkatama,fled scene', 'police', 'high', '2025-12-28 09:50:01'),
+(63, 'Workplace/Industrial Accident', 'incident', 'Work-related accidents', 'naaksidente sa trabaho,construction accident,nakuryente,nahulog sa building', 'police', 'high', '2025-12-28 09:50:01'),
+(64, 'Gas Leak/Chemical Spill', 'incident', 'Chemical hazards', 'gas leak,chemical spill,amoy gas,tumatagas na kemikal,LPG leak', 'police', 'high', '2025-12-28 09:50:01'),
+(65, 'Electric Shock/Power Hazard', 'incident', 'Electrical hazards', 'nakuryente,exposed wires,kuryente sa poste,electrical hazard', 'police', 'high', '2025-12-28 09:50:01'),
+(66, 'Suicide Attempt', 'incident', 'Suicidal behavior', 'magpapakamatay,suicide attempt,jumping,overdose,self-harm', 'police', 'critical', '2025-12-28 09:50:01'),
+(67, 'Mental Health Crisis', 'incident', 'Mental health emergencies', 'nagwawala,mental health crisis,violent mentally ill,naghahamon ng away', 'barangay', 'medium', '2025-12-28 09:50:01'),
+(68, 'Infectious Disease Outbreak', 'incident', 'Disease outbreaks', 'maraming may lagnat,food poisoning,dengue cluster,outbreak', 'barangay', 'high', '2025-12-28 09:50:01'),
+(69, 'Public Disturbance (Violent)', 'incident', 'Violent public disturbances', 'riot,gulo sa fiesta,mass fight,rumble,gang war', 'police', 'high', '2025-12-28 09:50:01'),
+(70, 'Drug Lab/Manufacturing', 'incident', 'Drug manufacturing', 'shabu lab,drug manufacturing,chemical smells,suspicious lab', 'police', 'critical', '2025-12-28 09:50:01'),
+(71, 'Illegal Discharge of Firearm', 'incident', 'Gunfire incidents', 'bumaril,gunshots,nagpapaputok ng baril,putok ng baril', 'police', 'high', '2025-12-28 09:50:01'),
+(72, 'Stabbing/Cutting Incident', 'incident', 'Knife-related attacks', 'sinaksak,knife attack,stab wound,saksak,patrolya', 'police', 'high', '2025-12-28 09:50:01'),
+(73, 'Online Scam', 'incident', 'Internet scams', 'online scam,na-scam,phishing,fake seller,bogus buyer', 'police', 'medium', '2025-12-28 09:50:01'),
+(74, 'Identity Theft', 'incident', 'Identity fraud', 'identity theft,ginamit ang pangalan,fake accounts,stolen identity', 'police', 'high', '2025-12-28 09:50:01'),
+(75, 'Cyberbullying/Online Threats', 'incident', 'Online harassment', 'cyberbullying,online threats,malicious posts,online blackmail', 'police', 'medium', '2025-12-28 09:50:01'),
+(76, 'Construction Noise', 'complaint', 'Noise from construction', 'construction noise,nagkakanyon,drilling,hammering,construction maingay', 'barangay', 'low', '2025-12-28 09:50:01'),
+(77, 'Business/Commercial Noise', 'complaint', 'Noise from businesses', 'factory noise,loud speakers,store noise,videoke bar,commercial noise', 'barangay', 'low', '2025-12-28 09:50:01'),
+(78, 'Vehicle Noise', 'complaint', 'Noisy vehicles', 'modified muffler,nagre-revving,truck noise,motorcycle noise,maingay na sasakyan', 'barangay', 'low', '2025-12-28 09:50:01'),
+(79, 'Nuisance Neighbors', 'complaint', 'Disruptive neighbors', 'nuisance neighbor,disruptive,abala,nag-aaway,laging may gulo', 'barangay', 'low', '2025-12-28 09:50:01'),
+(80, 'Trespassing (Complaint)', 'complaint', 'Unauthorized entry complaints', 'trespassing,pumapasok sa bakuran,unauthorized entry,sumusunod sa lote', 'barangay', 'medium', '2025-12-28 09:50:01'),
+(81, 'Animal Cruelty', 'complaint', 'Animal abuse cases', 'animal cruelty,pinapalo ang aso,starving animals,neglected pets,abused animals', 'barangay', 'medium', '2025-12-28 09:50:01'),
+(82, 'Obstruction', 'complaint', 'Road obstructions', 'obstruction,nakaharang,blocking road,vendor blocking,construction materials sa daan', 'barangay', 'low', '2025-12-28 09:50:01'),
+(83, 'Traffic Violations', 'complaint', 'Traffic rule violations', 'traffic violation,beating red light,no helmet,reckless driving,walang lisensya', 'barangay', 'low', '2025-12-28 09:50:01'),
+(84, 'Unregistered Vehicles', 'complaint', 'Unregistered vehicles', 'colorum,no plate number,illegal PUV,unregistered vehicle,walang rehistro', 'barangay', 'low', '2025-12-28 09:50:01'),
+(85, 'Illegal Vendor', 'complaint', 'Unauthorized vendors', 'illegal vendor,vendor sa bawal lugar,obstructing pedestrian,walang permit magtinda', 'barangay', 'low', '2025-12-28 09:50:01'),
+(86, 'Overpricing/Shortchanging', 'complaint', 'Price manipulation', 'overpricing,shortchanging,sobrang mahal,nagshoshortchange,panloloko sa timbang', 'barangay', 'low', '2025-12-28 09:50:01'),
+(87, 'Consumer Complaint', 'complaint', 'Product/service complaints', 'consumer complaint,fake products,defective item,no receipt,pangit na serbisyo', 'barangay', 'low', '2025-12-28 09:50:01'),
+(88, 'Public Drinking', 'complaint', 'Public alcohol consumption', 'public drinking,nag-iinom sa kalsada,drunk disturbance,liquor ban violation', 'barangay', 'low', '2025-12-28 09:50:01'),
+(89, 'Loitering/Tambay', 'complaint', 'Loitering issues', 'loitering,tambay,suspicious loitering,catcalling sa daan,naka-block sa daan', 'barangay', 'low', '2025-12-28 09:50:01'),
+(90, 'Public Urination/Defecation', 'complaint', 'Public sanitation issues', 'public urination,dumudumi sa public,umihi sa pader,lack of public toilet', 'barangay', 'low', '2025-12-28 09:50:01'),
+(91, 'Curfew Violation', 'complaint', 'Curfew breaches', 'curfew violation,minors out past curfew,children at night,curfew ordinance', 'barangay', 'low', '2025-12-28 09:50:01'),
+(92, 'Pollution', 'complaint', 'Environmental pollution', 'pollution,air pollution,chemical dumping,usok maitim,contamination', 'barangay', 'medium', '2025-12-28 09:50:01'),
+(93, 'Tree/Vegetation Hazard', 'complaint', 'Dangerous vegetation', 'dangerous tree,mababagsak na puno,overgrown plants,blocking branches', 'barangay', 'low', '2025-12-28 09:50:01'),
+(94, 'Food Safety', 'complaint', 'Food handling issues', 'food safety,dirty food handling,unsanitary food stall,langaw sa pagkain', 'barangay', 'medium', '2025-12-28 09:50:01'),
+(95, 'Smoking Violation', 'complaint', 'Smoking in prohibited areas', 'smoking violation,smoking in public,no smoking zone,secondhand smoke', 'barangay', 'low', '2025-12-28 09:50:01'),
+(96, 'Abandoned Vehicle', 'complaint', 'Abandoned vehicles', 'abandoned vehicle,nakaparada ng matagal,junk vehicle,abandoned car', 'barangay', 'low', '2025-12-28 09:50:01'),
+(97, 'Illegal Terminal', 'complaint', 'Unauthorized terminals', 'illegal terminal,colorum terminal,unauthorized PUV stop,illegal parking for hire', 'barangay', 'medium', '2025-12-28 09:50:01'),
+(98, 'Domestic Dispute (Non-violent)', 'blotter', 'Family conflicts without violence', 'domestic dispute,away mag-asawa,marital problems,non-violent family issue', 'barangay', 'low', '2025-12-28 09:50:01'),
+(99, 'Child/Parent Conflict', 'blotter', 'Parent-child disputes', 'child parent conflict,rebellious teenager,hindi sumusunod,generation gap', 'barangay', 'low', '2025-12-28 09:50:01'),
+(100, 'Financial Family Dispute', 'blotter', 'Family money disputes', 'financial family dispute,away sa pera,inheritance problem,utang sa kapamilya', 'barangay', 'medium', '2025-12-28 09:50:01'),
+(101, 'VAWC Cases (Documentation)', 'blotter', 'Violence against women documentation', 'VAWC,psychological violence,economic abuse,emotional abuse,violence against women', 'barangay', 'high', '2025-12-28 09:50:01'),
+(102, 'Property Damage Dispute', 'blotter', 'Disputes over property damage', 'property damage dispute,nasira ang pader,ayaw magbayad,accidental damage', 'barangay', 'medium', '2025-12-28 09:50:01'),
+(103, 'Shared Facility Dispute', 'blotter', 'Common area conflicts', 'shared facility dispute,away sa tubig,shared wall issue,common area use', 'barangay', 'low', '2025-12-28 09:50:01'),
+(104, 'Business Disagreement', 'blotter', 'Business partnership disputes', 'business disagreement,hindi natupad ang kontrata,business partner dispute,payment disagreement', 'barangay', 'medium', '2025-12-28 09:50:01'),
+(105, 'Landlord-Tenant Dispute', 'blotter', 'Rental conflicts', 'landlord tenant dispute,hindi nagbabayad ng rent,deposit hindi naibalik,eviction disagreement', 'barangay', 'medium', '2025-12-28 09:50:01'),
+(106, 'Property Rental Issues', 'blotter', 'Rental property problems', 'property rental issues,sira ang hiniram,overstaying renter,rules violation', 'barangay', 'medium', '2025-12-28 09:50:01'),
+(107, 'Workplace Harassment', 'blotter', 'Work harassment cases', 'workplace harassment,harassment sa trabaho,bullying sa office,discrimination', 'barangay', 'medium', '2025-12-28 09:50:01'),
+(108, 'Incident Documentation', 'blotter', 'Official documentation of events', 'incident documentation,for insurance,record ng nangyari,proof for employer', 'barangay', 'low', '2025-12-28 09:50:01'),
+(109, 'Lost Document Affidavit', 'blotter', 'Lost document reporting', 'lost document affidavit,nawala ang ID,lost important papers,affidavit of loss', 'barangay', 'low', '2025-12-28 09:50:01'),
+(110, 'Verification/Certification', 'blotter', 'Document verification', 'verification certification,certify residency,verify incident,authentication', 'barangay', 'low', '2025-12-28 09:50:01'),
+(111, 'Relationship Dispute', 'blotter', 'Romantic relationship conflicts', 'relationship dispute,away magsyota,love triangle,breakup problems', 'barangay', 'low', '2025-12-28 09:50:01'),
+(112, 'Friendship Conflict', 'blotter', 'Friend disputes', 'friendship conflict,away magkaibigan,siraan sa barkada,group conflict', 'barangay', 'low', '2025-12-28 09:50:01'),
+(113, 'Rumor/Chismis Issues', 'blotter', 'Rumor-related conflicts', 'rumor issues,paninira ng pangalan,false rumors,slander without evidence', 'barangay', 'low', '2025-12-28 09:50:01'),
+(114, 'Purok/Sitio Issues', 'blotter', 'Community organization problems', 'purok issues,community disagreement,HOA problems,neighborhood association', 'barangay', 'low', '2025-12-28 09:50:01'),
+(115, 'Public Facility Complaint', 'blotter', 'Public amenity issues', 'public facility complaint,sirang street light,damaged waiting shed,playground safety', 'barangay', 'low', '2025-12-28 09:50:01'),
+(116, 'Water/Electricity Dispute', 'blotter', 'Utility billing disputes', 'utility dispute,away sa bayarin,shared meter problem,utility conflict', 'barangay', 'low', '2025-12-28 09:50:01'),
+(117, 'Suspicious Activity', 'blotter', 'Suspicious behavior reporting', 'suspicious activity,kahina-hinalang tao,suspicious gatherings,possible illegal activity', 'barangay', 'medium', '2025-12-28 09:50:01'),
+(118, 'Pre-emptive Complaint', 'blotter', 'Preventive reporting', 'pre-emptive complaint,baka mangyari ang gulo,preventing possible fight,early warning', 'barangay', 'low', '2025-12-28 09:50:01'),
+(119, 'General Advice/Consultation', 'blotter', 'General inquiries', 'general advice,paano ang proseso,ask for advice,consultation only', 'barangay', 'low', '2025-12-28 09:50:01'),
+(120, 'Bullying in School', 'blotter', 'School bullying cases', 'bullying in school,binubully ang anak,school harassment,cyberbullying minor', 'barangay', 'high', '2025-12-28 09:50:01'),
+(121, 'Truancy/School Issues', 'blotter', 'School attendance problems', 'truancy,hindi pumapasok sa school,cutting classes,school problem', 'barangay', 'medium', '2025-12-28 09:50:01'),
+(122, 'Youth Gang Concern', 'blotter', 'Youth gang issues', 'youth gang concern,gang sa barangay,teenagers causing trouble,fraternity recruitment', 'barangay', 'high', '2025-12-28 09:50:01'),
+(123, 'PWD Accessibility Issues', 'blotter', 'Accessibility problems', 'PWD accessibility,walang ramp,no accessibility,discrimination PWD', 'barangay', 'medium', '2025-12-28 09:50:01'),
+(124, 'Social Media Conflict', 'blotter', 'Online social conflicts', 'social media conflict,away sa Facebook,online argument,post causing trouble', 'barangay', 'low', '2025-12-28 09:50:01'),
+(125, 'Online Transaction Problem', 'blotter', 'Online transaction issues', 'online transaction problem,e-commerce issue,digital payment problem,online purchase issue', 'barangay', 'low', '2025-12-28 09:50:01'),
+(126, 'Government Employee Complaint', 'blotter', 'Government service complaints', 'government employee complaint,mabagal na serbisyo,corrupt employee,poor public service', 'barangay', 'medium', '2025-12-28 09:50:01'),
+(127, 'Document Processing Issue', 'blotter', 'Document processing delays', 'document processing issue,tagal ng permit,delayed papers,bureaucracy problem', 'barangay', 'low', '2025-12-28 09:50:01'),
+(128, 'Religious/Cultural Issues', 'blotter', 'Religious conflicts', 'religious disturbance,maingay na simbahan,religious discrimination,cultural practice conflict', 'barangay', 'medium', '2025-12-28 09:50:01'),
+(129, 'Squatting/Illegal Settlers', 'blotter', 'Illegal settlement issues', 'squatting,illegal settlers,land invasion,squatting on property', 'barangay', 'high', '2025-12-28 09:50:01'),
+(130, 'Informal Settler Issues', 'blotter', 'Informal settlement problems', 'informal settler issues,ISF community problems,relocation concerns,informal housing', 'barangay', 'medium', '2025-12-28 09:50:01'),
+(142, 'Gender-based Incident', 'incident', 'Violence against women', NULL, 'police', 'high', '2026-01-03 15:40:01'),
+(143, 'Missing Pet / Nawawalang Alaga', 'incident', 'Lost pets or animals', NULL, 'barangay', 'low', '2026-01-03 15:40:01'),
+(144, 'Natural Disaster / Kalamidad', 'incident', 'Natural calamities', NULL, 'barangay', 'high', '2026-01-03 15:40:01'),
+(145, 'Rescue Operations / Pagsagip', 'incident', 'Rescue situations', NULL, 'police', 'high', '2026-01-03 15:40:01'),
+(146, 'Online Scam / Panloloko Online', 'incident', 'Internet scams', NULL, 'police', 'medium', '2026-01-03 15:40:01'),
+(147, 'Cyberbullying', 'incident', 'Online harassment', NULL, 'police', 'medium', '2026-01-03 15:40:01'),
+(155, 'Construction Noise / Ingay sa Konstruksyon', 'complaint', 'Noise from construction', NULL, 'barangay', 'low', '2026-01-03 15:40:01'),
+(156, 'Public Health Concern / Alalahanin sa Kalusugan', 'complaint', 'Health-related concerns', NULL, 'barangay', 'medium', '2026-01-03 15:40:01'),
+(157, 'Rabies Concern / Alalahanin sa Rabies', 'complaint', 'Rabies threats', NULL, 'barangay', 'medium', '2026-01-03 15:40:01'),
+(158, 'Public Nuisance / Istorbong Pampubliko', 'complaint', 'Public disturbances', NULL, 'barangay', 'low', '2026-01-03 15:40:01'),
+(159, 'Public Drinking / Pag-inom sa Pampubliko', 'complaint', 'Public alcohol consumption', NULL, 'barangay', 'low', '2026-01-03 15:40:01'),
+(160, 'Ordinance Violation / Paglabag sa Ordinansa', 'complaint', 'Violation of local ordinances', NULL, 'barangay', 'low', '2026-01-03 15:40:01'),
+(161, 'Smoking Violation / Paglabag sa Paninigarilyo', 'complaint', 'Smoking violations', NULL, 'barangay', 'low', '2026-01-03 15:40:01'),
+(162, 'Consumer Complaint / Reklamong Pangkonsyumer', 'complaint', 'Consumer-related issues', NULL, 'barangay', 'low', '2026-01-03 15:40:01'),
+(163, 'Illegal Vendor / Iligal na Tindera', 'complaint', 'Unauthorized vendors', NULL, 'barangay', 'low', '2026-01-03 15:40:01'),
+(164, 'Air Pollution / Polusyon sa Hangin', 'complaint', 'Air pollution issues', NULL, 'barangay', 'medium', '2026-01-03 15:40:01'),
+(165, 'Water Pollution / Polusyon sa Tubig', 'complaint', 'Water contamination', NULL, 'barangay', 'medium', '2026-01-03 15:40:01'),
+(166, 'Domestic Dispute / Alitan sa Tahanan', 'blotter', 'Family conflicts', NULL, 'barangay', 'medium', '2026-01-03 15:40:01'),
+(167, 'Neighbor Dispute / Alitan ng Kapitbahay', 'blotter', 'Neighbor conflicts', NULL, 'barangay', 'low', '2026-01-03 15:40:01'),
+(168, 'Family Conflict / Hidwaan sa Pamilya', 'blotter', 'Family disagreements', NULL, 'barangay', 'medium', '2026-01-03 15:40:01'),
+(169, 'Property Conflict / Hidwaan sa Ari-arian', 'blotter', 'Property disputes', NULL, 'barangay', 'medium', '2026-01-03 15:40:01'),
+(170, 'Land Dispute / Hidwaan sa Lupa', 'blotter', 'Land boundary issues', NULL, 'barangay', 'medium', '2026-01-03 15:40:01'),
+(171, 'Financial Dispute / Hidwaan sa Pera', 'blotter', 'Money-related disputes', NULL, 'barangay', 'low', '2026-01-03 15:40:01'),
+(172, 'Threats/Harassment / Pananakot', 'blotter', 'Threats and harassment', NULL, 'barangay', 'medium', '2026-01-03 15:40:01'),
+(173, 'Contract Dispute / Hidwaan sa Kontrata', 'blotter', 'Contract disagreements', NULL, 'barangay', 'medium', '2026-01-03 15:40:01'),
+(174, 'Record/Blotter Request / Kahilingan ng Blotter', 'blotter', 'Documentation requests', NULL, 'barangay', 'low', '2026-01-03 15:40:01'),
+(175, 'Barangay Clearance Request', 'blotter', 'Clearance requests', NULL, 'barangay', 'low', '2026-01-03 15:40:01'),
+(176, 'Certificate of Indigency', 'blotter', 'Indigency certification', NULL, 'barangay', 'low', '2026-01-03 15:40:01'),
+(177, 'Disability Concern / Alalahanin sa May Kapansanan', 'blotter', 'PWD-related issues', NULL, 'barangay', 'medium', '2026-01-03 15:40:01'),
+(178, 'Tenant-Landlord Dispute / Hidwaan ng Upahan', 'blotter', 'Rental conflicts', NULL, 'barangay', 'medium', '2026-01-03 15:40:01');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `roles`
+--
+
+CREATE TABLE `roles` (
+  `id` int(11) NOT NULL,
+  `role_name` varchar(50) NOT NULL,
+  `description` text DEFAULT NULL,
+  `permissions` text DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Dumping data for table `roles`
+--
+
+INSERT INTO `roles` (`id`, `role_name`, `description`, `permissions`, `created_at`) VALUES
+(1, 'admin', 'System Administrator', 'all', '2025-12-06 05:28:32'),
+(2, 'captain', 'Barangay Captain', 'manage_reports,view_reports,manage_users,manage_announcements', '2025-12-06 05:28:32'),
+(3, 'secretary', 'Barangay Secretary', 'manage_reports,view_reports,manage_announcements', '2025-12-06 05:28:32'),
+(4, 'lupon', 'Lupon Member', 'view_reports,manage_reports', '2025-12-06 05:28:32'),
+(5, 'tanod', 'Barangay Tanod', 'view_reports,update_reports_status', '2025-12-06 05:28:32');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `users`
+--
+
+CREATE TABLE `users` (
+  `id` int(11) NOT NULL,
+  `first_name` varchar(50) NOT NULL,
+  `middle_name` varchar(50) DEFAULT NULL,
+  `last_name` varchar(50) NOT NULL,
+  `suffix` varchar(10) DEFAULT NULL,
+  `sex` enum('Male','Female','Other') NOT NULL,
+  `birthday` date NOT NULL,
+  `age` int(11) DEFAULT NULL,
+  `permanent_address` text NOT NULL,
+  `contact_number` varchar(20) NOT NULL,
+  `emergency_contact` varchar(100) DEFAULT NULL,
+  `emergency_number` varchar(20) DEFAULT NULL,
+  `id_verification_path` varchar(255) DEFAULT NULL,
+  `email` varchar(100) NOT NULL,
+  `username` varchar(50) NOT NULL,
+  `password` varchar(255) NOT NULL,
+  `user_type` enum('citizen','barangay_member') DEFAULT 'citizen',
+  `role` varchar(50) DEFAULT NULL,
+  `position_id` int(11) DEFAULT NULL,
+  `date_appointed` date DEFAULT NULL,
+  `term_end` date DEFAULT NULL,
+  `office_hours` varchar(100) DEFAULT NULL,
+  `barangay` varchar(100) DEFAULT NULL,
+  `status` enum('active','inactive','pending','rejected') DEFAULT 'pending',
+  `is_active` tinyint(1) DEFAULT 1,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  `last_login` timestamp NULL DEFAULT NULL,
+  `pin_code` varchar(10) DEFAULT NULL,
+  `master_code` varchar(10) DEFAULT NULL,
+  `is_master_code_used` tinyint(1) DEFAULT 0,
+  `master_code_used_at` timestamp NULL DEFAULT NULL,
+  `reset_token` varchar(255) DEFAULT NULL,
+  `reset_token_expiry` timestamp NULL DEFAULT NULL,
+  `is_online` tinyint(1) DEFAULT 1,
+  `profile_picture` varchar(255) DEFAULT NULL,
+  `notification_token` varchar(255) DEFAULT NULL,
+  `wants_notifications` tinyint(1) DEFAULT 1
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Dumping data for table `users`
+--
+
+INSERT INTO `users` (`id`, `first_name`, `middle_name`, `last_name`, `suffix`, `sex`, `birthday`, `age`, `permanent_address`, `contact_number`, `emergency_contact`, `emergency_number`, `id_verification_path`, `email`, `username`, `password`, `user_type`, `role`, `position_id`, `date_appointed`, `term_end`, `office_hours`, `barangay`, `status`, `is_active`, `created_at`, `updated_at`, `last_login`, `pin_code`, `master_code`, `is_master_code_used`, `master_code_used_at`, `reset_token`, `reset_token_expiry`, `is_online`, `profile_picture`, `notification_token`, `wants_notifications`) VALUES
+(1001, 'System', '', 'Administrator', '', 'Male', '1990-01-01', 34, 'Barangay Hall, City Hall Compound', '9123456789', NULL, NULL, NULL, 'admin@leir.com', 'admin', 'hello11.', 'barangay_member', 'admin', NULL, NULL, NULL, NULL, 'LGU-4', 'active', 1, '2025-12-06 05:32:10', '2025-12-07 14:13:06', NULL, '1234', NULL, 0, NULL, NULL, NULL, 1, NULL, NULL, 1),
+(1002, 'Juan', 'Santos', 'Dela Cruz', 'Jr', 'Male', '1985-05-15', 39, '123 Main Street, Barangay 1, City', '9123456780', NULL, NULL, NULL, 'citizen@example.com', 'citizen', 'hello11.', 'citizen', 'citizen', NULL, NULL, NULL, NULL, 'Barangay 1', 'active', 1, '2025-12-06 05:32:10', '2025-12-07 14:13:06', NULL, NULL, NULL, 0, NULL, NULL, NULL, 1, NULL, NULL, 1),
+(1003, 'cla', '', 'galvez', '', 'Female', '2002-12-01', 23, 'Block 8  Towerville', '09978407627', 'clarisa galvez', '09978407625', 'uploads/ids/6935f6f75f045_1765144311.jpg', 'ysa@gmail.com', 'ysa', '$2y$10$ErRqKYCyQD2sBpZv.w2NiudfPvT89YSsiTvHn2i6Ylc6D1ztKOKym', 'citizen', 'citizen', NULL, NULL, NULL, NULL, 'Block 8 lot 2 6D Towerville', 'active', 1, '2025-12-07 21:51:51', '2026-01-06 16:24:06', '2026-01-06 16:24:06', NULL, NULL, 0, NULL, NULL, NULL, 1, '1765476337_693b07f17c86f_4f4053396ad983bb501fd6eae285bedd.jpg', NULL, 1),
+(1004, 'angelo', 'galvez', 'pabericio', '', 'Male', '2009-10-22', 16, 'Block 8 lot 2 6D Towerville', '09978407622', 'clarisa galvez', '09978407628', 'uploads/ids/6935f95ce533d_1765144924.jpeg', 'ysagalv5@gmail.com', 'cris', '$2y$10$mT0NIt.Ag.ohJtojwKgdnOB/w9JMSpROhQShWXGaQvgHkJeChVnBO', 'citizen', 'citizen', NULL, NULL, NULL, NULL, 'Block 8 lot 2 6D Towerville', 'active', 0, '2025-12-07 22:02:04', '2025-12-08 08:19:25', '2025-12-08 08:06:36', NULL, NULL, 0, NULL, NULL, NULL, 1, NULL, NULL, 1),
+(1005, 'Clarisa', 'Galvez', 'Manangan', '', 'Female', '2002-03-11', 23, 'Block 110', '09978407689', NULL, NULL, NULL, 'ysagalvez@gmail.com', 'clarisg', '$2y$10$Z5aPzVJE.ponvcbFJJ4oS.6IALC5jnaTCIFbNihF8YjCsIrwKMdnG', 'barangay_member', 'secretary', NULL, NULL, NULL, NULL, 'Block 110', 'active', 1, '2026-01-03 16:34:21', '2026-01-03 16:34:21', NULL, NULL, NULL, 0, NULL, NULL, NULL, 1, NULL, NULL, 1),
+(1006, 'Ysabel', '', 'Gal', '', 'Female', '2001-09-23', 24, '6D', '08976545678', NULL, NULL, NULL, 'ysagalv@gmail.com', 'ysag', '$2y$10$VqqQIuPWdyi.Lz86F/QGselYVD5UGtU98VJ5M8AtbAxsJ2kTGKq46', 'barangay_member', 'admin', NULL, NULL, NULL, NULL, '6D', 'active', 1, '2026-01-03 16:45:12', '2026-01-03 16:45:12', NULL, NULL, NULL, 0, NULL, NULL, NULL, 1, NULL, NULL, 1),
+(1007, 'JR', '', 'RACELIS', '', 'Male', '2001-11-13', 24, 'BLOCK 7', '09865434567', NULL, NULL, NULL, 'Jr@gmail.com', 'jr', '$2y$10$bUtOO.9WDZNnYcwLjoVNN.GJ74c8V7bazXPB.v1rzlFmVdoHV7/Ma', 'barangay_member', 'captain', NULL, NULL, NULL, NULL, 'BLOCK 7', 'pending', 1, '2026-01-03 17:32:35', '2026-01-03 17:32:35', NULL, NULL, '5981', 0, NULL, NULL, NULL, 1, NULL, NULL, 1),
+(1008, 'hanah', '', 'magnaye', '', 'Female', '2000-09-07', 25, 'talipapa', '09875678923', NULL, NULL, NULL, 'hanah@gmail.com', 'hanah', '$2y$10$ztzCxhIh82YzPdtHM4.syOWDRe04MxxWrdCNC7RdutzrIjstoVWCi', 'barangay_member', 'secretary', NULL, NULL, NULL, NULL, 'talipapa', 'pending', 1, '2026-01-03 17:51:52', '2026-01-03 17:51:52', NULL, NULL, '4939', 0, NULL, NULL, NULL, 1, NULL, NULL, 1);
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `user_citizen_details`
+--
+
+CREATE TABLE `user_citizen_details` (
+  `id` int(11) NOT NULL,
+  `user_id` int(11) NOT NULL,
+  `guardian_name` varchar(100) DEFAULT NULL,
+  `guardian_contact` varchar(20) DEFAULT NULL,
+  `id_type` enum('barangay_id','school_id','government_id','other') DEFAULT NULL,
+  `id_upload_path` varchar(255) DEFAULT NULL,
+  `guardian_id_upload_path` varchar(255) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Dumping data for table `user_citizen_details`
+--
+
+INSERT INTO `user_citizen_details` (`id`, `user_id`, `guardian_name`, `guardian_contact`, `id_type`, `id_upload_path`, `guardian_id_upload_path`, `created_at`, `updated_at`) VALUES
+(1, 1003, '', '', 'barangay_id', 'uploads/ids/6935f6f75f045_1765144311.jpg', NULL, '2025-12-07 21:51:51', '2025-12-07 21:51:51'),
+(2, 1004, 'Clarisa Galez', '09876234568', 'school_id', 'uploads/ids/6935f95ce533d_1765144924.jpeg', 'uploads/guardian_ids/guardian_6935f95ce6406_1765144924.jpg', '2025-12-07 22:02:04', '2025-12-07 22:02:04');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `user_notifications`
+--
+
+CREATE TABLE `user_notifications` (
+  `id` int(11) NOT NULL,
+  `user_id` int(11) NOT NULL,
+  `title` varchar(255) NOT NULL,
+  `message` text NOT NULL,
+  `type` enum('info','success','warning','error','emergency') DEFAULT 'info',
+  `is_read` tinyint(1) DEFAULT 0,
+  `related_id` int(11) DEFAULT NULL,
+  `related_type` varchar(50) DEFAULT NULL,
+  `action_url` varchar(255) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `user_roles`
+--
+
+CREATE TABLE `user_roles` (
+  `id` int(11) NOT NULL,
+  `user_id` int(11) NOT NULL,
+  `role_id` int(11) NOT NULL,
+  `assigned_by` int(11) DEFAULT NULL,
+  `assigned_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Dumping data for table `user_roles`
+--
+
+INSERT INTO `user_roles` (`id`, `user_id`, `role_id`, `assigned_by`, `assigned_at`) VALUES
+(1, 1001, 1, NULL, '2025-12-06 05:32:10');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `user_sessions`
+--
+
+CREATE TABLE `user_sessions` (
+  `id` int(11) NOT NULL,
+  `user_id` int(11) NOT NULL,
+  `session_token` varchar(255) NOT NULL,
+  `ip_address` varchar(45) DEFAULT NULL,
+  `user_agent` text DEFAULT NULL,
+  `last_activity` timestamp NOT NULL DEFAULT current_timestamp(),
+  `is_active` tinyint(1) DEFAULT 1
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Indexes for dumped tables
+--
+
+--
+-- Indexes for table `activity_logs`
+--
+ALTER TABLE `activity_logs`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_user_action` (`user_id`,`action`),
+  ADD KEY `idx_created` (`created_at`);
+
+--
+-- Indexes for table `ai_classification_logs`
+--
+ALTER TABLE `ai_classification_logs`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_report` (`report_id`);
+
+--
+-- Indexes for table `announcements`
+--
+ALTER TABLE `announcements`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_announcements_active` (`is_active`,`barangay`,`target_role`),
+  ADD KEY `idx_announcements_barangay_active` (`barangay`,`is_active`,`created_at`);
+
+--
+-- Indexes for table `barangay_personnel_master_codes`
+--
+ALTER TABLE `barangay_personnel_master_codes`
+  ADD KEY `barangay_personnel_master_codes_ibfk_1` (`admin_id`),
+  ADD KEY `barangay_personnel_master_codes_ibfk_2` (`assigned_to`);
+
+--
+-- Indexes for table `barangay_personnel_registrations`
+--
+ALTER TABLE `barangay_personnel_registrations`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `user_id` (`user_id`),
+  ADD KEY `admin_id` (`admin_id`),
+  ADD KEY `idx_master_code` (`master_code`);
+
+--
+-- Indexes for table `barangay_positions`
+--
+ALTER TABLE `barangay_positions`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `barangay_positions_ibfk_1` (`role_id`);
+
+--
+-- Indexes for table `file_encryption_logs`
+--
+ALTER TABLE `file_encryption_logs`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `last_decrypted_by` (`last_decrypted_by`),
+  ADD KEY `idx_report` (`report_id`),
+  ADD KEY `idx_key` (`encryption_key`),
+  ADD KEY `idx_file_encryption_report` (`report_id`,`encryption_key`);
+
+--
+-- Indexes for table `lost_found_items`
+--
+ALTER TABLE `lost_found_items`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `created_by` (`created_by`);
+
+--
+-- Indexes for table `messages`
+--
+ALTER TABLE `messages`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `report_id` (`report_id`),
+  ADD KEY `sender_id` (`sender_id`),
+  ADD KEY `receiver_id` (`receiver_id`);
+
+--
+-- Indexes for table `notifications`
+--
+ALTER TABLE `notifications`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `user_id` (`user_id`);
+
+--
+-- Indexes for table `reports`
+--
+ALTER TABLE `reports`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `report_number` (`report_number`),
+  ADD KEY `user_id` (`user_id`),
+  ADD KEY `report_type_id` (`report_type_id`),
+  ADD KEY `assigned_to` (`assigned_to`),
+  ADD KEY `status` (`status`),
+  ADD KEY `priority` (`priority`),
+  ADD KEY `idx_reports_user_status` (`user_id`,`status`),
+  ADD KEY `idx_reports_created` (`created_at`),
+  ADD KEY `idx_reports_type` (`report_type_id`),
+  ADD KEY `submitted_by` (`submitted_by`),
+  ADD KEY `idx_reports_user_status_date` (`user_id`,`status`,`created_at`);
+
+--
+-- Indexes for table `report_attachments`
+--
+ALTER TABLE `report_attachments`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `report_id` (`report_id`);
+
+--
+-- Indexes for table `report_status_history`
+--
+ALTER TABLE `report_status_history`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `report_id` (`report_id`),
+  ADD KEY `updated_by` (`updated_by`),
+  ADD KEY `idx_report_history_report_status` (`report_id`,`status`,`created_at`);
+
+--
+-- Indexes for table `report_timeline`
+--
+ALTER TABLE `report_timeline`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `report_id` (`report_id`),
+  ADD KEY `created_by` (`created_by`);
+
+--
+-- Indexes for table `report_types`
+--
+ALTER TABLE `report_types`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `unique_report_type` (`type_name`,`category`,`jurisdiction`),
+  ADD KEY `idx_category` (`category`),
+  ADD KEY `idx_jurisdiction` (`jurisdiction`),
+  ADD KEY `idx_severity` (`severity_level`);
+
+--
+-- Indexes for table `roles`
+--
+ALTER TABLE `roles`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `role_name` (`role_name`);
+
+--
+-- Indexes for table `users`
+--
+ALTER TABLE `users`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `email` (`email`),
+  ADD UNIQUE KEY `username` (`username`),
+  ADD KEY `idx_user_type` (`user_type`),
+  ADD KEY `idx_status` (`status`),
+  ADD KEY `idx_users_status` (`is_active`,`status`),
+  ADD KEY `idx_users_barangay` (`user_type`,`barangay`),
+  ADD KEY `idx_position` (`position_id`),
+  ADD KEY `idx_users_barangay_status` (`barangay`,`status`,`is_active`);
+
+--
+-- Indexes for table `user_citizen_details`
+--
+ALTER TABLE `user_citizen_details`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `user_id` (`user_id`);
+
+--
+-- Indexes for table `user_notifications`
+--
+ALTER TABLE `user_notifications`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_user_read` (`user_id`,`is_read`),
+  ADD KEY `idx_user_notifications_read` (`user_id`,`is_read`,`created_at`);
+
+--
+-- Indexes for table `user_roles`
+--
+ALTER TABLE `user_roles`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `unique_user_role` (`user_id`,`role_id`),
+  ADD KEY `role_id` (`role_id`),
+  ADD KEY `assigned_by` (`assigned_by`);
+
+--
+-- Indexes for table `user_sessions`
+--
+ALTER TABLE `user_sessions`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `session_token` (`session_token`),
+  ADD KEY `idx_token` (`session_token`),
+  ADD KEY `idx_user` (`user_id`);
+
+--
+-- AUTO_INCREMENT for dumped tables
+--
+
+--
+-- AUTO_INCREMENT for table `activity_logs`
+--
+ALTER TABLE `activity_logs`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `ai_classification_logs`
+--
+ALTER TABLE `ai_classification_logs`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `announcements`
+--
+ALTER TABLE `announcements`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `barangay_personnel_registrations`
+--
+ALTER TABLE `barangay_personnel_registrations`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
+
+--
+-- AUTO_INCREMENT for table `barangay_positions`
+--
+ALTER TABLE `barangay_positions`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=8;
+
+--
+-- AUTO_INCREMENT for table `file_encryption_logs`
+--
+ALTER TABLE `file_encryption_logs`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `lost_found_items`
+--
+ALTER TABLE `lost_found_items`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `messages`
+--
+ALTER TABLE `messages`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `notifications`
+--
+ALTER TABLE `notifications`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `reports`
+--
+ALTER TABLE `reports`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=10009;
+
+--
+-- AUTO_INCREMENT for table `report_attachments`
+--
+ALTER TABLE `report_attachments`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `report_status_history`
+--
+ALTER TABLE `report_status_history`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=9;
+
+--
+-- AUTO_INCREMENT for table `report_timeline`
+--
+ALTER TABLE `report_timeline`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `report_types`
+--
+ALTER TABLE `report_types`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=179;
+
+--
+-- AUTO_INCREMENT for table `roles`
+--
+ALTER TABLE `roles`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=7;
+
+--
+-- AUTO_INCREMENT for table `users`
+--
+ALTER TABLE `users`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=1009;
+
+--
+-- AUTO_INCREMENT for table `user_citizen_details`
+--
+ALTER TABLE `user_citizen_details`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
+
+--
+-- AUTO_INCREMENT for table `user_notifications`
+--
+ALTER TABLE `user_notifications`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `user_roles`
+--
+ALTER TABLE `user_roles`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+
+--
+-- AUTO_INCREMENT for table `user_sessions`
+--
+ALTER TABLE `user_sessions`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- Constraints for dumped tables
+--
+
+--
+-- Constraints for table `activity_logs`
+--
+ALTER TABLE `activity_logs`
+  ADD CONSTRAINT `activity_logs_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL;
+
+--
+-- Constraints for table `ai_classification_logs`
+--
+ALTER TABLE `ai_classification_logs`
+  ADD CONSTRAINT `ai_classification_logs_ibfk_1` FOREIGN KEY (`report_id`) REFERENCES `reports` (`id`) ON DELETE SET NULL;
+
+--
+-- Constraints for table `barangay_personnel_master_codes`
+--
+ALTER TABLE `barangay_personnel_master_codes`
+  ADD CONSTRAINT `barangay_personnel_master_codes_ibfk_1` FOREIGN KEY (`admin_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `barangay_personnel_master_codes_ibfk_2` FOREIGN KEY (`assigned_to`) REFERENCES `users` (`id`) ON DELETE SET NULL;
+
+--
+-- Constraints for table `barangay_personnel_registrations`
+--
+ALTER TABLE `barangay_personnel_registrations`
+  ADD CONSTRAINT `barangay_personnel_registrations_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `barangay_personnel_registrations_ibfk_2` FOREIGN KEY (`admin_id`) REFERENCES `users` (`id`) ON DELETE CASCADE;
+
+--
+-- Constraints for table `file_encryption_logs`
+--
+ALTER TABLE `file_encryption_logs`
+  ADD CONSTRAINT `file_encryption_logs_ibfk_1` FOREIGN KEY (`report_id`) REFERENCES `reports` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `file_encryption_logs_ibfk_2` FOREIGN KEY (`last_decrypted_by`) REFERENCES `users` (`id`) ON DELETE SET NULL;
+
+--
+-- Constraints for table `lost_found_items`
+--
+ALTER TABLE `lost_found_items`
+  ADD CONSTRAINT `lost_found_items_ibfk_1` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`) ON DELETE SET NULL;
+
+--
+-- Constraints for table `messages`
+--
+ALTER TABLE `messages`
+  ADD CONSTRAINT `messages_ibfk_1` FOREIGN KEY (`report_id`) REFERENCES `reports` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `messages_ibfk_2` FOREIGN KEY (`sender_id`) REFERENCES `users` (`id`),
+  ADD CONSTRAINT `messages_ibfk_3` FOREIGN KEY (`receiver_id`) REFERENCES `users` (`id`) ON DELETE SET NULL;
+
+--
+-- Constraints for table `notifications`
+--
+ALTER TABLE `notifications`
+  ADD CONSTRAINT `notifications_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE;
+
+--
+-- Constraints for table `reports`
+--
+ALTER TABLE `reports`
+  ADD CONSTRAINT `reports_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `reports_ibfk_2` FOREIGN KEY (`report_type_id`) REFERENCES `report_types` (`id`),
+  ADD CONSTRAINT `reports_ibfk_3` FOREIGN KEY (`assigned_to`) REFERENCES `users` (`id`) ON DELETE SET NULL,
+  ADD CONSTRAINT `reports_ibfk_4` FOREIGN KEY (`submitted_by`) REFERENCES `users` (`id`) ON DELETE SET NULL;
+
+--
+-- Constraints for table `report_attachments`
+--
+ALTER TABLE `report_attachments`
+  ADD CONSTRAINT `report_attachments_ibfk_1` FOREIGN KEY (`report_id`) REFERENCES `reports` (`id`) ON DELETE CASCADE;
+
+--
+-- Constraints for table `report_status_history`
+--
+ALTER TABLE `report_status_history`
+  ADD CONSTRAINT `report_status_history_ibfk_1` FOREIGN KEY (`report_id`) REFERENCES `reports` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `report_status_history_ibfk_2` FOREIGN KEY (`updated_by`) REFERENCES `users` (`id`) ON DELETE SET NULL;
+
+--
+-- Constraints for table `report_timeline`
+--
+ALTER TABLE `report_timeline`
+  ADD CONSTRAINT `report_timeline_ibfk_1` FOREIGN KEY (`report_id`) REFERENCES `reports` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `report_timeline_ibfk_2` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`) ON DELETE CASCADE;
+
+--
+-- Constraints for table `user_citizen_details`
+--
+ALTER TABLE `user_citizen_details`
+  ADD CONSTRAINT `user_citizen_details_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE;
+
+--
+-- Constraints for table `user_notifications`
+--
+ALTER TABLE `user_notifications`
+  ADD CONSTRAINT `user_notifications_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE;
+
+--
+-- Constraints for table `user_roles`
+--
+ALTER TABLE `user_roles`
+  ADD CONSTRAINT `user_roles_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `user_roles_ibfk_2` FOREIGN KEY (`role_id`) REFERENCES `roles` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `user_roles_ibfk_3` FOREIGN KEY (`assigned_by`) REFERENCES `users` (`id`) ON DELETE SET NULL;
+
+--
+-- Constraints for table `user_sessions`
+--
+ALTER TABLE `user_sessions`
+  ADD CONSTRAINT `user_sessions_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE;
+COMMIT;
+
+/*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
+/*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
+/*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
