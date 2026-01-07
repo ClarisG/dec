@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: localhost:3307
--- Generation Time: Jan 06, 2026 at 06:02 PM
+-- Generation Time: Jan 07, 2026 at 12:03 PM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -123,7 +123,7 @@ CREATE TABLE `barangay_personnel_registrations` (
 
 INSERT INTO `barangay_personnel_registrations` (`id`, `user_id`, `admin_id`, `master_code`, `master_code_used`, `master_code_used_at`, `is_active`, `created_at`, `updated_at`) VALUES
 (1, 1007, 1001, '5981', 0, NULL, 1, '2026-01-03 17:32:35', '2026-01-03 17:32:35'),
-(2, 1008, 1001, '4939', 0, NULL, 1, '2026-01-03 17:51:52', '2026-01-03 17:51:52');
+(2, 1008, 1001, '4939', 1, '2026-01-06 18:37:39', 1, '2026-01-03 17:51:52', '2026-01-06 18:37:39');
 
 -- --------------------------------------------------------
 
@@ -278,7 +278,8 @@ INSERT INTO `reports` (`id`, `report_number`, `user_id`, `report_type_id`, `titl
 (10005, 'RPT-20260105-9B0B25', 1003, 11, 'Ingay', 'Itong kapit bahay namin na si Jeff Paray, 11:52 pm na nagkakantahan o videoke pa rin sila, napaka ingay. Sinaway na ni Hanah pero pinakyuhan lang siya ni Jeff.', 'Silang', '2026-01-05 23:59:00', '2026-01-06 00:00:28', '', '', 'complaint', NULL, 'pending', 'low', NULL, NULL, NULL, NULL, '1234', '2026-01-05 16:00:28', '2026-01-05 16:00:28', NULL, 'Block 8 lot 2 6D Towerville', NULL, NULL, 0, 0, 0),
 (10006, 'RPT-20260105-A63CBA', 1003, 72, 'yay', 'may saksakan na nangyari', 'jjkjhk', '2026-01-05 19:56:00', '2026-01-06 02:57:08', '', '', 'incident', '[{\"original_name\":\"Blue and White Simple Corporate Letterhead.png\",\"encrypted_name\":\"encrypted_1767639428_695c098414075_Blue and White Simple Corporate Letterhead.png\",\"file_type\":\"png\",\"file_size\":102358,\"encryption_key_hash\":\"dd5aaf0ba30faee45db2b88214916c4e5b5717d5c5872e6df695c63fffa7ca16\",\"original_hash\":\"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855\",\"iv\":\"f23c1baeacf99860d3d27a176ccb9acc\"}]', 'pending', 'high', NULL, NULL, NULL, NULL, '1234', '2026-01-05 18:57:08', '2026-01-05 18:57:08', NULL, 'Block 8 lot 2 6D Towerville', NULL, NULL, 0, 0, 0),
 (10007, 'RPT-20260106-F95802', 1003, 7, 'Theft Report', 'may nag nakaw ng mga alahas', 'aS', '2026-01-06 10:35:00', '2026-01-06 17:35:32', '', '', 'incident', NULL, 'pending', 'high', NULL, NULL, NULL, NULL, '', '2026-01-06 09:35:32', '2026-01-06 09:35:32', NULL, 'Block 8 lot 2 6D Towerville', NULL, NULL, 1, 0, 0),
-(10008, 'RPT-20260106-21CF9A', 1003, 72, 'Stabbing Report', 'may nag saksakan', 'aa', '2026-01-06 10:37:00', '2026-01-06 17:38:02', '', '', 'incident', NULL, 'pending', 'high', NULL, NULL, NULL, NULL, '', '2026-01-06 09:38:02', '2026-01-06 09:38:02', NULL, 'Block 8 lot 2 6D Towerville', NULL, NULL, 1, 0, 0);
+(10008, 'RPT-20260106-21CF9A', 1003, 72, 'Stabbing Report', 'may nag saksakan', 'aa', '2026-01-06 10:37:00', '2026-01-06 17:38:02', '', '', 'incident', NULL, 'pending', 'high', NULL, NULL, NULL, NULL, '', '2026-01-06 09:38:02', '2026-01-06 09:38:02', NULL, 'Block 8 lot 2 6D Towerville', NULL, NULL, 1, 0, 0),
+(10009, 'RPT-20260106-BF3CEA', 1003, 50, 'Theft Report', 'nadukutan ng wallet at cellphone', 'asdads', '2026-01-06 21:17:00', '2026-01-07 04:18:30', '', '', 'incident', '[{\"original_name\":\"im.jpeg\",\"encrypted_name\":\"1767730710_695d6e1685d57_im.jpeg\",\"file_type\":\"jpeg\",\"file_size\":254002,\"encryption_key_hash\":null,\"original_hash\":\"e600dcfcb3ea9fd5300121b822e895710472ca2ec278178ab82ca0b5ad6f8055\",\"iv\":null}]', 'pending', 'medium', NULL, NULL, NULL, NULL, '', '2026-01-06 20:18:30', '2026-01-06 20:18:30', NULL, 'Block 8 lot 2 6D Towerville', NULL, NULL, 0, 0, 0);
 
 -- --------------------------------------------------------
 
@@ -325,7 +326,8 @@ INSERT INTO `report_status_history` (`id`, `report_id`, `status`, `updated_by`, 
 (5, 10005, 'pending', NULL, 'Report submitted by citizen', '2026-01-05 16:00:28', NULL, NULL, NULL),
 (6, 10006, 'pending', NULL, 'Report submitted by citizen', '2026-01-05 18:57:08', NULL, NULL, NULL),
 (7, 10007, 'pending', NULL, 'Report submitted by citizen', '2026-01-06 09:35:32', NULL, NULL, NULL),
-(8, 10008, 'pending', NULL, 'Report submitted by citizen', '2026-01-06 09:38:02', NULL, NULL, NULL);
+(8, 10008, 'pending', NULL, 'Report submitted by citizen', '2026-01-06 09:38:02', NULL, NULL, NULL),
+(9, 10009, 'pending', NULL, 'Report submitted by citizen', '2026-01-06 20:18:30', NULL, NULL, NULL);
 
 -- --------------------------------------------------------
 
@@ -603,12 +605,12 @@ CREATE TABLE `users` (
 INSERT INTO `users` (`id`, `first_name`, `middle_name`, `last_name`, `suffix`, `sex`, `birthday`, `age`, `permanent_address`, `contact_number`, `emergency_contact`, `emergency_number`, `id_verification_path`, `email`, `username`, `password`, `user_type`, `role`, `position_id`, `date_appointed`, `term_end`, `office_hours`, `barangay`, `status`, `is_active`, `created_at`, `updated_at`, `last_login`, `pin_code`, `master_code`, `is_master_code_used`, `master_code_used_at`, `reset_token`, `reset_token_expiry`, `is_online`, `profile_picture`, `notification_token`, `wants_notifications`) VALUES
 (1001, 'System', '', 'Administrator', '', 'Male', '1990-01-01', 34, 'Barangay Hall, City Hall Compound', '9123456789', NULL, NULL, NULL, 'admin@leir.com', 'admin', 'hello11.', 'barangay_member', 'admin', NULL, NULL, NULL, NULL, 'LGU-4', 'active', 1, '2025-12-06 05:32:10', '2025-12-07 14:13:06', NULL, '1234', NULL, 0, NULL, NULL, NULL, 1, NULL, NULL, 1),
 (1002, 'Juan', 'Santos', 'Dela Cruz', 'Jr', 'Male', '1985-05-15', 39, '123 Main Street, Barangay 1, City', '9123456780', NULL, NULL, NULL, 'citizen@example.com', 'citizen', 'hello11.', 'citizen', 'citizen', NULL, NULL, NULL, NULL, 'Barangay 1', 'active', 1, '2025-12-06 05:32:10', '2025-12-07 14:13:06', NULL, NULL, NULL, 0, NULL, NULL, NULL, 1, NULL, NULL, 1),
-(1003, 'cla', '', 'galvez', '', 'Female', '2002-12-01', 23, 'Block 8  Towerville', '09978407627', 'clarisa galvez', '09978407625', 'uploads/ids/6935f6f75f045_1765144311.jpg', 'ysa@gmail.com', 'ysa', '$2y$10$ErRqKYCyQD2sBpZv.w2NiudfPvT89YSsiTvHn2i6Ylc6D1ztKOKym', 'citizen', 'citizen', NULL, NULL, NULL, NULL, 'Block 8 lot 2 6D Towerville', 'active', 1, '2025-12-07 21:51:51', '2026-01-06 16:24:06', '2026-01-06 16:24:06', NULL, NULL, 0, NULL, NULL, NULL, 1, '1765476337_693b07f17c86f_4f4053396ad983bb501fd6eae285bedd.jpg', NULL, 1),
+(1003, 'cla', '', 'galvez', '', 'Female', '2002-12-01', 23, 'Block 8  Towerville', '09978407627', 'clarisa galvez', '09978407625', 'uploads/ids/6935f6f75f045_1765144311.jpg', 'ysa@gmail.com', 'ysa', '$2y$10$ErRqKYCyQD2sBpZv.w2NiudfPvT89YSsiTvHn2i6Ylc6D1ztKOKym', 'citizen', 'citizen', NULL, NULL, NULL, NULL, 'Block 8 lot 2 6D Towerville', 'active', 1, '2025-12-07 21:51:51', '2026-01-07 10:35:25', '2026-01-07 10:35:25', NULL, NULL, 0, NULL, NULL, NULL, 1, '1765476337_693b07f17c86f_4f4053396ad983bb501fd6eae285bedd.jpg', NULL, 1),
 (1004, 'angelo', 'galvez', 'pabericio', '', 'Male', '2009-10-22', 16, 'Block 8 lot 2 6D Towerville', '09978407622', 'clarisa galvez', '09978407628', 'uploads/ids/6935f95ce533d_1765144924.jpeg', 'ysagalv5@gmail.com', 'cris', '$2y$10$mT0NIt.Ag.ohJtojwKgdnOB/w9JMSpROhQShWXGaQvgHkJeChVnBO', 'citizen', 'citizen', NULL, NULL, NULL, NULL, 'Block 8 lot 2 6D Towerville', 'active', 0, '2025-12-07 22:02:04', '2025-12-08 08:19:25', '2025-12-08 08:06:36', NULL, NULL, 0, NULL, NULL, NULL, 1, NULL, NULL, 1),
-(1005, 'Clarisa', 'Galvez', 'Manangan', '', 'Female', '2002-03-11', 23, 'Block 110', '09978407689', NULL, NULL, NULL, 'ysagalvez@gmail.com', 'clarisg', '$2y$10$Z5aPzVJE.ponvcbFJJ4oS.6IALC5jnaTCIFbNihF8YjCsIrwKMdnG', 'barangay_member', 'secretary', NULL, NULL, NULL, NULL, 'Block 110', 'active', 1, '2026-01-03 16:34:21', '2026-01-03 16:34:21', NULL, NULL, NULL, 0, NULL, NULL, NULL, 1, NULL, NULL, 1),
+(1005, 'Clarisa', 'Galvez', 'Manangan', '', 'Female', '2002-03-11', 23, 'Block 110', '09978407689', NULL, NULL, NULL, 'ysagalvez@gmail.com', 'clarisg', '$2y$10$Z5aPzVJE.ponvcbFJJ4oS.6IALC5jnaTCIFbNihF8YjCsIrwKMdnG', 'barangay_member', 'secretary', NULL, NULL, NULL, NULL, 'Block 110', 'active', 1, '2026-01-03 16:34:21', '2026-01-06 18:14:29', NULL, NULL, '1019', 0, NULL, NULL, NULL, 1, NULL, NULL, 1),
 (1006, 'Ysabel', '', 'Gal', '', 'Female', '2001-09-23', 24, '6D', '08976545678', NULL, NULL, NULL, 'ysagalv@gmail.com', 'ysag', '$2y$10$VqqQIuPWdyi.Lz86F/QGselYVD5UGtU98VJ5M8AtbAxsJ2kTGKq46', 'barangay_member', 'admin', NULL, NULL, NULL, NULL, '6D', 'active', 1, '2026-01-03 16:45:12', '2026-01-03 16:45:12', NULL, NULL, NULL, 0, NULL, NULL, NULL, 1, NULL, NULL, 1),
 (1007, 'JR', '', 'RACELIS', '', 'Male', '2001-11-13', 24, 'BLOCK 7', '09865434567', NULL, NULL, NULL, 'Jr@gmail.com', 'jr', '$2y$10$bUtOO.9WDZNnYcwLjoVNN.GJ74c8V7bazXPB.v1rzlFmVdoHV7/Ma', 'barangay_member', 'captain', NULL, NULL, NULL, NULL, 'BLOCK 7', 'pending', 1, '2026-01-03 17:32:35', '2026-01-03 17:32:35', NULL, NULL, '5981', 0, NULL, NULL, NULL, 1, NULL, NULL, 1),
-(1008, 'hanah', '', 'magnaye', '', 'Female', '2000-09-07', 25, 'talipapa', '09875678923', NULL, NULL, NULL, 'hanah@gmail.com', 'hanah', '$2y$10$ztzCxhIh82YzPdtHM4.syOWDRe04MxxWrdCNC7RdutzrIjstoVWCi', 'barangay_member', 'secretary', NULL, NULL, NULL, NULL, 'talipapa', 'pending', 1, '2026-01-03 17:51:52', '2026-01-03 17:51:52', NULL, NULL, '4939', 0, NULL, NULL, NULL, 1, NULL, NULL, 1);
+(1008, 'hanah', '', 'magnaye', '', 'Female', '2000-09-07', 25, 'talipapa', '09875678923', NULL, NULL, NULL, 'hanah@gmail.com', 'hanah', '$2y$10$ztzCxhIh82YzPdtHM4.syOWDRe04MxxWrdCNC7RdutzrIjstoVWCi', 'barangay_member', 'secretary', NULL, NULL, NULL, NULL, 'talipapa', 'pending', 1, '2026-01-03 17:51:52', '2026-01-06 19:46:43', '2026-01-06 18:37:39', NULL, '4939', 1, '2026-01-06 18:37:39', NULL, NULL, 1, '1767728803_695d66a356987_504896849_9887062978015746_9181476553568709558_n.jpg', NULL, 1);
 
 -- --------------------------------------------------------
 
@@ -942,7 +944,7 @@ ALTER TABLE `notifications`
 -- AUTO_INCREMENT for table `reports`
 --
 ALTER TABLE `reports`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=10009;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=10010;
 
 --
 -- AUTO_INCREMENT for table `report_attachments`
@@ -954,7 +956,7 @@ ALTER TABLE `report_attachments`
 -- AUTO_INCREMENT for table `report_status_history`
 --
 ALTER TABLE `report_status_history`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=9;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=10;
 
 --
 -- AUTO_INCREMENT for table `report_timeline`

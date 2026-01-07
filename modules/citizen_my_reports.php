@@ -196,7 +196,7 @@ try {
     
     <!-- Error/Success Messages -->
     <?php if ($error): ?>
-        <div class="bg-red-50 border-l-4 border-red-500 p-4 mb-6 rounded animate-fadeIn">
+        <div class="bg-red-50 border-l-4 border-red-500 p-4 mb-6 rounded">
             <div class="flex items-center">
                 <i class="fas fa-exclamation-circle text-red-500 mr-3"></i>
                 <div class="flex-1">
@@ -207,7 +207,7 @@ try {
     <?php endif; ?>
     
     <?php if ($success): ?>
-        <div class="bg-green-50 border-l-4 border-green-500 p-4 mb-6 rounded animate-fadeIn">
+        <div class="bg-green-50 border-l-4 border-green-500 p-4 mb-6 rounded">
             <div class="flex items-center">
                 <i class="fas fa-check-circle text-green-500 mr-3"></i>
                 <div class="flex-1">
@@ -405,18 +405,18 @@ try {
                                 </div>
                             </div>
                             
-                            <!-- Mobile Actions - PRINT BUTTON ALWAYS VISIBLE -->
+                            <!-- Mobile Actions -->
                             <div class="flex space-x-2">
                                 <button onclick="viewReportDetails(<?php echo $report['id']; ?>); return false;" 
-                                        class="flex-1 px-3 py-1.5 bg-blue-50 text-blue-700 rounded text-xs hover:bg-blue-100 print-action-btn">
+                                        class="flex-1 px-3 py-1.5 bg-blue-50 text-blue-700 rounded text-xs hover:bg-blue-100">
                                     <i class="fas fa-eye mr-1"></i> View
                                 </button>
                                 <button onclick="viewReportTimeline(<?php echo $report['id']; ?>); return false;" 
-                                        class="flex-1 px-3 py-1.5 bg-gray-50 text-gray-700 rounded text-xs hover:bg-gray-100 print-action-btn">
+                                        class="flex-1 px-3 py-1.5 bg-gray-50 text-gray-700 rounded text-xs hover:bg-gray-100">
                                     <i class="fas fa-history mr-1"></i> Timeline
                                 </button>
                                 <button onclick="printReport(<?php echo $report['id']; ?>); return false;" 
-                                        class="flex-1 px-3 py-1.5 bg-green-500 text-white rounded text-xs hover:bg-green-600 print-action-btn print-permanent print-button-fixed">
+                                        class="flex-1 px-3 py-1.5 bg-green-500 text-white rounded text-xs hover:bg-green-600">
                                     <i class="fas fa-print mr-1"></i> Print
                                 </button>
                             </div>
@@ -465,7 +465,7 @@ try {
                             $created_time = date('h:i A', strtotime($report['created_at']));
                             ?>
                             
-                            <tr class="hover:bg-gray-50 transition-colors" data-report-id="<?php echo $report['id']; ?>">
+                            <tr class="hover:bg-gray-50">
                                 <!-- Report Details -->
                                 <td class="px-4 py-4">
                                     <div class="flex items-start">
@@ -530,19 +530,19 @@ try {
                                     <div class="text-xs text-gray-500"><?php echo $created_time; ?></div>
                                 </td>
                                 
-                                <!-- Actions - PRINT BUTTON ALWAYS VISIBLE -->
+                                <!-- Actions -->
                                 <td class="px-4 py-4 whitespace-nowrap text-sm font-medium">
                                     <div class="flex space-x-2">
                                         <button onclick="viewReportDetails(<?php echo $report['id']; ?>); return false;" 
-                                                class="px-3 py-1.5 bg-blue-50 text-blue-700 rounded text-xs hover:bg-blue-100 transition-colors print-action-btn">
+                                                class="px-3 py-1.5 bg-blue-50 text-blue-700 rounded text-xs hover:bg-blue-100">
                                             <i class="fas fa-eye mr-1"></i> View
                                         </button>
                                         <button onclick="viewReportTimeline(<?php echo $report['id']; ?>); return false;" 
-                                                class="px-3 py-1.5 bg-gray-50 text-gray-700 rounded text-xs hover:bg-gray-100 transition-colors print-action-btn">
+                                                class="px-3 py-1.5 bg-gray-50 text-gray-700 rounded text-xs hover:bg-gray-100">
                                             <i class="fas fa-history mr-1"></i> Timeline
                                         </button>
                                         <button onclick="printReport(<?php echo $report['id']; ?>); return false;" 
-                                                class="px-3 py-1.5 bg-green-500 text-white rounded text-xs hover:bg-green-600 transition-colors print-action-btn print-permanent print-button-fixed">
+                                                class="px-3 py-1.5 bg-green-500 text-white rounded text-xs hover:bg-green-600">
                                             <i class="fas fa-print mr-1"></i> Print
                                         </button>
                                     </div>
@@ -565,7 +565,7 @@ try {
             </div>
             <div class="flex space-x-3">
                 <button type="button" onclick="printAllReports()"
-                        class="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 flex items-center text-sm transition-colors print-action-btn print-button-fixed">
+                        class="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 flex items-center text-sm">
                     <i class="fas fa-print mr-2"></i> Print All Filtered Reports
                 </button>
             </div>
@@ -580,7 +580,7 @@ try {
         <!-- Modal Header -->
         <div class="flex justify-between items-center mb-4 pb-3 border-b sticky top-0 bg-white z-10">
             <h3 class="text-lg font-bold text-gray-800" id="modalTitle">Report Details</h3>
-            <button type="button" onclick="closeModal()" class="text-gray-400 hover:text-gray-600 text-xl transition-colors">
+            <button type="button" onclick="closeModal()" class="text-gray-400 hover:text-gray-600 text-xl">
                 <i class="fas fa-times"></i>
             </button>
         </div>
@@ -598,7 +598,7 @@ try {
         <!-- Modal Header -->
         <div class="flex justify-between items-center mb-4 pb-3 border-b">
             <h3 class="text-base font-bold text-gray-800">Enter PIN Code</h3>
-            <button type="button" onclick="closePinModal()" class="text-gray-400 hover:text-gray-600 transition-colors">
+            <button type="button" onclick="closePinModal()" class="text-gray-400 hover:text-gray-600">
                 <i class="fas fa-times"></i>
             </button>
         </div>
@@ -618,7 +618,7 @@ try {
                                    maxlength="1" 
                                    oninput="handleModalPinInput(this, <?php echo $i + 1; ?>)" 
                                    onkeydown="handleModalPinKeydown(event, <?php echo $i + 1; ?>)"
-                                   class="pin-input w-12 h-12 text-center text-xl font-bold border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-1 focus:ring-blue-200 outline-none transition-colors"
+                                   class="pin-input w-12 h-12 text-center text-xl font-bold border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-1 focus:ring-blue-200 outline-none"
                                    autocomplete="off">
                         <?php endfor; ?>
                     </div>
@@ -629,11 +629,11 @@ try {
                 
                 <div class="flex justify-end space-x-2">
                     <button type="button" onclick="closePinModal()"
-                            class="px-3 py-1.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm transition-colors">
+                            class="px-3 py-1.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm">
                         Cancel
                     </button>
                     <button type="submit" name="enter_pin"
-                            class="px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm transition-colors">
+                            class="px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm">
                         Verify PIN
                     </button>
                 </div>
@@ -673,8 +673,6 @@ function viewReportDetails(reportId) {
         })
         .then(html => {
             document.getElementById('modalContent').innerHTML = html;
-            // Initialize any interactive elements in the loaded content
-            initModalContent();
         })
         .catch(error => {
             console.error('Error loading report details:', error);
@@ -730,7 +728,7 @@ function viewReportTimeline(reportId) {
         });
 }
 
-// Print Report - Enhanced with multiple fallbacks
+// Print Report
 function printReport(reportId) {
     // Show toast notification
     showToast('Opening print preview...', 'info');
@@ -742,7 +740,6 @@ function printReport(reportId) {
     const url = `${AJAX_URL}download_report.php?id=${reportId}&format=print&_=${Date.now()}`;
     
     try {
-        // First check if popups are allowed
         const printWindow = window.open('', '_blank', 'width=1200,height=800');
         
         if (printWindow) {
@@ -930,15 +927,6 @@ function handleModalPinKeydown(event, index) {
     }
 }
 
-// Initialize modal content after loading
-function initModalContent() {
-    // Add any initialization for loaded modal content here
-    const printButtons = document.querySelectorAll('#modalContent button[onclick*="printReport"]');
-    printButtons.forEach(btn => {
-        btn.classList.add('print-permanent', 'print-button-fixed');
-    });
-}
-
 // Toast notification
 function showToast(message, type = 'info') {
     // Remove existing toasts
@@ -953,7 +941,7 @@ function showToast(message, type = 'info') {
         'info': 'bg-blue-600'
     };
     
-    toast.className = `toast-notification fixed top-4 right-4 px-4 py-2 rounded-lg shadow-lg text-white z-50 transform transition-all duration-300 animate-fadeIn ${typeClasses[type] || 'bg-blue-600'} text-sm`;
+    toast.className = `toast-notification fixed top-4 right-4 px-4 py-2 rounded-lg shadow-lg text-white z-50 transform transition-all duration-300 ${typeClasses[type] || 'bg-blue-600'} text-sm`;
     toast.innerHTML = `
         <div class="flex items-center">
             <i class="fas ${type === 'success' ? 'fa-check-circle' : type === 'error' ? 'fa-exclamation-circle' : type === 'warning' ? 'fa-exclamation-triangle' : 'fa-info-circle'} mr-2"></i>
@@ -985,69 +973,9 @@ function validateDateRange() {
     return true;
 }
 
-// ENSURE PRINT BUTTONS ARE ALWAYS VISIBLE - FIXED VERSION
-function ensurePrintButtonsVisible() {
-    const printButtons = document.querySelectorAll('.print-action-btn, .print-permanent, .print-button-fixed, button[onclick*="printReport"], button[onclick*="printAllReports"]');
-    
-    printButtons.forEach(btn => {
-        // Force visibility with highest priority using inline styles
-        btn.style.setProperty('display', 'inline-block', 'important');
-        btn.style.setProperty('visibility', 'visible', 'important');
-        btn.style.setProperty('opacity', '1', 'important');
-        btn.style.setProperty('position', 'static', 'important');
-        btn.style.setProperty('z-index', '9999', 'important');
-        btn.style.setProperty('pointer-events', 'auto', 'important');
-        
-        // Make sure print buttons are green and stand out
-        if (btn.onclick && btn.onclick.toString().includes('printReport') || 
-            btn.onclick && btn.onclick.toString().includes('printAllReports') ||
-            btn.getAttribute('onclick') && btn.getAttribute('onclick').includes('print')) {
-            btn.style.setProperty('background-color', '#10b981', 'important');
-            btn.style.setProperty('color', 'white', 'important');
-            btn.style.setProperty('border-color', '#10b981', 'important');
-            btn.style.setProperty('font-weight', 'bold', 'important');
-        }
-        
-        // Remove any hiding classes
-        btn.classList.remove('hidden', 'invisible', 'opacity-0');
-        btn.classList.add('print-permanent', 'print-button-fixed');
-    });
-}
-
-// Initialize - FIXED VERSION
+// Initialize
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('My Reports module loaded - PRINT BUTTONS SECURED');
-    
-    // Run immediately and multiple times to catch all buttons
-    ensurePrintButtonsVisible();
-    setTimeout(ensurePrintButtonsVisible, 100);
-    setTimeout(ensurePrintButtonsVisible, 500);
-    setTimeout(ensurePrintButtonsVisible, 1000);
-    
-    // Set up a mutation observer to watch for DOM changes
-    const observer = new MutationObserver(function(mutations) {
-        mutations.forEach(function(mutation) {
-            if (mutation.type === 'childList' || mutation.type === 'attributes') {
-                ensurePrintButtonsVisible();
-            }
-        });
-    });
-    
-    // Start observing
-    observer.observe(document.body, { 
-        childList: true, 
-        subtree: true,
-        attributes: true,
-        attributeFilter: ['style', 'class', 'onclick']
-    });
-    
-    // Also run on user interaction
-    document.addEventListener('click', ensurePrintButtonsVisible);
-    document.addEventListener('mouseover', ensurePrintButtonsVisible);
-    document.addEventListener('scroll', ensurePrintButtonsVisible);
-    
-    // Keep checking every 2 seconds (reduced frequency)
-    const printButtonInterval = setInterval(ensurePrintButtonsVisible, 2000);
+    console.log('My Reports module loaded');
     
     // Add event listener for PIN form submission
     const pinForm = document.getElementById('pinForm');
@@ -1111,20 +1039,10 @@ document.addEventListener('DOMContentLoaded', function() {
             closePinModal();
         }
     });
-    
-    // Final check - make absolutely sure print buttons are visible
-    window.addEventListener('load', function() {
-        setTimeout(ensurePrintButtonsVisible, 2000);
-    });
 });
 </script>
 
 <style>
-/* Modal animations */
-.fixed {
-    transition: all 0.3s ease;
-}
-
 /* Status Colors */
 .status-badge {
     display: inline-flex;
@@ -1142,107 +1060,9 @@ document.addEventListener('DOMContentLoaded', function() {
 .status-referred { background-color: #ffedd5; color: #9a3412; }
 .status-closed { background-color: #f3f4f6; color: #374151; }
 
-/* PRINT BUTTONS - PERMANENTLY VISIBLE - HIGHEST PRIORITY */
-.print-permanent,
-.print-action-btn,
-.print-button-fixed,
-button.print-permanent,
-button.print-action-btn,
-button.print-button-fixed,
-button[onclick*="printReport"],
-button[onclick*="printAllReports"] {
-    display: inline-block !important;
-    visibility: visible !important;
-    opacity: 1 !important;
-    position: static !important;
-    z-index: 9999 !important;
-    pointer-events: auto !important;
-    cursor: pointer !important;
-}
-
-/* Override ANY style that tries to hide print buttons */
-.print-permanent[style*="display: none"],
-.print-action-btn[style*="display: none"],
-.print-button-fixed[style*="display: none"],
-.print-permanent[style*="visibility: hidden"],
-.print-action-btn[style*="visibility: hidden"],
-.print-button-fixed[style*="visibility: hidden"],
-.print-permanent[style*="opacity: 0"],
-.print-action-btn[style*="opacity: 0"],
-.print-button-fixed[style*="opacity: 0"] {
-    display: inline-block !important;
-    visibility: visible !important;
-    opacity: 1 !important;
-}
-
-/* Make sure print buttons have clear, prominent styling */
-button[onclick*="printReport"],
-button[onclick*="printAllReports"],
-.print-button-fixed[onclick*="print"],
-button.bg-green-500,
-button.bg-green-600 {
-    background-color: #10b981 !important;
-    color: white !important;
-    border: 2px solid #10b981 !important;
-    font-weight: bold !important;
-    box-shadow: 0 2px 4px rgba(16, 185, 129, 0.3) !important;
-}
-
-button[onclick*="printReport"]:hover,
-button[onclick*="printAllReports"]:hover,
-.print-button-fixed:hover,
-button.bg-green-500:hover,
-button.bg-green-600:hover {
-    background-color: #059669 !important;
-    border-color: #059669 !important;
-    transform: translateY(-1px) !important;
-    box-shadow: 0 4px 6px rgba(5, 150, 105, 0.4) !important;
-}
-
-/* Animations */
-.animate-fadeIn {
-    animation: fadeIn 0.3s ease-in-out;
-}
-
-.animate-fadeOut {
-    animation: fadeOut 0.3s ease-in-out;
-}
-
-@keyframes fadeIn {
-    from {
-        opacity: 0;
-        transform: translateY(-10px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
-@keyframes fadeOut {
-    from {
-        opacity: 1;
-        transform: translateY(0);
-    }
-    to {
-        opacity: 0;
-        transform: translateY(-10px);
-    }
-}
-
-/* Loading spinner */
-.spinner {
-    border: 3px solid #f3f3f3;
-    border-top: 3px solid #3498db;
-    border-radius: 50%;
-    width: 40px;
-    height: 40px;
-    animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
+/* Modal animations */
+.fixed {
+    transition: all 0.3s ease;
 }
 
 /* Toast notifications */
@@ -1275,13 +1095,6 @@ button.bg-green-600:hover {
     
     .hidden.md\:block {
         display: none;
-    }
-    
-    /* Ensure print buttons are larger on mobile */
-    .print-button-fixed {
-        min-width: 70px !important;
-        padding: 10px 5px !important;
-        font-size: 11px !important;
     }
 }
 
@@ -1358,72 +1171,20 @@ button {
 
 button:hover {
     transform: translateY(-1px);
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
-/* Ensure all action buttons have good contrast */
-.print-action-btn {
-    border: 1px solid transparent !important;
+/* Loading spinner */
+.spinner {
+    border: 3px solid #f3f3f3;
+    border-top: 3px solid #3498db;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    animation: spin 1s linear infinite;
 }
 
-.print-action-btn:hover {
-    border-color: currentColor !important;
-}
-
-/* PRINT BUTTON SPECIAL STYLING */
-.print-button-fixed {
-    animation: pulse-green 2s infinite;
-    position: relative;
-    overflow: hidden;
-}
-
-.print-button-fixed::after {
-    content: '';
-    position: absolute;
-    top: -50%;
-    left: -50%;
-    width: 200%;
-    height: 200%;
-    background: linear-gradient(
-        to bottom right,
-        rgba(255, 255, 255, 0) 0%,
-        rgba(255, 255, 255, 0.1) 50%,
-        rgba(255, 255, 255, 0) 100%
-    );
-    transform: rotate(30deg);
-    animation: shine 3s infinite;
-}
-
-@keyframes pulse-green {
-    0% {
-        box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
-    }
-    70% {
-        box-shadow: 0 0 0 10px rgba(16, 185, 129, 0);
-    }
-    100% {
-        box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
-    }
-}
-
-@keyframes shine {
-    0% {
-        transform: translateX(-100%) translateY(-100%) rotate(30deg);
-    }
-    100% {
-        transform: translateX(100%) translateY(100%) rotate(30deg);
-    }
-}
-
-/* Force print button container to not hide buttons */
-td.whitespace-nowrap,
-td.px-4.py-4 {
-    position: relative;
-    z-index: 1;
-}
-
-/* Make sure nothing overlays print buttons */
-button.print-button-fixed {
-    z-index: 99999 !important;
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
 }
 </style>
