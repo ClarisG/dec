@@ -20,6 +20,33 @@ $category = $_GET['category'] ?? '';
 $date_from = $_GET['date_from'] ?? '';
 $date_to = $_GET['date_to'] ?? '';
 
+// Helper function to get web-accessible path
+function getRelativePath($absolute_path) {
+    $base_dir = realpath(__DIR__ . '/../');
+    $file_path = realpath($absolute_path);
+    
+    if ($file_path && strpos($file_path, $base_dir) === 0) {
+        return '.' . str_replace($base_dir, '', $file_path);
+    }
+    
+    // Fallback to relative path
+    if (strpos($absolute_path, __DIR__) === 0) {
+        return '.' . str_replace(__DIR__, '', $absolute_path);
+    }
+    
+    return $absolute_path;
+}
+
+// Helper function to format file size
+function formatBytes($bytes, $precision = 2) {
+    $units = ['B', 'KB', 'MB', 'GB', 'TB'];
+    $bytes = max($bytes, 0);
+    $pow = floor(($bytes ? log($bytes) : 0) / log(1024));
+    $pow = min($pow, count($units) - 1);
+    $bytes /= pow(1024, $pow);
+    return round($bytes, $precision) . ' ' . $units[$pow];
+}
+
 try {
     $conn = getDbConnection();
     
@@ -58,9 +85,10 @@ try {
     $stmt->execute($params);
     $reports = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
-    // Check if logo exists - Look for logo in multiple locations
-    $logo_path = null;
+    // Check if logo exists
+    $logo_url = null;
     $possible_logo_paths = [
+        __DIR__ . '/../images/10213.png',
         __DIR__ . '/../images/logo.png',
         __DIR__ . '/../images/logo.jpg',
         __DIR__ . '/../images/barangay-logo.png',
@@ -70,7 +98,7 @@ try {
     
     foreach ($possible_logo_paths as $path) {
         if (file_exists($path)) {
-            $logo_path = $path;
+            $logo_url = getRelativePath($path);
             break;
         }
     }
@@ -91,12 +119,14 @@ try {
                 margin: 0;
                 padding: 0;
                 box-sizing: border-box;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
             }
             
             body {
                 font-family: 'Times New Roman', 'Georgia', serif;
                 color: #000;
-                font-size: 12px;
+                font-size: 11px;
                 line-height: 1.4;
                 background: #fff;
                 margin: 0;
@@ -109,7 +139,8 @@ try {
                 width: 100%;
                 padding: 20px 0;
                 border-bottom: 3px solid #1a4f8c;
-                margin-bottom: 30px;
+                margin-bottom: 25px;
+                page-break-after: avoid;
             }
             
             .letterhead-header {
@@ -121,12 +152,27 @@ try {
             
             .logo-container {
                 flex: 0 0 auto;
+                text-align: center;
             }
             
             .logo-img {
-                max-height: 80px;
-                max-width: 150px;
+                max-height: 120px;
+                max-width: 180px;
                 height: auto;
+                width: auto;
+                display: block;
+            }
+            
+            .logo-placeholder {
+                width: 180px;
+                height: 120px;
+                background: linear-gradient(135deg, #1a4f8c 0%, #2c7bb6 100%);
+                color: white;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-weight: bold;
+                border-radius: 4px;
             }
             
             .header-text {
@@ -198,17 +244,19 @@ try {
             .summary-grid {
                 display: grid;
                 grid-template-columns: repeat(2, 1fr);
-                gap: 15px;
+                gap: 12px;
                 margin-bottom: 20px;
                 padding: 15px;
                 background: #f9f9f9;
                 border: 1px solid #ddd;
                 border-radius: 4px;
+                page-break-inside: avoid;
+                font-size: 11px;
             }
             
             .summary-item {
                 display: flex;
-                margin-bottom: 8px;
+                margin-bottom: 6px;
             }
             
             .summary-label {
@@ -226,11 +274,12 @@ try {
             /* Report cards */
             .report-card {
                 border: 2px solid #1a4f8c;
-                border-radius: 4px;
+                border-radius: 6px;
                 padding: 20px;
-                margin-bottom: 25px;
+                margin-bottom: 30px;
                 page-break-inside: avoid;
                 background: #fff;
+                break-inside: avoid;
             }
             
             .report-header {
@@ -238,12 +287,12 @@ try {
                 color: white;
                 padding: 15px;
                 margin: -20px -20px 20px -20px;
-                border-radius: 4px 4px 0 0;
+                border-radius: 6px 6px 0 0;
                 font-weight: bold;
             }
             
             .report-title {
-                font-size: 16px;
+                font-size: 18px;
                 font-weight: bold;
                 margin-bottom: 5px;
             }
@@ -251,7 +300,7 @@ try {
             .report-meta {
                 display: flex;
                 justify-content: space-between;
-                font-size: 11px;
+                font-size: 12px;
                 color: rgba(255,255,255,0.9);
             }
             
@@ -262,13 +311,13 @@ try {
                 gap: 0;
                 margin-bottom: 15px;
                 border: 1px solid #000;
-                font-size: 12px;
+                font-size: 11px;
             }
             
             .info-row {
                 display: flex;
                 border-bottom: 1px solid #000;
-                min-height: 32px;
+                min-height: 34px;
             }
             
             .info-row:last-child {
@@ -298,7 +347,7 @@ try {
             /* Status badge */
             .status-badge {
                 display: inline-block;
-                padding: 4px 12px;
+                padding: 4px 10px;
                 border-radius: 3px;
                 font-size: 11px;
                 font-weight: bold;
@@ -320,21 +369,23 @@ try {
                 margin-top: 10px;
                 font-size: 11px;
                 line-height: 1.5;
-                max-height: 100px;
+                max-height: 120px;
                 overflow: hidden;
                 position: relative;
                 border-left: 4px solid #1a4f8c;
+                white-space: pre-line;
             }
             
             /* Footer */
             .footer {
-                margin-top: 50px;
+                margin-top: 40px;
                 padding-top: 15px;
                 border-top: 1px solid #ddd;
                 text-align: center;
                 font-size: 10px;
                 color: #666;
                 font-style: italic;
+                page-break-before: avoid;
             }
             
             /* Print Actions - Hidden when printing */
@@ -344,27 +395,32 @@ try {
                 border-bottom: 1px solid #ddd;
                 text-align: center;
                 margin-bottom: 20px;
-                position: sticky;
+                position: fixed;
                 top: 0;
-                z-index: 100;
+                left: 0;
+                right: 0;
+                z-index: 1000;
+                box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+                display: block !important;
+                visibility: visible !important;
+                opacity: 1 !important;
             }
             
             .print-btn {
                 background: #1a4f8c;
                 color: white;
                 border: none;
-                padding: 10px 24px;
-                border-radius: 4px;
+                padding: 12px 24px;
+                border-radius: 5px;
                 cursor: pointer;
                 font-size: 14px;
-                margin: 0 8px;
+                margin: 0 10px;
                 transition: background 0.3s;
                 font-weight: 500;
                 display: inline-block !important;
                 visibility: visible !important;
                 opacity: 1 !important;
                 pointer-events: auto !important;
-                cursor: pointer !important;
             }
             
             .print-btn:hover {
@@ -373,14 +429,24 @@ try {
                 box-shadow: 0 2px 5px rgba(0,0,0,0.2);
             }
             
+            .print-btn.landscape {
+                background: #2c7bb6;
+            }
+            
+            .print-btn.close {
+                background: #666;
+            }
+            
             /* Print-specific styles */
             @media print {
                 body {
                     margin: 0;
                     padding: 0;
-                    font-size: 11px;
+                    font-size: 10px;
                     background: white !important;
                     color: black !important;
+                    -webkit-print-color-adjust: exact !important;
+                    print-color-adjust: exact !important;
                 }
                 
                 .no-print {
@@ -398,44 +464,39 @@ try {
                 }
                 
                 .print-actions {
-                    display: none;
+                    display: none !important;
                 }
                 
                 /* Ensure sections don't break awkwardly */
-                .section {
-                    page-break-inside: avoid;
-                    margin-bottom: 20px;
-                }
-                
+                .section,
                 .report-card {
                     page-break-inside: avoid;
+                    break-inside: avoid;
                 }
                 
-                /* Add page breaks after every 3rd report */
-                .report-card:nth-child(3n) {
+                /* Add page breaks after every 2nd report */
+                .report-card:nth-child(2n) {
                     page-break-after: always;
+                }
+                
+                .report-card:last-child {
+                    page-break-after: auto;
                 }
                 
                 /* Adjust for portrait */
                 @page {
                     size: A4 portrait;
-                    margin: 20mm;
+                    margin: 15mm;
                 }
                 
                 /* Adjust for landscape */
                 @page landscape {
                     size: A4 landscape;
-                    margin: 15mm;
+                    margin: 12mm;
                 }
                 
                 .print-landscape {
                     page: landscape;
-                }
-                
-                /* Improve print quality */
-                * {
-                    -webkit-print-color-adjust: exact !important;
-                    print-color-adjust: exact !important;
                 }
             }
             
@@ -455,23 +516,23 @@ try {
                     margin-bottom: 20px;
                 }
                 
-                .print-actions {
-                    background: white;
-                    border-radius: 8px 8px 0 0;
-                    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-                    margin-bottom: 20px;
-                    position: fixed;
-                    top: 0;
-                    left: 20px;
-                    right: 20px;
-                    z-index: 1000;
-                }
-                
                 /* Force print buttons to stay visible */
                 .print-btn {
                     display: inline-block !important;
                     visibility: visible !important;
                     opacity: 1 !important;
+                    pointer-events: auto !important;
+                }
+                
+                .print-actions {
+                    display: block !important;
+                    visibility: visible !important;
+                    opacity: 1 !important;
+                    position: fixed !important;
+                    top: 0 !important;
+                    left: 0 !important;
+                    right: 0 !important;
+                    z-index: 1000 !important;
                 }
             }
             
@@ -502,9 +563,21 @@ try {
                 }
                 
                 .print-btn {
-                    padding: 8px 12px;
-                    font-size: 12px;
-                    margin: 2px;
+                    padding: 10px 15px;
+                    font-size: 13px;
+                    margin: 5px;
+                    display: block;
+                    width: 100%;
+                    margin-bottom: 10px;
+                }
+                
+                .letterhead-header {
+                    flex-direction: column;
+                    text-align: center;
+                }
+                
+                .logo-container {
+                    margin-bottom: 15px;
                 }
             }
             
@@ -516,12 +589,30 @@ try {
                 border: 2px dashed #ddd;
                 border-radius: 8px;
                 margin: 20px 0;
+                page-break-inside: avoid;
             }
             
             .empty-state i {
                 font-size: 48px;
                 color: #ccc;
                 margin-bottom: 15px;
+            }
+            
+            /* Page numbers for print */
+            .page-number {
+                position: fixed;
+                bottom: 10px;
+                right: 20px;
+                font-size: 10px;
+                color: #999;
+            }
+            
+            @media print {
+                .page-number {
+                    position: fixed;
+                    bottom: 10mm;
+                    right: 20mm;
+                }
             }
         </style>
         <script>
@@ -534,10 +625,13 @@ try {
         }
         
         function printLandscape() {
-            // Add landscape class and print
             document.body.classList.add('print-landscape');
-            window.print();
-            document.body.classList.remove('print-landscape');
+            setTimeout(() => {
+                window.print();
+                setTimeout(() => {
+                    document.body.classList.remove('print-landscape');
+                }, 100);
+            }, 100);
         }
         
         document.addEventListener('DOMContentLoaded', function() {
@@ -561,19 +655,6 @@ try {
                 printActions.style.visibility = 'visible';
                 printActions.style.opacity = '1';
             }
-            
-            // Prevent any auto-hiding
-            setInterval(() => {
-                printButtons.forEach(btn => {
-                    if (btn.style.display === 'none' || 
-                        btn.style.visibility === 'hidden' || 
-                        btn.style.opacity === '0') {
-                        btn.style.display = 'inline-block';
-                        btn.style.visibility = 'visible';
-                        btn.style.opacity = '1';
-                    }
-                });
-            }, 1000);
         });
         </script>
     </head>
@@ -583,14 +664,17 @@ try {
             <button onclick="printDocument()" class="print-btn">
                 <i class="fas fa-print"></i> Print All Reports (Portrait)
             </button>
-            <button onclick="printLandscape()" class="print-btn" style="background: #2c7bb6;">
+            <button onclick="printLandscape()" class="print-btn landscape">
                 <i class="fas fa-print"></i> Print All Reports (Landscape)
             </button>
-            <button onclick="closeWindow()" class="print-btn" style="background: #666;">
+            <button onclick="closeWindow()" class="print-btn close">
                 <i class="fas fa-times"></i> Close
             </button>
-            <p style="margin-top: 10px; font-size: 12px; color: #666;">
+            <p style="margin-top: 10px; font-size: 13px; color: #666;">
                 Choose portrait for standard printing or landscape for wider layout
+            </p>
+            <p style="margin-top: 5px; font-size: 11px; color: #888;">
+                Total Reports: <?php echo count($reports); ?> | Generated: <?php echo date('F d, Y h:i A'); ?>
             </p>
         </div>
         
@@ -599,10 +683,10 @@ try {
             <div class="letterhead">
                 <div class="letterhead-header">
                     <div class="logo-container">
-                        <?php if ($logo_path): ?>
-                            <img src="<?php echo htmlspecialchars($logo_path); ?>" class="logo-img" alt="Barangay Logo">
+                        <?php if ($logo_url): ?>
+                            <img src="<?php echo htmlspecialchars($logo_url); ?>" class="logo-img" alt="Barangay Logo">
                         <?php else: ?>
-                            <div style="width: 150px; height: 80px; background: #1a4f8c; color: white; display: flex; align-items: center; justify-content: center; font-weight: bold;">
+                            <div class="logo-placeholder">
                                 BARANGAY LOGO
                             </div>
                         <?php endif; ?>
@@ -611,7 +695,7 @@ try {
                         <h1>BARANGAY REPORTS SUMMARY</h1>
                         <h2>Multiple Reports Printout</h2>
                     </div>
-                    <div class="logo-container" style="width: 150px;">
+                    <div class="logo-container" style="width: 180px;">
                         <!-- Empty for alignment -->
                     </div>
                 </div>
@@ -715,7 +799,7 @@ try {
                         <span class="info-value"><?php echo htmlspecialchars(ucfirst($report['priority'])); ?></span>
                     </div>
                     <div class="info-row">
-                        <span class="info-label">Category:</span>
+                        <span class="info-label">Category:</th>
                         <span class="info-value"><?php echo htmlspecialchars(ucfirst($report['category'])); ?></span>
                     </div>
                     <div class="info-row">
@@ -748,34 +832,15 @@ try {
                 </div>
                 <?php endif; ?>
                 
-                <!-- Show evidence files if any -->
-                <?php 
-                $evidence_files = [];
-                if (!empty($report['evidence_files'])) {
-                    $evidence_files = json_decode($report['evidence_files'], true);
-                }
-                ?>
-                
-                <?php if (!empty($evidence_files)): ?>
-                <div class="info-row">
-                    <span class="info-label">Attached Files:</span>
-                    <div class="info-value">
-                        <div style="font-size: 11px; color: #555; margin-top: 5px;">
-                            <?php echo count($evidence_files); ?> file(s) attached
-                        </div>
-                    </div>
-                </div>
-                <?php endif; ?>
-                
                 <?php if (!empty($report['resolution_notes'])): ?>
                 <div class="info-row">
                     <span class="info-label">Resolution:</span>
                     <div class="info-value">
-                        <div style="font-size: 11px; color: #155724; background: #d4edda; padding: 8px; border-radius: 3px; border-left: 4px solid #28a745;">
+                        <div style="font-size: 11px; color: #155724; background: #d4edda; padding: 10px; border-radius: 4px; border-left: 4px solid #28a745;">
                             <?php 
                             $notes = $report['resolution_notes'];
-                            echo nl2br(htmlspecialchars(substr($notes, 0, 150)));
-                            if (strlen($notes) > 150) echo '...';
+                            echo nl2br(htmlspecialchars(substr($notes, 0, 200)));
+                            if (strlen($notes) > 200) echo '...';
                             ?>
                         </div>
                     </div>
@@ -783,8 +848,8 @@ try {
                 <?php endif; ?>
             </div>
             
-            <?php if (($index + 1) % 3 == 0 && ($index + 1) < count($reports)): ?>
-            <div class="page-break"></div>
+            <?php if (($index + 1) % 2 == 0 && ($index + 1) < count($reports)): ?>
+            <div style="page-break-after: always;"></div>
             <?php endif; ?>
             
             <?php endforeach; ?>
@@ -793,10 +858,18 @@ try {
             <!-- Footer -->
             <div class="footer">
                 <p>Generated by Barangay Reporting System | Bulk Print Module</p>
-                <p>Document ID: BULK-PRINT-<?php echo date('YmdHis'); ?> | Page 1 of 1</p>
+                <p>Document ID: BULK-PRINT-<?php echo date('YmdHis'); ?> | Total Reports: <?php echo count($reports); ?></p>
                 <p>This document contains confidential information. Handle with care.</p>
+                <?php if (!empty($reports)): ?>
+                <p style="margin-top: 8px; font-size: 10px; color: #999;">
+                    Reports printed: <?php echo date('F d, Y h:i A'); ?> | Page 1 of <?php echo ceil(count($reports) / 2); ?>
+                </p>
+                <?php endif; ?>
             </div>
         </div>
+        
+        <!-- Page numbers (will be positioned by CSS) -->
+        <div class="page-number no-print" style="display: none;"></div>
     </body>
     </html>
     <?php

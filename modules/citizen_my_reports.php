@@ -39,36 +39,6 @@ $stats = [
     'closed' => 0
 ];
 
-// Handle PIN entry for anonymous report decryption
-if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['enter_pin'])) {
-    $report_id = intval($_POST['report_id']);
-    $pin_code = trim($_POST['pin_code']);
-    
-    try {
-        $conn = getDbConnection();
-        
-        // Check if report belongs to user and is anonymous
-        $report_query = "SELECT * FROM reports WHERE id = :id AND user_id = :user_id AND is_anonymous = 1";
-        $report_stmt = $conn->prepare($report_query);
-        $report_stmt->execute([':id' => $report_id, ':user_id' => $user_id]);
-        $report = $report_stmt->fetch(PDO::FETCH_ASSOC);
-        
-        if ($report) {
-            // Check PIN
-            if ($report['pin_code'] == $pin_code) {
-                $_SESSION['decrypted_reports'][$report_id] = true;
-                $success = "PIN verified. You can now view the decrypted files.";
-            } else {
-                $error = "Incorrect PIN. Please try again.";
-            }
-        } else {
-            $error = "Report not found or is not anonymous.";
-        }
-    } catch(PDOException $e) {
-        $error = "Database error: " . $e->getMessage();
-    }
-}
-
 // Handle status filter
 $status_filter = isset($_GET['status']) ? $_GET['status'] : 'all';
 $category_filter = isset($_GET['category']) ? $_GET['category'] : 'all';
@@ -537,7 +507,7 @@ try {
                                                 class="px-3 py-1.5 bg-blue-50 text-blue-700 rounded text-xs hover:bg-blue-100">
                                             <i class="fas fa-eye mr-1"></i> View
                                         </button>
-                                        <button onclick="viewReportTimeline(<?php echo $report['id']; ?>); return false;" 
+                                        <button onclick="viewReportTimeline(<?php echo $report['id'] ?>); return false;" 
                                                 class="px-3 py-1.5 bg-gray-50 text-gray-700 rounded text-xs hover:bg-gray-100">
                                             <i class="fas fa-history mr-1"></i> Timeline
                                         </button>
@@ -592,52 +562,17 @@ try {
     </div>
 </div>
 
-<!-- PIN Entry Modal -->
-<div id="pinModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 hidden">
-    <div class="relative top-4 mx-auto p-4 border w-full max-w-md shadow-lg rounded-lg bg-white">
-        <!-- Modal Header -->
-        <div class="flex justify-between items-center mb-4 pb-3 border-b">
-            <h3 class="text-base font-bold text-gray-800">Enter PIN Code</h3>
-            <button type="button" onclick="closePinModal()" class="text-gray-400 hover:text-gray-600">
+<!-- Attachment Viewer Modal -->
+<div id="attachmentViewerModal" class="fixed inset-0 bg-gray-900 bg-opacity-90 overflow-y-auto h-full w-full z-[60] hidden">
+    <div class="relative top-4 mx-auto p-4 border w-full max-w-6xl shadow-lg rounded-lg bg-white max-h-[90vh] overflow-hidden">
+        <div class="flex justify-between items-center mb-4 pb-3 border-b sticky top-0 bg-white z-10">
+            <h3 class="text-lg font-bold text-gray-800" id="attachmentTitle">Attachment Viewer</h3>
+            <button type="button" onclick="closeAttachmentViewer()" class="text-gray-400 hover:text-gray-600 text-xl">
                 <i class="fas fa-times"></i>
             </button>
         </div>
-        
-        <!-- Modal Content -->
-        <div class="mb-4">
-            <p class="text-sm text-gray-600 mb-3">This report was submitted anonymously. Please enter your 4-digit PIN to view encrypted files.</p>
-            
-            <form id="pinForm" method="POST" action="">
-                <input type="hidden" id="pinReportId" name="report_id">
-                
-                <div class="mb-4">
-                    <label class="block text-sm font-medium text-gray-700 mb-2">4-Digit Security PIN</label>
-                    <div class="flex justify-center space-x-2 mb-3">
-                        <?php for ($i = 0; $i < 4; $i++): ?>
-                            <input type="password" name="pin_code[]" 
-                                   maxlength="1" 
-                                   oninput="handleModalPinInput(this, <?php echo $i + 1; ?>)" 
-                                   onkeydown="handleModalPinKeydown(event, <?php echo $i + 1; ?>)"
-                                   class="pin-input w-12 h-12 text-center text-xl font-bold border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-1 focus:ring-blue-200 outline-none"
-                                   autocomplete="off">
-                        <?php endfor; ?>
-                    </div>
-                    <p class="text-xs text-gray-500 text-center">
-                        Enter the same 4-digit PIN you used when submitting the report.
-                    </p>
-                </div>
-                
-                <div class="flex justify-end space-x-2">
-                    <button type="button" onclick="closePinModal()"
-                            class="px-3 py-1.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm">
-                        Cancel
-                    </button>
-                    <button type="submit" name="enter_pin"
-                            class="px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm">
-                        Verify PIN
-                    </button>
-                </div>
-            </form>
+        <div id="attachmentViewerContent" class="overflow-y-auto max-h-[calc(90vh-80px)]">
+            <!-- Attachment content will be loaded here -->
         </div>
     </div>
 </div>
@@ -673,6 +608,8 @@ function viewReportDetails(reportId) {
         })
         .then(html => {
             document.getElementById('modalContent').innerHTML = html;
+            // Initialize attachment viewers
+            initializeAttachmentViewers();
         })
         .catch(error => {
             console.error('Error loading report details:', error);
@@ -726,6 +663,216 @@ function viewReportTimeline(reportId) {
                 </div>
             `;
         });
+}
+
+// Initialize attachment viewers
+function initializeAttachmentViewers() {
+    // Add click handlers for attachment preview buttons
+    document.querySelectorAll('.preview-attachment').forEach(button => {
+        button.addEventListener('click', function(e) {
+            e.preventDefault();
+            const filePath = this.getAttribute('data-file-path');
+            const fileName = this.getAttribute('data-file-name');
+            const fileType = this.getAttribute('data-file-type');
+            viewAttachment(filePath, fileName, fileType);
+        });
+    });
+    
+    // Add click handlers for download buttons
+    document.querySelectorAll('.download-attachment').forEach(button => {
+        button.addEventListener('click', function(e) {
+            e.preventDefault();
+            const filePath = this.getAttribute('data-file-path');
+            const fileName = this.getAttribute('data-file-name');
+            downloadAttachment(filePath, fileName);
+        });
+    });
+}
+
+// View Attachment
+function viewAttachment(filePath, fileName, fileType) {
+    const viewerContent = document.getElementById('attachmentViewerContent');
+    const viewerTitle = document.getElementById('attachmentTitle');
+    
+    viewerTitle.textContent = `Viewing: ${fileName}`;
+    
+    // Show loading
+    viewerContent.innerHTML = `
+        <div class="flex justify-center items-center h-64">
+            <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600"></div>
+            <span class="ml-3 text-gray-600">Loading attachment...</span>
+        </div>
+    `;
+    
+    // Show modal
+    document.getElementById('attachmentViewerModal').classList.remove('hidden');
+    
+    // Determine file type and render accordingly
+    const imageTypes = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'];
+    const pdfTypes = ['pdf'];
+    const videoTypes = ['mp4', 'avi', 'mov', 'wmv', 'flv', 'webm'];
+    const audioTypes = ['mp3', 'wav', 'ogg', 'm4a'];
+    const documentTypes = ['doc', 'docx', 'txt', 'rtf'];
+    const spreadsheetTypes = ['xls', 'xlsx', 'csv'];
+    
+    const extension = fileType.toLowerCase();
+    
+    if (imageTypes.includes(extension)) {
+        // Show image
+        viewerContent.innerHTML = `
+            <div class="text-center p-4">
+                <div class="mb-4">
+                    <h4 class="font-medium text-gray-800">${fileName}</h4>
+                    <p class="text-sm text-gray-500">Image File (${extension.toUpperCase()})</p>
+                </div>
+                <div class="max-h-[60vh] overflow-auto">
+                    <img src="${filePath}" 
+                         alt="${fileName}" 
+                         class="max-w-full mx-auto rounded-lg shadow-lg"
+                         onerror="this.onerror=null; this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAwIiBoZWlnaHQ9IjQwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZjBmMGYwIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxNCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0iIzk5OSI+SW1hZ2UgTm90IEF2YWlsYWJsZTwvdGV4dD48L3N2Zz4=';">
+                </div>
+                <div class="mt-4 flex justify-center space-x-4">
+                    <button onclick="downloadAttachment('${filePath}', '${fileName}')" 
+                            class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                        <i class="fas fa-download mr-2"></i> Download
+                    </button>
+                    <button onclick="closeAttachmentViewer()" 
+                            class="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700">
+                        <i class="fas fa-times mr-2"></i> Close
+                    </button>
+                </div>
+            </div>
+        `;
+    } else if (pdfTypes.includes(extension)) {
+        // Show PDF viewer
+        viewerContent.innerHTML = `
+            <div class="text-center p-4">
+                <div class="mb-4">
+                    <h4 class="font-medium text-gray-800">${fileName}</h4>
+                    <p class="text-sm text-gray-500">PDF Document</p>
+                </div>
+                <div class="max-h-[60vh] overflow-auto border rounded-lg">
+                    <iframe src="${filePath}" 
+                            title="${fileName}"
+                            class="w-full h-[60vh] border-0"
+                            onerror="this.onerror=null; this.innerHTML='<div class=\\'p-8 text-center text-red-500\\'><i class=\\"fas fa-exclamation-triangle text-3xl mb-3\\"></i><p>Unable to load PDF preview</p></div>';">
+                    </iframe>
+                </div>
+                <div class="mt-4 flex justify-center space-x-4">
+                    <a href="${filePath}" target="_blank" 
+                       class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 no-underline">
+                        <i class="fas fa-external-link-alt mr-2"></i> Open in New Tab
+                    </a>
+                    <button onclick="downloadAttachment('${filePath}', '${fileName}')" 
+                            class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">
+                        <i class="fas fa-download mr-2"></i> Download
+                    </button>
+                    <button onclick="closeAttachmentViewer()" 
+                            class="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700">
+                        <i class="fas fa-times mr-2"></i> Close
+                    </button>
+                </div>
+            </div>
+        `;
+    } else if (videoTypes.includes(extension)) {
+        // Show video player
+        viewerContent.innerHTML = `
+            <div class="text-center p-4">
+                <div class="mb-4">
+                    <h4 class="font-medium text-gray-800">${fileName}</h4>
+                    <p class="text-sm text-gray-500">Video File (${extension.toUpperCase()})</p>
+                </div>
+                <div class="max-h-[60vh] overflow-auto">
+                    <video controls class="max-w-full mx-auto rounded-lg shadow-lg">
+                        <source src="${filePath}" type="video/${extension}">
+                        Your browser does not support the video tag.
+                    </video>
+                </div>
+                <div class="mt-4 flex justify-center space-x-4">
+                    <button onclick="downloadAttachment('${filePath}', '${fileName}')" 
+                            class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                        <i class="fas fa-download mr-2"></i> Download
+                    </button>
+                    <button onclick="closeAttachmentViewer()" 
+                            class="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700">
+                        <i class="fas fa-times mr-2"></i> Close
+                    </button>
+                </div>
+            </div>
+        `;
+    } else if (audioTypes.includes(extension)) {
+        // Show audio player
+        viewerContent.innerHTML = `
+            <div class="text-center p-4">
+                <div class="mb-4">
+                    <h4 class="font-medium text-gray-800">${fileName}</h4>
+                    <p class="text-sm text-gray-500">Audio File (${extension.toUpperCase()})</p>
+                </div>
+                <div class="max-h-[60vh] overflow-auto p-8">
+                    <audio controls class="w-full">
+                        <source src="${filePath}" type="audio/${extension}">
+                        Your browser does not support the audio element.
+                    </audio>
+                </div>
+                <div class="mt-4 flex justify-center space-x-4">
+                    <button onclick="downloadAttachment('${filePath}', '${fileName}')" 
+                            class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                        <i class="fas fa-download mr-2"></i> Download
+                    </button>
+                    <button onclick="closeAttachmentViewer()" 
+                            class="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700">
+                        <i class="fas fa-times mr-2"></i> Close
+                    </button>
+                </div>
+            </div>
+        `;
+    } else {
+        // Unsupported file type - show download option only
+        viewerContent.innerHTML = `
+            <div class="text-center p-8">
+                <div class="w-20 h-20 mx-auto bg-gray-100 rounded-full flex items-center justify-center mb-4">
+                    <i class="fas fa-file text-3xl text-gray-400"></i>
+                </div>
+                <h4 class="font-medium text-gray-800 mb-2">${fileName}</h4>
+                <p class="text-sm text-gray-500 mb-4">File type: ${extension.toUpperCase()}</p>
+                <p class="text-gray-600 mb-6">This file type cannot be previewed. Please download to view.</p>
+                <div class="flex justify-center space-x-4">
+                    <button onclick="downloadAttachment('${filePath}', '${fileName}')" 
+                            class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                        <i class="fas fa-download mr-2"></i> Download File
+                    </button>
+                    <button onclick="closeAttachmentViewer()" 
+                            class="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700">
+                        <i class="fas fa-times mr-2"></i> Close
+                    </button>
+                </div>
+            </div>
+        `;
+    }
+}
+
+// Download Attachment
+function downloadAttachment(filePath, fileName) {
+    showToast('Preparing download...', 'info');
+    
+    // Create a temporary anchor element
+    const link = document.createElement('a');
+    link.href = filePath;
+    link.download = fileName;
+    link.target = '_blank';
+    
+    // Append to body, click, and remove
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    showToast('Download started', 'success');
+}
+
+// Close Attachment Viewer
+function closeAttachmentViewer() {
+    document.getElementById('attachmentViewerModal').classList.add('hidden');
+    document.getElementById('attachmentViewerContent').innerHTML = '';
 }
 
 // Print Report
@@ -860,73 +1007,6 @@ function closeModal() {
     document.getElementById('modalContent').innerHTML = '';
 }
 
-// Open PIN Modal
-function openPinModal(reportId) {
-    document.getElementById('pinReportId').value = reportId;
-    document.getElementById('pinModal').classList.remove('hidden');
-    
-    // Clear PIN inputs
-    const pinInputs = document.querySelectorAll('#pinForm .pin-input');
-    pinInputs.forEach(input => input.value = '');
-    if (pinInputs[0]) pinInputs[0].focus();
-}
-
-// Close PIN Modal
-function closePinModal() {
-    document.getElementById('pinModal').classList.add('hidden');
-}
-
-// PIN Input Handling for Modal
-function handleModalPinInput(input, index) {
-    const value = input.value;
-    
-    // Only allow numbers
-    if (!/^\d*$/.test(value)) {
-        input.value = '';
-        return;
-    }
-    
-    // Auto-focus next input if a number is entered
-    if (value && index < 4) {
-        const pinInputs = document.querySelectorAll('#pinForm .pin-input');
-        if (pinInputs[index]) {
-            pinInputs[index].focus();
-        }
-    }
-    
-    // If user enters more than one character, take only the first
-    if (value.length > 1) {
-        input.value = value.charAt(0);
-    }
-}
-
-function handleModalPinKeydown(event, index) {
-    const key = event.key;
-    const pinInputs = document.querySelectorAll('#pinForm .pin-input');
-    
-    if (key === 'Backspace' || key === 'Delete') {
-        // If current input is empty and backspace pressed, go to previous input
-        if (pinInputs[index - 1].value === '' && index > 1) {
-            setTimeout(() => {
-                if (pinInputs[index - 2]) {
-                    pinInputs[index - 2].focus();
-                    pinInputs[index - 2].select();
-                }
-            }, 10);
-        }
-    }
-    
-    // Arrow key navigation
-    if (key === 'ArrowLeft' && index > 1 && pinInputs[index - 2]) {
-        pinInputs[index - 2].focus();
-        pinInputs[index - 2].select();
-    }
-    if (key === 'ArrowRight' && index < 4 && pinInputs[index]) {
-        pinInputs[index].focus();
-        pinInputs[index].select();
-    }
-}
-
 // Toast notification
 function showToast(message, type = 'info') {
     // Remove existing toasts
@@ -977,30 +1057,6 @@ function validateDateRange() {
 document.addEventListener('DOMContentLoaded', function() {
     console.log('My Reports module loaded');
     
-    // Add event listener for PIN form submission
-    const pinForm = document.getElementById('pinForm');
-    if (pinForm) {
-        pinForm.addEventListener('submit', function(e) {
-            // Validate PIN
-            const pinInputs = document.querySelectorAll('#pinForm input[name="pin_code[]"]');
-            let pin = '';
-            pinInputs.forEach(input => pin += input.value);
-            
-            if (pin.length !== 4 || !/^\d{4}$/.test(pin)) {
-                e.preventDefault();
-                showToast('Please enter a valid 4-digit PIN', 'error');
-                return false;
-            }
-            
-            // Add the pin as a single value for PHP processing
-            const hiddenPinInput = document.createElement('input');
-            hiddenPinInput.type = 'hidden';
-            hiddenPinInput.name = 'pin_code';
-            hiddenPinInput.value = pin;
-            this.appendChild(hiddenPinInput);
-        });
-    }
-    
     // Add event listener for filter form
     const filterForm = document.getElementById('filterForm');
     if (filterForm) {
@@ -1023,11 +1079,11 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    const pinModal = document.getElementById('pinModal');
-    if (pinModal) {
-        pinModal.addEventListener('click', function(e) {
+    const attachmentViewerModal = document.getElementById('attachmentViewerModal');
+    if (attachmentViewerModal) {
+        attachmentViewerModal.addEventListener('click', function(e) {
             if (e.target === this) {
-                closePinModal();
+                closeAttachmentViewer();
             }
         });
     }
@@ -1036,7 +1092,7 @@ document.addEventListener('DOMContentLoaded', function() {
     document.addEventListener('keydown', function(e) {
         if (e.key === 'Escape') {
             closeModal();
-            closePinModal();
+            closeAttachmentViewer();
         }
     });
 });
@@ -1105,16 +1161,6 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 }
 
-/* PIN input styling */
-.pin-input {
-    transition: all 0.2s;
-}
-
-.pin-input:focus {
-    border-color: #3b82f6;
-    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-}
-
 /* Modal backdrop */
 .bg-opacity-50 {
     backdrop-filter: blur(4px);
@@ -1128,13 +1174,15 @@ img {
 
 /* Fix for modal scrolling on mobile */
 @media (max-width: 640px) {
-    #reportDetailsModal > div {
+    #reportDetailsModal > div,
+    #attachmentViewerModal > div {
         margin: 0.5rem;
         width: calc(100% - 1rem);
         max-height: 95vh;
     }
     
-    #modalContent {
+    #modalContent,
+    #attachmentViewerContent {
         max-height: calc(95vh - 60px);
     }
 }
@@ -1144,11 +1192,6 @@ img {
     button, a {
         min-height: 44px;
         min-width: 44px;
-    }
-    
-    .pin-input {
-        width: 50px;
-        height: 50px;
     }
 }
 
@@ -1187,4 +1230,37 @@ button:hover {
     0% { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }
 }
+
+/* Attachment viewer styles */
+.attachment-item {
+    transition: all 0.2s ease;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.5rem;
+    padding: 0.75rem;
+    background: #f9fafb;
+}
+
+.attachment-item:hover {
+    background: #f3f4f6;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+.file-icon {
+    width: 2.5rem;
+    height: 2.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 0.5rem;
+    font-size: 1.25rem;
+}
+
+.file-icon.image { background: #dbeafe; color: #1d4ed8; }
+.file-icon.pdf { background: #fee2e2; color: #dc2626; }
+.file-icon.video { background: #fef3c7; color: #d97706; }
+.file-icon.audio { background: #d1fae5; color: #059669; }
+.file-icon.document { background: #e0e7ff; color: #4f46e5; }
+.file-icon.spreadsheet { background: #dcfce7; color: #16a34a; }
+.file-icon.other { background: #f3f4f6; color: #6b7280; }
 </style>

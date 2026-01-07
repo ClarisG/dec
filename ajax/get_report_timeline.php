@@ -179,7 +179,7 @@ function getStatusIcon($status) {
                 <span class="text-sm text-gray-600">Pending/Submitted</span>
             </div>
             <div class="flex items-center">
-                <div class="w-3 h-3 rounded-full bg-orange-500 mr-2"></div>
+                <div class="w-3 h-3 rounded-full bg-red-500 mr-2"></div>
                 <span class="text-sm text-gray-600">Verification</span>
             </div>
             <div class="flex items-center">

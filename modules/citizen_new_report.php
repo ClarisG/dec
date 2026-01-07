@@ -64,21 +64,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['submit_report'])) {
             $involved_persons = trim($_POST['involved_persons'] ?? '');
             $witnesses = trim($_POST['witnesses'] ?? '');
             
-            // Handle PIN as single field or array
-            $pin_code = '';
             $is_anonymous = isset($_POST['is_anonymous']) ? 1 : 0;
-            
-            // Only require PIN if not anonymous
-            if (!$is_anonymous) {
-                if (isset($_POST['pin_code'])) {
-                    if (is_array($_POST['pin_code'])) {
-                        $pin_code = implode('', $_POST['pin_code']);
-                    } else {
-                        $pin_code = trim($_POST['pin_code']);
-                    }
-                }
-            }
-            
             $category = $_POST['category'] ?? 'incident';
             
             // Validate required fields
@@ -99,6 +85,12 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['submit_report'])) {
                         mkdir($upload_dir, 0777, true);
                     }
                     
+                    // Also create a subdirectory for this user if it doesn't exist
+                    $user_upload_dir = $upload_dir . 'user_' . $user_id . '/';
+                    if (!file_exists($user_upload_dir)) {
+                        mkdir($user_upload_dir, 0777, true);
+                    }
+                    
                     // Limit to 10 files
                     $file_count = count($_FILES['evidence_files']['name']);
                     if ($file_count > 10) {
@@ -107,62 +99,32 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['submit_report'])) {
                         for ($i = 0; $i < $file_count; $i++) {
                             if ($_FILES['evidence_files']['error'][$i] == UPLOAD_ERR_OK) {
                                 $original_name = basename($_FILES['evidence_files']['name'][$i]);
-                                $file_name = time() . '_' . uniqid() . '_' . $original_name;
-                                $file_path = $upload_dir . $file_name;
+                                $file_extension = strtolower(pathinfo($original_name, PATHINFO_EXTENSION));
+                                
+                                // Generate a unique filename
+                                $unique_id = time() . '_' . uniqid();
+                                $file_name = $unique_id . '_' . preg_replace('/[^a-zA-Z0-9\._-]/', '_', $original_name);
+                                $file_path = $user_upload_dir . $file_name;
                                 
                                 $allowed_extensions = ['jpg', 'jpeg', 'png', 'gif', 'pdf', 'doc', 'docx', 'mp4', 'avi', 'mov', 'wav', 'mp3'];
-                                $file_extension = strtolower(pathinfo($original_name, PATHINFO_EXTENSION));
                                 
                                 // Check file type and size (10MB max)
                                 if (in_array($file_extension, $allowed_extensions) &&
                                     $_FILES['evidence_files']['size'][$i] <= 10 * 1024 * 1024) {
                                     
                                     if (move_uploaded_file($_FILES['evidence_files']['tmp_name'][$i], $file_path)) {
-                                        // Only encrypt if not anonymous and PIN provided
-                                        if (!$is_anonymous && !empty($pin_code)) {
-                                            // Generate strong encryption key from PIN
-                                            $encryption_key = hash_pbkdf2("sha256", $pin_code, "LEIR_SALT", 10000, 32);
-                                            $iv = openssl_random_pseudo_bytes(16);
-                                            
-                                            // Encrypt file content
-                                            $file_content = file_get_contents($file_path);
-                                            $encrypted_content = openssl_encrypt(
-                                                $file_content,
-                                                'AES-256-CBC',
-                                                $encryption_key,
-                                                OPENSSL_RAW_DATA,
-                                                $iv
-                                            );
-                                            
-                                            // Save encrypted file
-                                            $encrypted_file_path = $upload_dir . 'encrypted_' . $file_name;
-                                            file_put_contents($encrypted_file_path, $encrypted_content . $iv);
-                                            
-                                            // Delete original unencrypted file
-                                            unlink($file_path);
-                                            
-                                            // Store file metadata
-                                            $evidence_files[] = [
-                                                'original_name' => $original_name,
-                                                'encrypted_name' => basename($encrypted_file_path),
-                                                'file_type' => $file_extension,
-                                                'file_size' => $_FILES['evidence_files']['size'][$i],
-                                                'encryption_key_hash' => hash('sha256', $encryption_key),
-                                                'original_hash' => hash('sha256', file_get_contents($_FILES['evidence_files']['tmp_name'][$i])),
-                                                'iv' => bin2hex($iv)
-                                            ];
-                                        } else {
-                                            // For anonymous reports, don't encrypt
-                                            $evidence_files[] = [
-                                                'original_name' => $original_name,
-                                                'encrypted_name' => basename($file_path),
-                                                'file_type' => $file_extension,
-                                                'file_size' => $_FILES['evidence_files']['size'][$i],
-                                                'encryption_key_hash' => null,
-                                                'original_hash' => hash('sha256', file_get_contents($file_path)),
-                                                'iv' => null
-                                            ];
-                                        }
+                                        // Store relative path for database
+                                        $relative_path = 'uploads/reports/user_' . $user_id . '/' . $file_name;
+                                        
+                                        // Store file metadata (NO ENCRYPTION)
+                                        $evidence_files[] = [
+                                            'original_name' => $original_name,
+                                            'stored_name' => $file_name,
+                                            'path' => $relative_path,
+                                            'file_type' => $file_extension,
+                                            'file_size' => $_FILES['evidence_files']['size'][$i],
+                                            'encrypted' => false
+                                        ];
                                     }
                                 } else {
                                     $error = "File '{$original_name}' is not allowed or too large (max 10MB).";
@@ -188,7 +150,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['submit_report'])) {
                     $user = $user_stmt->fetch(PDO::FETCH_ASSOC);
                     $barangay = $user['barangay'] ?? '';
                     
-                    // Insert report with all fields
+                    // Insert report with all fields (PIN CODE REMOVED)
                     $insert_query = "INSERT INTO reports (
                         report_number, 
                         user_id, 
@@ -202,7 +164,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['submit_report'])) {
                         evidence_files, 
                         status,
                         priority, 
-                        pin_code, 
                         is_anonymous, 
                         created_at, 
                         category,
@@ -220,7 +181,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['submit_report'])) {
                         :evidence_files, 
                         'pending',
                         :priority, 
-                        :pin_code, 
                         :is_anonymous, 
                         NOW(), 
                         :category,
@@ -242,7 +202,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['submit_report'])) {
                         ':witnesses' => $witnesses,
                         ':evidence_files' => $evidence_files_json,
                         ':priority' => $severity,
-                        ':pin_code' => $pin_code,
                         ':is_anonymous' => $is_anonymous,
                         ':category' => $category,
                         ':barangay' => $barangay
@@ -256,15 +215,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['submit_report'])) {
                         $history_stmt = $conn->prepare($history_query);
                         $history_stmt->execute([':report_id' => $report_id]);
                         
-                        if ($is_anonymous) {
-                            $success = "Report submitted successfully!<br>
-                                        <strong>Report Number:</strong> $report_number<br>
-                                        <a href='?module=my-reports' class='text-blue-600 hover:underline'>View in My Reports</a>";
-                        } else {
-                            $success = "Report submitted successfully!<br>
-                                        <strong>Report Number:</strong> $report_number<br>
-                                        <a href='?module=my-reports' class='text-blue-600 hover:underline'>View in My Reports</a>";
-                        }
+                        $success = "Report submitted successfully!<br>
+                                    <strong>Report Number:</strong> $report_number<br>
+                                    <a href='?module=my-reports' class='text-blue-600 hover:underline'>View in My Reports</a>";
                         
                         // Clear form
                         $_POST = array();
@@ -512,23 +465,18 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['submit_report'])) {
                 </div>
             </div>
             
-            <!-- Anonymous Option & PIN -->
+            <!-- Anonymous Option -->
             <div class="bg-gray-50 rounded-xl p-6 mb-6">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <!-- Anonymous Option -->
-                    <div>
-                        <div class="flex items-center">
-                            <input type="checkbox" id="incident_is_anonymous" name="is_anonymous" value="1" 
-                                   class="h-5 w-5 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                                   onchange="togglePinCodeVisibility('incident', this.checked)">
-                            <label for="incident_is_anonymous" class="ml-3 block text-sm font-medium text-gray-700">
-                                Submit anonymously
-                            </label>
-                        </div>
-                        <p class="text-sm text-gray-500 mt-2 ml-8">
-                            Your name will not be visible to the public.
-                    </div>
+                <div class="flex items-center">
+                    <input type="checkbox" id="incident_is_anonymous" name="is_anonymous" value="1" 
+                           class="h-5 w-5 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                    <label for="incident_is_anonymous" class="ml-3 block text-sm font-medium text-gray-700">
+                        Submit anonymously
+                    </label>
                 </div>
+                <p class="text-sm text-gray-500 mt-2 ml-8">
+                    Your name will not be visible to the public.
+                </p>
             </div>
             
             <!-- Terms and Submit -->
@@ -690,22 +638,16 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['submit_report'])) {
             
             <!-- Anonymous Option -->
             <div class="bg-gray-50 rounded-xl p-6 mb-6">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <!-- Anonymous Option -->
-                    <div>
-                        <div class="flex items-center">
-                            <input type="checkbox" id="complaint_is_anonymous" name="is_anonymous" value="1" 
-                                   class="h-5 w-5 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                                   onchange="togglePinCodeVisibility('complaint', this.checked)">
-                            <label for="complaint_is_anonymous" class="ml-3 block text-sm font-medium text-gray-700">
-                                Submit anonymously
-                            </label>
-                        </div>
-                        <p class="text-sm text-gray-500 mt-2 ml-8">
-                            Your name will not be visible to the public.
-                        </p>
-                    </div>
+                <div class="flex items-center">
+                    <input type="checkbox" id="complaint_is_anonymous" name="is_anonymous" value="1" 
+                           class="h-5 w-5 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                    <label for="complaint_is_anonymous" class="ml-3 block text-sm font-medium text-gray-700">
+                        Submit anonymously
+                    </label>
                 </div>
+                <p class="text-sm text-gray-500 mt-2 ml-8">
+                    Your name will not be visible to the public.
+                </p>
             </div>
             
             <!-- Terms and Submit -->
@@ -867,23 +809,16 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['submit_report'])) {
             
             <!-- Anonymous Option -->
             <div class="bg-gray-50 rounded-xl p-6 mb-6">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <!-- Anonymous Option -->
-                    <div>
-                        <div class="flex items-center">
-                            <input type="checkbox" id="blotter_is_anonymous" name="is_anonymous" value="1" 
-                                   class="h-5 w-5 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                                   onchange="togglePinCodeVisibility('blotter', this.checked)">
-                            <label for="blotter_is_anonymous" class="ml-3 block text-sm font-medium text-gray-700">
-                                Submit anonymously
-                            </label>
-                        </div>
-                        <p class="text-sm text-gray-500 mt-2 ml-8">
-                            Your name will not be visible to the public.
-                        </p>
-                    </div>
-                    
+                <div class="flex items-center">
+                    <input type="checkbox" id="blotter_is_anonymous" name="is_anonymous" value="1" 
+                           class="h-5 w-5 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                    <label for="blotter_is_anonymous" class="ml-3 block text-sm font-medium text-gray-700">
+                        Submit anonymously
+                    </label>
                 </div>
+                <p class="text-sm text-gray-500 mt-2 ml-8">
+                    Your name will not be visible to the public.
+                </p>
             </div>
             
             <!-- Terms and Submit -->
@@ -1006,29 +941,6 @@ tabs.forEach(tab => {
         }
     });
 });
-
-// Toggle PIN code visibility based on anonymous checkbox
-function togglePinCodeVisibility(formType, isAnonymous) {
-    const pinSection = document.getElementById(formType + 'PinSection');
-    const pinInputs = document.querySelectorAll(`#${formType}Form .pin-input`);
-    
-    if (pinSection) {
-        if (isAnonymous) {
-            pinSection.classList.add('hidden');
-            // Clear PIN inputs
-            pinInputs.forEach(input => {
-                input.value = '';
-                input.required = false;
-            });
-        } else {
-            pinSection.classList.remove('hidden');
-            // Require PIN inputs
-            pinInputs.forEach(input => {
-                input.required = true;
-            });
-        }
-    }
-}
 
 // AI Analysis Functions
 let analysisTimeouts = {};
@@ -1631,6 +1543,11 @@ function handleFileUpload(files, formType) {
             </button>
         `;
         fileList.appendChild(fileItem);
+        
+        // Preview image files
+        if (file.type.startsWith('image/')) {
+            previewImageFile(file, formType);
+        }
     });
     
     // Update count
@@ -1640,6 +1557,23 @@ function handleFileUpload(files, formType) {
     if (newFiles.length > 0) {
         showToast(`Added ${newFiles.length} file(s)`, 'success');
     }
+}
+
+// Preview image files
+function previewImageFile(file, formType) {
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const previewId = formType + '_' + file.name.replace(/[^a-zA-Z0-9]/g, '_');
+        const previewHtml = `
+            <div id="${previewId}" class="file-preview mb-2 p-2 border rounded">
+                <img src="${e.target.result}" alt="${file.name}" class="max-w-full max-h-40 mx-auto">
+                <p class="text-xs text-center mt-1">${file.name}</p>
+            </div>
+        `;
+        const fileList = document.getElementById(formType + 'FileList');
+        fileList.insertAdjacentHTML('afterbegin', previewHtml);
+    };
+    reader.readAsDataURL(file);
 }
 
 function removeFile(formType, fileName, fileSize) {
@@ -1737,78 +1671,9 @@ document.querySelectorAll('.drop-zone').forEach(dropZone => {
     });
 });
 
-// PIN Code handling
-function handlePinInput(input, index) {
-    const value = input.value;
-    
-    if (!/^\d*$/.test(value)) {
-        input.value = '';
-        return;
-    }
-    
-    if (value && index < 4) {
-        const pinInputs = document.querySelectorAll('.pin-input');
-        if (pinInputs[index]) {
-            pinInputs[index].focus();
-        }
-    }
-}
-
-function handlePinKeydown(event, index) {
-    const key = event.key;
-    const pinInputs = document.querySelectorAll('.pin-input');
-    
-    if (key === 'Backspace' || key === 'Delete') {
-        if (pinInputs[index - 1].value === '' && index > 1) {
-            setTimeout(() => {
-                pinInputs[index - 2].focus();
-                pinInputs[index - 2].select();
-            }, 10);
-        }
-    }
-    
-    if (key === 'ArrowLeft' && index > 1) {
-        pinInputs[index - 2].focus();
-        pinInputs[index - 2].select();
-    }
-    if (key === 'ArrowRight' && index < 4) {
-        pinInputs[index].focus();
-        pinInputs[index].select();
-    }
-}
-
-function handlePinPaste(event) {
-    event.preventDefault();
-    const pasteData = event.clipboardData.getData('text').trim();
-    const pinInputs = document.querySelectorAll('.pin-input');
-    
-    if (/^\d{4}$/.test(pasteData)) {
-        const digits = pasteData.split('');
-        digits.forEach((digit, index) => {
-            if (index < 4) {
-                pinInputs[index].value = digit;
-            }
-        });
-        if (pinInputs[3]) {
-            pinInputs[3].focus();
-        }
-    }
-}
-
 // Form validation
 document.querySelectorAll('form').forEach(form => {
     form.addEventListener('submit', function(e) {
-        // Check if anonymous
-        const anonymousCheckbox = this.querySelector('input[name="is_anonymous"]');
-        const isAnonymous = anonymousCheckbox ? anonymousCheckbox.checked : false;
-        
-        // Validate PIN only if not anonymous
-        if (!isAnonymous) {
-            const pinInputs = this.querySelectorAll('input[name="pin_code[]"]');
-            let fullPin = '';
-            pinInputs.forEach(input => fullPin += input.value);
-        }
-        
         // Validate report type is selected
         const reportTypeId = this.querySelector('input[name="report_type_id"]');
         if (!reportTypeId || !reportTypeId.value) {
@@ -1862,14 +1727,6 @@ function showToast(message, type) {
 
 // Initialize when page loads
 document.addEventListener('DOMContentLoaded', function() {
-    // Initialize PIN fields
-    const pinInputs = document.querySelectorAll('.pin-input');
-    pinInputs.forEach((input, index) => {
-        input.addEventListener('input', (e) => handlePinInput(e.target, index + 1));
-        input.addEventListener('keydown', (e) => handlePinKeydown(e, index + 1));
-        input.addEventListener('paste', handlePinPaste);
-    });
-    
     // Initialize character counters
     document.querySelectorAll('textarea[name="description"]').forEach(textarea => {
         const formType = textarea.id.replace('Description', '').toLowerCase();
@@ -1880,14 +1737,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 charCount.textContent = this.value.length;
             });
         }
-    });
-    
-    // Initialize anonymous checkbox listeners
-    document.querySelectorAll('input[name="is_anonymous"]').forEach(checkbox => {
-        const formType = checkbox.id.replace('_is_anonymous', '').toLowerCase();
-        checkbox.addEventListener('change', function() {
-            togglePinCodeVisibility(formType, this.checked);
-        });
     });
 });
 </script>
@@ -1905,17 +1754,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
 .tab-button.active-tab .text-gray-600 {
     color: #dbeafe;
-}
-
-.pin-input {
-    transition: all 0.2s ease;
-    font-family: monospace;
-}
-
-.pin-input:focus {
-    border-color: #3b82f6;
-    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-    transform: translateY(-2px);
 }
 
 .file-item {
@@ -2000,5 +1838,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
 .confidence-meter {
     display: inline-block;
+}
+
+.file-preview img {
+    max-width: 100%;
+    max-height: 160px;
+    object-fit: contain;
 }
 </style>

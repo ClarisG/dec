@@ -24,7 +24,7 @@ if (!defined('BASE_URL')) {
 
 // Define logo paths if not already defined
 if (!defined('LOGO_PATH')) {
-    define('LOGO_PATH', __DIR__ . '/../images/10213.png');
+    define('LOGO_PATH', __DIR__ . '../images/10213.png');
 }
 if (!defined('LOGO_URL') && defined('BASE_URL')) {
     define('LOGO_URL', BASE_URL . 'dec/images/10213.png');

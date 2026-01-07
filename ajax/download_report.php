@@ -19,6 +19,59 @@ if (!$report_id) {
     exit('Invalid report ID');
 }
 
+// Helper function to get web-accessible path
+function getRelativePath($absolute_path) {
+    $base_dir = realpath(__DIR__ . '/../');
+    $file_path = realpath($absolute_path);
+    
+    if ($file_path && strpos($file_path, $base_dir) === 0) {
+        return '.' . str_replace($base_dir, '', $file_path);
+    }
+    
+    // Fallback to relative path
+    if (strpos($absolute_path, __DIR__) === 0) {
+        return '.' . str_replace(__DIR__, '', $absolute_path);
+    }
+    
+    return $absolute_path;
+}
+
+// Helper function to format file size
+function formatBytes($bytes, $precision = 2) {
+    $units = ['B', 'KB', 'MB', 'GB', 'TB'];
+    $bytes = max($bytes, 0);
+    $pow = floor(($bytes ? log($bytes) : 0) / log(1024));
+    $pow = min($pow, count($units) - 1);
+    $bytes /= pow(1024, $pow);
+    return round($bytes, $precision) . ' ' . $units[$pow];
+}
+
+// Helper function to get file placeholder HTML (UPDATED - No duplicate file name)
+function getFilePlaceholderHTML($file_name, $file_type, $file_size, $extension) {
+    $icon = 'fa-file';
+    $color = 'file-icon-other';
+    
+    switch($file_type) {
+        case 'Image': $icon = 'fa-image'; $color = 'file-icon-image'; break;
+        case 'PDF': $icon = 'fa-file-pdf'; $color = 'file-icon-pdf'; break;
+        case 'Video': $icon = 'fa-file-video'; $color = 'file-icon-video'; break;
+        case 'Audio': $icon = 'fa-file-audio'; $color = 'file-icon-audio'; break;
+        case 'Document': $icon = 'fa-file-word'; $color = 'file-icon-document'; break;
+        case 'Spreadsheet': $icon = 'fa-file-excel'; $color = 'file-icon-spreadsheet'; break;
+    }
+    
+    // Return only placeholder without duplicate file name
+    return '
+        <div class="evidence-placeholder">
+            <i class="fas ' . $icon . ' evidence-file-icon ' . $color . '"></i>
+            <div class="file-details">
+                <span class="file-type">' . strtoupper($extension) . '</span>
+                <span>' . $file_size . '</span>
+            </div>
+        </div>
+    ';
+}
+
 try {
     $conn = getDbConnection();
     $user_id = $_SESSION['user_id'];
@@ -53,10 +106,15 @@ try {
     $history_stmt->execute([':report_id' => $report_id]);
     $status_history = $history_stmt->fetchAll(PDO::FETCH_ASSOC);
     
-    // Check if logo exists - Look for logo in multiple locations
+    // Check if logo exists
     $logo_path = null;
+    $logo_url = null;
     $possible_logo_paths = [
         __DIR__ . '/../images/10213.png',
+        __DIR__ . '/../images/logo.png',
+        __DIR__ . '/../images/logo.jpg',
+        __DIR__ . '/../images/barangay-logo.png',
+        __DIR__ . '/../uploads/logo.png',
         __DIR__ . '/images/10213.png',
         '../images/10213.png',
         'images/10213.png',
@@ -66,21 +124,20 @@ try {
     foreach ($possible_logo_paths as $path) {
         if (file_exists($path)) {
             $logo_path = $path;
-            // Convert to web-accessible path if needed
-            if (strpos($path, __DIR__) !== false) {
-                $logo_path = str_replace(__DIR__, '.', $path);
-            }
+            // Convert to web-accessible path
+            $logo_url = getRelativePath($path);
             break;
         }
     }
     
     // Also check for common image extensions
     if (!$logo_path) {
-        $image_extensions = ['png', 'jpg', 'jpeg', 'gif'];
+        $image_extensions = ['png', 'jpg', 'jpeg', 'gif', 'svg'];
         foreach ($image_extensions as $ext) {
             $test_path = __DIR__ . '/../images/10213.' . $ext;
             if (file_exists($test_path)) {
-                $logo_path = str_replace(__DIR__, '.', $test_path);
+                $logo_path = $test_path;
+                $logo_url = getRelativePath($test_path);
                 break;
             }
         }
@@ -116,7 +173,7 @@ try {
                 padding: 0;
             }
             
-            /* BARANGAY OFFICIAL REPORT Header with Logo */
+            /* BARANGAY OFFICIAL REPORT Header with Logo - UPDATED LOGO STYLING */
             .report-header {
                 padding: 15px 0 20px 0;
                 border-bottom: 2px solid #000;
@@ -142,16 +199,19 @@ try {
                 z-index: 1;
             }
             
+            /* UPDATED: Better logo size handling */
             .logo-img-small {
                 max-height: 100px;
-                max-width: 120px;
-                height: 120px;
-                width: 100px;
+                max-width: 150px;
+                height: auto;
+                width: auto;
+                display: block;
+                object-fit: contain;
             }
             
             .logo-placeholder {
-                width: 50px;
-                height: 50px;
+                width: 120px;
+                height: 120px;
                 background: #f0f0f0;
                 display: flex;
                 align-items: center;
@@ -160,50 +220,50 @@ try {
             }
             
             .logo-placeholder span {
-                font-size: 7px;
+                font-size: 12px;
                 color: #666;
                 text-align: center;
-                padding: 2px;
+                padding: 5px;
             }
             
             .header-text {
                 flex: 1;
                 text-align: center;
-                padding-left: 100px; /* Space for logo */
+                padding-left: 150px; /* Space for logo */
                 padding-right: 70px; /* Space for balance */
             }
             
             .header-text h1 {
-                font-size: 20px;
+                font-size: 24px;
                 font-weight: bold;
-                color: #000;
-                margin-bottom: 3px;
+                color: #1a4f8c; /* CHANGED TO BLUE */
+                margin-bottom: 5px;
                 text-transform: uppercase;
                 letter-spacing: 0.5px;
                 line-height: 1.2;
             }
             
             .header-text h2 {
-                font-size: 14px;
+                font-size: 16px;
                 font-weight: normal;
-                color: #333;
-                margin-bottom: 5px;
+                color: #1a4f8c; /* CHANGED TO BLUE */
+                margin-bottom: 8px;
             }
             
             .header-meta {
                 display: flex;
                 justify-content: space-between;
-                font-size: 11px;
+                font-size: 12px;
                 color: #000;
-                padding: 4px 0;
+                padding: 8px 0;
                 border-top: 1px solid #ddd;
-                margin-top: 8px;
-                margin-left: 70px; /* Align with text */
+                margin-top: 10px;
+                margin-left: 150px; /* Align with text */
                 margin-right: 70px;
             }
             
             .header-meta div {
-                padding: 1px 0;
+                padding: 2px 0;
             }
             
             .header-meta strong {
@@ -221,12 +281,12 @@ try {
             
             .section-title {
                 color: #000;
-                font-size: 13px;
+                font-size: 16px;
                 font-weight: bold;
                 text-transform: uppercase;
-                padding-bottom: 4px;
-                margin-bottom: 12px;
-                border-bottom: 1px solid #000;
+                padding-bottom: 8px;
+                margin-bottom: 15px;
+                border-bottom: 2px solid #000;
                 letter-spacing: 0.5px;
             }
             
@@ -234,14 +294,14 @@ try {
             .report-table {
                 width: 100%;
                 border-collapse: collapse;
-                margin-bottom: 18px;
-                font-size: 11px;
+                margin-bottom: 20px;
+                font-size: 12px;
             }
             
             .report-table th,
             .report-table td {
                 border: 1px solid #000;
-                padding: 6px 8px;
+                padding: 8px 10px;
                 vertical-align: top;
                 text-align: left;
             }
@@ -260,9 +320,9 @@ try {
             /* Status badge */
             .status-badge {
                 display: inline-block;
-                padding: 2px 6px;
-                border-radius: 2px;
-                font-size: 9px;
+                padding: 4px 10px;
+                border-radius: 3px;
+                font-size: 11px;
                 font-weight: bold;
                 text-transform: uppercase;
             }
@@ -276,66 +336,52 @@ try {
             /* Description box */
             .description-box {
                 border: 1px solid #ddd;
-                padding: 12px;
-                margin: 8px 0;
-                line-height: 1.5;
-                font-size: 11px;
+                padding: 15px;
+                margin: 10px 0;
+                line-height: 1.6;
+                font-size: 12px;
                 background: #f9f9f9;
-                border-radius: 3px;
-            }
-            
-            /* Evidence files */
-            .evidence-grid {
-                display: grid;
-                grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-                gap: 8px;
-                margin-top: 8px;
-            }
-            
-            .evidence-item {
-                border: 1px solid #ddd;
-                padding: 6px;
-                text-align: center;
-                background: #f9f9f9;
-                border-radius: 3px;
+                border-radius: 4px;
+                white-space: pre-line;
             }
             
             /* Timeline */
             .timeline {
                 position: relative;
-                padding-left: 15px;
-                margin-top: 12px;
+                padding-left: 20px;
+                margin-top: 15px;
             }
             
             .timeline::before {
                 content: '';
                 position: absolute;
-                left: 5px;
+                left: 7px;
                 top: 0;
                 bottom: 0;
-                width: 1px;
+                width: 2px;
                 background: #000;
             }
             
             .timeline-item {
                 position: relative;
-                margin-bottom: 12px;
-                padding-bottom: 12px;
+                margin-bottom: 15px;
+                padding-bottom: 15px;
                 border-bottom: 1px solid #eee;
             }
             
             /* Signature section */
             .signature-section {
-                margin-top: 35px;
-                padding-top: 18px;
-                border-top: 1px solid #000;
+                margin-top: 40px;
+                padding-top: 20px;
+                border-top: 2px solid #000;
+                page-break-inside: avoid;
             }
             
             .signature-grid {
                 display: grid;
                 grid-template-columns: 1fr 1fr;
-                gap: 35px;
-                margin-top: 25px;
+                gap: 40px;
+                margin-top: 30px;
             }
             
             .signature-box {
@@ -343,68 +389,82 @@ try {
             }
             
             .signature-line {
-                width: 100%;
+                width: 80%;
                 height: 1px;
                 background: #000;
-                margin: 35px auto 4px;
+                margin: 40px auto 8px;
             }
             
             .signature-name {
                 font-weight: bold;
-                margin-top: 4px;
+                margin-top: 8px;
                 color: #000;
-                font-size: 11px;
+                font-size: 14px;
             }
             
             .signature-title {
-                font-size: 9px;
+                font-size: 11px;
                 color: #666;
-                margin-top: 1px;
+                margin-top: 2px;
             }
             
             /* Footer */
             .footer {
-                margin-top: 25px;
-                padding-top: 8px;
+                margin-top: 30px;
+                padding-top: 10px;
                 border-top: 1px solid #ddd;
                 text-align: center;
-                font-size: 8px;
+                font-size: 10px;
                 color: #666;
                 font-style: italic;
+                page-break-inside: avoid;
             }
             
             /* Print Actions - ALWAYS VISIBLE */
             .print-actions {
                 background: #fff;
-                padding: 12px;
+                padding: 15px;
                 border-bottom: 1px solid #ddd;
                 text-align: center;
-                margin-bottom: 15px;
+                margin-bottom: 20px;
                 position: fixed;
                 top: 0;
                 left: 0;
                 right: 0;
                 z-index: 1000;
-                box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+                box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+                display: block !important;
+                visibility: visible !important;
+                opacity: 1 !important;
             }
             
             .print-btn {
                 background: #1a4f8c;
                 color: white;
                 border: none;
-                padding: 8px 15px;
-                border-radius: 3px;
+                padding: 12px 24px;
+                border-radius: 5px;
                 cursor: pointer;
-                font-size: 12px;
-                margin: 0 4px;
+                font-size: 14px;
+                margin: 0 10px;
                 font-weight: 500;
                 display: inline-block !important;
                 visibility: visible !important;
                 opacity: 1 !important;
+                pointer-events: auto !important;
+                transition: background 0.3s;
             }
             
             .print-btn:hover {
                 background: #2c7bb6;
+            }
+            
+            .print-btn.landscape {
+                background: #2c7bb6;
+            }
+            
+            .print-btn.close {
+                background: #666;
             }
             
             /* Print-specific styles */
@@ -412,9 +472,11 @@ try {
                 body {
                     margin: 0;
                     padding: 0;
-                    font-size: 10px;
+                    font-size: 11px;
                     background: white !important;
                     color: black !important;
+                    -webkit-print-color-adjust: exact !important;
+                    print-color-adjust: exact !important;
                 }
                 
                 .no-print {
@@ -427,7 +489,7 @@ try {
                 
                 .report-header {
                     padding-top: 0;
-                    margin-bottom: 15px;
+                    margin-bottom: 20px;
                 }
                 
                 .report-content {
@@ -436,8 +498,8 @@ try {
                 }
                 
                 .logo-img-small {
-                    max-height: 100px;
-                    max-width: 120px;
+                    max-height: 80px;
+                    max-width: 100px;
                 }
                 
                 /* Ensure no page breaks inside important sections */
@@ -470,68 +532,18 @@ try {
             @media screen {
                 body {
                     background: #f5f5f5;
-                    padding-top: 60px; /* Space for fixed print actions */
+                    padding-top: 80px; /* Space for fixed print actions */
                 }
                 
                 .report-content {
                     background: white;
-                    padding: 25px;
-                    box-shadow: 0 0 15px rgba(0,0,0,0.1);
-                    border-radius: 0;
-                    margin-bottom: 15px;
-                }
-            }
-            
-            /* Responsive adjustments */
-            @media (max-width: 768px) {
-                .report-table {
-                    font-size: 10px;
+                    padding: 30px;
+                    box-shadow: 0 0 20px rgba(0,0,0,0.1);
+                    border-radius: 8px;
+                    margin-bottom: 40px;
                 }
                 
-                .report-table th,
-                .report-table td {
-                    padding: 5px 6px;
-                }
-                
-                .signature-grid {
-                    grid-template-columns: 1fr;
-                    gap: 15px;
-                }
-                
-                .header-meta {
-                    flex-direction: column;
-                    text-align: center;
-                    margin-left: 0;
-                    margin-right: 0;
-                }
-                
-                .header-text {
-                    padding-left: 60px;
-                    padding-right: 60px;
-                }
-                
-                .print-btn {
-                    padding: 6px 10px;
-                    font-size: 11px;
-                    margin: 2px;
-                }
-                
-                .logo-img-small {
-                    max-height: 40px;
-                    max-width: 50px;
-                }
-            }
-            
-            /* PERMANENT VISIBILITY FOR PRINT BUTTONS */
-            .print-permanent {
-                display: inline-block !important;
-                visibility: visible !important;
-                opacity: 1 !important;
-                position: static !important;
-            }
-            
-            /* ADDED: Force print buttons to stay visible on screen */
-            @media screen {
+                /* Force print buttons to stay visible on screen */
                 .print-actions {
                     display: block !important;
                     visibility: visible !important;
@@ -551,6 +563,67 @@ try {
                     cursor: pointer !important;
                 }
             }
+            
+            /* Responsive adjustments */
+            @media (max-width: 768px) {
+                .report-table {
+                    font-size: 11px;
+                }
+                
+                .report-table th,
+                .report-table td {
+                    padding: 6px 8px;
+                }
+                
+                .signature-grid {
+                    grid-template-columns: 1fr;
+                    gap: 20px;
+                }
+                
+                .header-meta {
+                    flex-direction: column;
+                    text-align: center;
+                    margin-left: 0;
+                    margin-right: 0;
+                }
+                
+                .header-text {
+                    padding-left: 0;
+                    padding-right: 0;
+                    margin-left: 140px;
+                }
+                
+                .print-btn {
+                    padding: 10px 15px;
+                    font-size: 13px;
+                    margin: 5px;
+                    display: block;
+                    width: 100%;
+                    margin-bottom: 10px;
+                }
+                
+                .logo-img-small {
+                    max-height: 80px;
+                    max-width: 100px;
+                }
+                
+                .header-text h1 {
+                    font-size: 20px;
+                }
+                
+                .header-text h2 {
+                    font-size: 14px;
+                }
+            }
+            
+            /* Page break helpers */
+            .page-break {
+                page-break-before: always;
+            }
+            
+            .avoid-break {
+                page-break-inside: avoid;
+            }
         </style>
         <script>
         function printDocument() {
@@ -562,13 +635,73 @@ try {
         }
         
         function printLandscape() {
+            // Add landscape class to body
             document.body.classList.add('print-landscape');
+            
+            // Print after a short delay
             setTimeout(() => {
                 window.print();
+                // Remove landscape class after printing
                 setTimeout(() => {
                     document.body.classList.remove('print-landscape');
                 }, 100);
             }, 100);
+        }
+        
+        // Function to ensure all images are loaded before printing
+        function ensureImagesLoaded() {
+            const images = document.querySelectorAll('img');
+            let loadedCount = 0;
+            const totalImages = images.length;
+            
+            if (totalImages === 0) {
+                return Promise.resolve();
+            }
+            
+            return new Promise((resolve) => {
+                images.forEach(img => {
+                    if (img.complete) {
+                        loadedCount++;
+                    } else {
+                        img.onload = () => {
+                            loadedCount++;
+                            if (loadedCount === totalImages) {
+                                resolve();
+                            }
+                        };
+                        img.onerror = () => {
+                            loadedCount++;
+                            if (loadedCount === totalImages) {
+                                resolve();
+                            }
+                        };
+                    }
+                });
+                
+                // If all images are already loaded
+                if (loadedCount === totalImages) {
+                    resolve();
+                }
+            });
+        }
+        
+        // Enhanced print function with image loading
+        function printWithImages() {
+            showPrintStatus('Loading images...');
+            ensureImagesLoaded().then(() => {
+                showPrintStatus('Opening print dialog...');
+                window.print();
+                setTimeout(() => {
+                    showPrintStatus('Ready');
+                }, 1000);
+            });
+        }
+        
+        function showPrintStatus(message) {
+            const statusEl = document.getElementById('printStatus');
+            if (statusEl) {
+                statusEl.textContent = message;
+            }
         }
         
         document.addEventListener('DOMContentLoaded', function() {
@@ -597,34 +730,37 @@ try {
                 printActions.style.zIndex = '1000';
             }
             
-            // Prevent any auto-hiding
-            setInterval(() => {
-                printButtons.forEach(btn => {
-                    if (btn.style.display === 'none' || 
-                        btn.style.visibility === 'hidden' || 
-                        btn.style.opacity === '0') {
-                        btn.style.display = 'inline-block';
-                        btn.style.visibility = 'visible';
-                        btn.style.opacity = '1';
-                    }
-                });
-            }, 1000);
+            // Update print buttons to use enhanced print
+            const portraitBtn = document.querySelector('.print-btn:not(.landscape):not(.close)');
+            const landscapeBtn = document.querySelector('.print-btn.landscape');
+            
+            if (portraitBtn) {
+                portraitBtn.onclick = printWithImages;
+            }
+            
+            if (landscapeBtn) {
+                landscapeBtn.onclick = function() {
+                    document.body.classList.add('print-landscape');
+                    printWithImages();
+                };
+            }
         });
         </script>
     </head>
     <body>
         <!-- Print Actions - ALWAYS VISIBLE -->
         <div class="no-print print-actions">
-            <button onclick="printDocument()" class="print-btn print-permanent">
+            <button onclick="printWithImages()" class="print-btn">
                 <i class="fas fa-print"></i> Print (Portrait)
             </button>
-            <button onclick="printLandscape()" class="print-btn print-permanent" style="background: #2c7bb6;">
+            <button onclick="printLandscape()" class="print-btn landscape">
                 <i class="fas fa-print"></i> Print (Landscape)
             </button>
-            <button onclick="closeWindow()" class="print-btn print-permanent" style="background: #666;">
+            <button onclick="closeWindow()" class="print-btn close">
                 <i class="fas fa-times"></i> Close
             </button>
-            <p style="margin-top: 8px; font-size: 11px; color: #666;">
+            <div id="printStatus" style="margin-top: 10px; font-size: 12px; color: #666;"></div>
+            <p style="margin-top: 8px; font-size: 12px; color: #666;">
                 Portrait for standard printing | Landscape for wider layout
             </p>
         </div>
@@ -635,8 +771,8 @@ try {
                 <div class="header-with-logo">
                     <!-- Barangay Logo - Upper Left Side -->
                     <div class="logo-left">
-                        <?php if (!empty($logo_path)): ?>
-                            <img src="<?php echo htmlspecialchars($logo_path); ?>"
+                        <?php if (!empty($logo_url)): ?>
+                            <img src="<?php echo htmlspecialchars($logo_url); ?>"
                                  alt="Barangay Logo"
                                  class="logo-img-small">
                         <?php else: ?>
@@ -666,7 +802,7 @@ try {
             </div>
             
             <!-- Report Information Table -->
-            <div style="margin-bottom: 22px;">
+            <div style="margin-bottom: 25px;" class="avoid-break">
                 <div class="section-title">REPORT INFORMATION</div>
                 <table class="report-table">
                     <tr>
@@ -695,7 +831,7 @@ try {
             </div>
             
             <!-- Incident Details Table -->
-            <div style="margin-bottom: 22px;">
+            <div style="margin-bottom: 25px;" class="avoid-break">
                 <div class="section-title">INCIDENT DETAILS</div>
                 <table class="report-table">
                     <tr>
@@ -722,80 +858,44 @@ try {
                         <td colspan="3"><?php echo htmlspecialchars($report['email']); ?></td>
                     </tr>
                     <?php endif; ?>
+                    <?php if (!empty($report['involved_persons'])): ?>
+                    <tr>
+                        <th>Involved Persons:</th>
+                        <td colspan="3"><?php echo nl2br(htmlspecialchars($report['involved_persons'])); ?></td>
+                    </tr>
+                    <?php endif; ?>
+                    <?php if (!empty($report['witnesses'])): ?>
+                    <tr>
+                        <th>Witnesses:</th>
+                        <td colspan="3"><?php echo nl2br(htmlspecialchars($report['witnesses'])); ?></td>
+                    </tr>
+                    <?php endif; ?>
                 </table>
             </div>
             
             <!-- Description -->
-            <div style="margin-bottom: 22px;">
+            <div style="margin-bottom: 25px;" class="avoid-break">
                 <div class="section-title">INCIDENT DESCRIPTION</div>
                 <div class="description-box">
                     <?php echo nl2br(htmlspecialchars($report['description'])); ?>
                 </div>
             </div>
             
-            <!-- Evidence Files -->
-            <?php if (!empty($evidence_files)): ?>
-            <div style="margin-bottom: 22px;">
-                <div class="section-title">ATTACHED EVIDENCE FILES</div>
-                <div class="evidence-grid">
-                    <?php foreach ($evidence_files as $file): ?>
-                        <?php 
-                        $extension = strtolower(pathinfo($file['name'] ?? '', PATHINFO_EXTENSION));
-                        $is_video = in_array($extension, ['mp4', 'avi', 'mov', 'wmv', 'flv', 'mkv']);
-                        $is_image = in_array($extension, ['jpg', 'jpeg', 'png', 'gif', 'bmp']);
-                        $is_document = in_array($extension, ['pdf', 'doc', 'docx', 'txt', 'xls', 'xlsx']);
-                        ?>
-                        <div class="evidence-item">
-                            <div style="font-size: 18px; color: #1a4f8c; margin-bottom: 4px;">
-                                <?php if ($is_video): ?>
-                                    <i class="fas fa-video"></i>
-                                <?php elseif ($is_image): ?>
-                                    <i class="fas fa-image"></i>
-                                <?php elseif ($is_document): ?>
-                                    <i class="fas fa-file-alt"></i>
-                                <?php else: ?>
-                                    <i class="fas fa-file"></i>
-                                <?php endif; ?>
-                            </div>
-                            <div style="font-size: 9px; word-break: break-all; margin-bottom: 2px;">
-                                <?php echo htmlspecialchars($file['name'] ?? 'Unnamed File'); ?>
-                            </div>
-                            <div style="font-size: 8px; color: #666;">
-                                <?php 
-                                if ($is_video) {
-                                    echo 'Video';
-                                } elseif ($is_image) {
-                                    echo 'Image';
-                                } elseif ($is_document) {
-                                    echo 'Document';
-                                } else {
-                                    echo 'File';
-                                }
-                                if (isset($file['size'])): ?>
-                                    <br><?php echo formatBytes($file['size']); ?>
-                                <?php endif; ?>
-                            </div>
-                        </div>
-                    <?php endforeach; ?>
-                </div>
-            </div>
-            <?php endif; ?>
-            
             <!-- Status History -->
             <?php if (!empty($status_history)): ?>
-            <div style="margin-bottom: 22px;">
+            <div style="margin-bottom: 25px;" class="avoid-break">
                 <div class="section-title">STATUS HISTORY TIMELINE</div>
                 <div class="timeline">
                     <?php foreach ($status_history as $history): ?>
                         <div class="timeline-item">
-                            <div style="font-weight: bold; color: #1a4f8c; margin-bottom: 4px; font-size: 10px;">
+                            <div style="font-weight: bold; color: #1a4f8c; margin-bottom: 5px; font-size: 12px;">
                                 <?php echo date('F d, Y h:i A', strtotime($history['created_at'])); ?>
-                                <span class="status-badge status-<?php echo $history['status']; ?>" style="margin-left: 8px;">
+                                <span class="status-badge status-<?php echo $history['status']; ?>" style="margin-left: 10px;">
                                     <?php echo strtoupper($history['status']); ?>
                                 </span>
                             </div>
                             <?php if (!empty($history['notes'])): ?>
-                            <div style="font-size: 9px; color: #333; padding: 4px; background: #f5f5f5; border-radius: 2px;">
+                            <div style="font-size: 11px; color: #333; padding: 8px; background: #f5f5f5; border-radius: 3px; margin-top: 5px;">
                                 <?php echo nl2br(htmlspecialchars($history['notes'])); ?>
                             </div>
                             <?php endif; ?>
@@ -807,10 +907,15 @@ try {
             
             <!-- Resolution Notes -->
             <?php if (!empty($report['resolution_notes'])): ?>
-            <div style="margin-bottom: 22px;">
+            <div style="margin-bottom: 25px;" class="avoid-break">
                 <div class="section-title">RESOLUTION NOTES</div>
-                <div class="description-box" style="background: #e8f4f8;">
+                <div class="description-box" style="background: #e8f4f8; border-left: 4px solid #1a4f8c;">
                     <?php echo nl2br(htmlspecialchars($report['resolution_notes'])); ?>
+                    <?php if (!empty($report['resolved_at'])): ?>
+                    <p style="font-size: 11px; color: #666; margin-top: 10px; font-style: italic;">
+                        <i class="fas fa-calendar-check"></i> Resolved on: <?php echo date('F d, Y h:i A', strtotime($report['resolved_at'])); ?>
+                    </p>
+                    <?php endif; ?>
                 </div>
             </div>
             <?php endif; ?>
@@ -828,6 +933,7 @@ try {
                     </div>
                     
                     <div class="signature-box">
+                        <div class="signature-line"></div>
                         <div class="signature-name">_________________________</div>
                         <div class="signature-title">Barangay Official</div>
                         <div class="signature-title">Date: _________________________</div>
@@ -839,6 +945,9 @@ try {
             <div class="footer">
                 <p>Generated by Barangay Reporting System | Document ID: PRINT-<?php echo $report['id']; ?>-<?php echo date('YmdHis'); ?></p>
                 <p>This is an official document. Unauthorized duplication is prohibited.</p>
+                <p style="margin-top: 8px; font-size: 9px; color: #999;">
+                    Printed on: <?php echo date('F d, Y h:i A'); ?>
+                </p>
             </div>
         </div>
     </body>
@@ -849,13 +958,4 @@ try {
     header('HTTP/1.1 500 Internal Server Error');
     echo 'Database error: ' . htmlspecialchars($e->getMessage());
 }
-
-// Helper function to format file size
-function formatBytes($bytes, $precision = 2) {
-    $units = ['B', 'KB', 'MB', 'GB', 'TB'];
-    $bytes = max($bytes, 0);
-    $pow = floor(($bytes ? log($bytes) : 0) / log(1024));
-    $pow = min($pow, count($units) - 1);
-    $bytes /= pow(1024, $pow);
-    return round($bytes, $precision) . ' ' . $units[$pow];
-}
+?>
