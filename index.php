@@ -589,7 +589,7 @@ if (isset($_SESSION['user_id'])) {
         <div class="loading-content">
             <div class="loading-logo-container">
                 <div class="loading-logo-wrapper">
-                    <img src="../dec/images/10213.png" alt="LEIR Logo" class="loading-logo-image">
+                    <img src="images/10213.png" alt="LEIR Logo" class="loading-logo-image">
                 </div>
             </div>
             <div class="loading-dots">
