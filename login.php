@@ -1,6 +1,6 @@
 <?php
 // login.php - Simplified design matching your uploaded image
-session_start();
+
 
 // Include database configuration
 require_once __DIR__ . '/config/config.php';
