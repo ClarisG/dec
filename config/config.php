@@ -1,8 +1,8 @@
 <?php
 // config/config.php - Updated configuration
 define('DB_HOST', '153.92.15.81');
-define('DB_NAME', 'lu514031374_leir');
-define('DB_USER', 'lu514031374_leir');
+define('DB_NAME', 'u514031374_leir');
+define('DB_USER', 'u514031374_leir');
 define('DB_PASS', 'leirP@55w0rd');
 define('DB_PORT', '3306');
 
