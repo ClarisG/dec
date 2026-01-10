@@ -1038,7 +1038,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             
             <div class="logo-container">
                 <div class="logo-circle">
-                    <img src="../dec/images/10213.png" alt="LEIR Logo">
+                    <img src="images/10213.png" alt="LEIR Logo">
                 </div>
             </div>
         </div>
@@ -1116,7 +1116,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 <div class="mobile-container md:hidden">
     <div class="mobile-header">
         <div class="mobile-logo-circle">
-            <img src="../dec/images/10213.png" alt="LEIR Logo">
+            <img src="images/10213.png" alt="LEIR Logo">
         </div>
         
         <!-- Add the wave separator from index.php -->
