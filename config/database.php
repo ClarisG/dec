@@ -3,11 +3,11 @@
 
 function getDbConnection() {
     // Use the actual database credentials directly
-    $host = 'localhost';
-    $dbname = 'leir_db';
-    $username = 'root';
-    $password = '';
-    $port = '3307';
+    $host = '153.92.15.81';
+    $dbname = 'lu514031374_leir';
+    $username = 'lu514031374_leir';
+    $password = 'leirP@55w0rd';
+    $port = '3306';
     
     try {
         $conn = new PDO("mysql:host=$host;port=$port;dbname=$dbname;charset=utf8mb4", 
