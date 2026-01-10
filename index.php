@@ -606,7 +606,7 @@ if (isset($_SESSION['user_id'])) {
             <nav class="flex justify-between items-center py-4">
                 <!-- Logo and Title Container - Updated for desktop spacing -->
                 <div class="flex items-center space-x-1 desktop-logo-container">
-                    <img src="../dec/images/10213.png"
+                    <img src="images/10213.png"
                     alt="Law Enforcement Logo"
                     class="w-12 h-14 sm:w-14 sm:h-16"
                     />

@@ -1,41 +1,30 @@
 <?php
 // config/database.php
-class Database {
-    private static $instance = null;
-    private $conn;
+
+function getDbConnection() {
+    // Use the actual database credentials directly
+    $host = 'localhost';
+    $dbname = 'leir_db';
+    $username = 'root';
+    $password = '';
+    $port = '3307';
     
-    private function __construct() {
-        $servername = "localhost";
-        $username = "root";
-        $password = "";
-        $dbname = "leir_db";
-        $port = 3307;
-        
-        try {
-            $this->conn = new PDO(
-                "mysql:host=$servername;port=$port;dbname=$dbname;charset=utf8mb4",
-                $username,
-                $password,
-                [
-                    PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-                    PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-                    PDO::ATTR_EMULATE_PREPARES => false
-                ]
-            );
-        } catch(PDOException $e) {
-            die("Database connection failed: " . $e->getMessage());
-        }
-    }
-    
-    public static function getInstance() {
-        if (self::$instance == null) {
-            self::$instance = new Database();
-        }
-        return self::$instance->conn;
+    try {
+        $conn = new PDO("mysql:host=$host;port=$port;dbname=$dbname;charset=utf8mb4", 
+                       $username, $password);
+        $conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+        $conn->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
+        $conn->setAttribute(PDO::ATTR_EMULATE_PREPARES, false);
+        return $conn;
+    } catch(PDOException $e) {
+        // Log the error but don't show database credentials
+        error_log("Database Connection Error: " . $e->getMessage());
+        die("Database connection failed. Please contact administrator.");
     }
 }
 
-function getDbConnection() {
-    return Database::getInstance();
+// Keep for backward compatibility if needed
+if (!isset($pdo)) {
+    $pdo = getDbConnection();
 }
 ?>

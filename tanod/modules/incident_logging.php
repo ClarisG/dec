@@ -1,5 +1,14 @@
 <?php
+session_start();
 require_once '../../config/database.php';
+
+// Check if user is logged in and is a tanod
+if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'tanod') {
+    header('Location: ../../index.php');
+    exit();
+}
+
+$tanod_id = $_SESSION['user_id'];
 
 // Handle form submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {

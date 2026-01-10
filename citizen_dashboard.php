@@ -16,6 +16,7 @@ require_once 'config/database.php';
 require_once 'config/rate_limit.php';
 require_once 'config/base_url.php';
 
+
 // Get user data
 $user_id = $_SESSION['user_id'];
 $username = $_SESSION['username'];

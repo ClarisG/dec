@@ -1,59 +1,30 @@
 <?php
 // config/session.php
 
-// Start session if not already started
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
+// Start session first
+session_start();
 
-// Set security headers
-header("X-Frame-Options: DENY");
-header("X-Content-Type-Options: nosniff");
-header("X-XSS-Protection: 1; mode=block");
+// Set default timezone
+date_default_timezone_set('Asia/Manila');
 
-// CSRF Token generation
-if (empty($_SESSION['csrf_token'])) {
-    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
-}
-
-// Check if user is logged in
+// Check if user is logged in (basic check)
 function isLoggedIn() {
-    return isset($_SESSION['user_id']) && !empty($_SESSION['user_id']);
+    return isset($_SESSION['user_id']) && isset($_SESSION['role']);
 }
 
-// Redirect if not logged in
-function requireLogin() {
-    if (!isLoggedIn()) {
-        header("Location: login.php");
-        exit();
-    }
+// Get user role
+function getUserRole() {
+    return $_SESSION['role'] ?? null;
 }
 
-// Redirect if already logged in
-function requireNoLogin() {
-    if (isLoggedIn()) {
-        header("Location: dashboard.php");
-        exit();
-    }
+// Get user ID
+function getUserId() {
+    return $_SESSION['user_id'] ?? null;
 }
 
-// Regenerate session ID for security
-function regenerateSession() {
-    session_regenerate_id(true);
-}
-
-// Destroy session
-function destroySession() {
-    $_SESSION = array();
-    
-    if (ini_get("session.use_cookies")) {
-        $params = session_get_cookie_params();
-        setcookie(session_name(), '', time() - 42000,
-            $params["path"], $params["domain"],
-            $params["secure"], $params["httponly"]
-        );
-    }
-    
-    session_destroy();
-}
+// Session security can be set via .htaccess or php.ini
+// For XAMPP, you can add these to php.ini:
+// session.cookie_httponly = 1
+// session.cookie_secure = 0 (for development)
+// session.use_strict_mode = 1
 ?>

@@ -36,10 +36,8 @@ if ($module == 'case' && isset($_POST['assign_case'])) {
     $lupon_member = $_POST['lupon_member'];
     
     try {
-        $stmt = $conn->prepare("UPDATE cases SET assigned_lupon = :lupon, status = 'processing', assigned_at = NOW() WHERE id = :id");
-        $stmt->bindParam(':lupon', $lupon_member);
-        $stmt->bindParam(':id', $case_id);
-        $stmt->execute();
+        $stmt = $conn->prepare("UPDATE reports SET assigned_lupon = :lupon, status = 'processing', assigned_at = NOW() WHERE id = :id");
+        $stmt->execute([':lupon' => $lupon_member, ':id' => $case_id]);
         
         $_SESSION['success'] = "Case #$case_id assigned to $lupon_member successfully!";
         header("Location: secretary_dashboard.php?module=case");
@@ -58,8 +56,7 @@ $user_query = "SELECT u.*,
                FROM users u 
                WHERE u.id = :id";
 $user_stmt = $conn->prepare($user_query);
-$user_stmt->bindParam(':id', $user_id);
-$user_stmt->execute();
+$user_stmt->execute([':id' => $user_id]);
 $user_data = $user_stmt->fetch(PDO::FETCH_ASSOC);
 
 if ($user_data) {
@@ -79,16 +76,22 @@ $stats = [];
 if ($module == 'dashboard') {
     // Pending cases
     $pending_query = "SELECT COUNT(*) as count FROM reports WHERE status = 'pending'";
-    $stats['pending_cases'] = $conn->query($pending_query)->fetchColumn();
+    $pending_stmt = $conn->prepare($pending_query);
+    $pending_stmt->execute();
+    $stats['pending_cases'] = $pending_stmt->fetchColumn();
     
     // Approaching deadline (cases filed > 12 days ago)
     $deadline_query = "SELECT COUNT(*) as count FROM reports WHERE status IN ('pending', 'assigned', 'investigating') 
                       AND DATEDIFF(NOW(), created_at) >= 12";
-    $stats['approaching_deadline'] = $conn->query($deadline_query)->fetchColumn();
+    $deadline_stmt = $conn->prepare($deadline_query);
+    $deadline_stmt->execute();
+    $stats['approaching_deadline'] = $deadline_stmt->fetchColumn();
     
     // Total reports
     $total_reports_query = "SELECT COUNT(*) as count FROM reports";
-    $stats['total_reports'] = $conn->query($total_reports_query)->fetchColumn();
+    $total_reports_stmt = $conn->prepare($total_reports_query);
+    $total_reports_stmt->execute();
+    $stats['total_reports'] = $total_reports_stmt->fetchColumn();
     
     // Recent announcements
     $announce_query = "SELECT * FROM announcements 
@@ -108,7 +111,9 @@ if ($module == 'dashboard') {
                             LIMIT 5";
     $recent_stmt = $conn->prepare($recent_reports_query);
     $recent_stmt->execute();
+    $recent_stmt->execute();
     $recent_reports = $recent_stmt->fetchAll(PDO::FETCH_ASSOC);
+    $recent_stmt->closeCursor();
 }
 
 // Function to get module title
@@ -116,7 +121,7 @@ function getModuleTitle($module) {
     $titles = [
         'dashboard' => 'Dashboard Overview',
         'case' => 'Case & Blotter Management',
-        'compliance' => 'Compliance Monitoring',
+        'compliance' => 'Document Generation',
         'referral' => 'External Referral Desk',
         'profile' => 'Profile Account'
     ];
@@ -128,7 +133,7 @@ function getModuleSubtitle($module) {
     $subtitles = [
         'dashboard' => 'Overview of all secretary functions and quick actions',
         'case' => 'Manage cases, assign blotter numbers, and track case progress',
-        'compliance' => 'Monitor RA 7160 deadlines and compliance requirements',
+        'compliance' => 'Generate legal documents and forms for barangay proceedings',
         'referral' => 'Handle VAWC, minor cases, and external agency referrals',
         'profile' => 'Manage your account information and activity log'
     ];
@@ -419,7 +424,7 @@ function getModuleSubtitle($module) {
             width: 20px;
             height: 20px;
             display: flex;
-            align-items: center;
+                align-items: center;
             justify-content: center;
             font-size: 12px;
             font-weight: 600;
@@ -503,8 +508,8 @@ function getModuleSubtitle($module) {
                     <?php endif; ?>
                 </a>
                 <a href="?module=compliance" class="sidebar-link block p-3 text-white rounded-lg <?php echo $module == 'compliance' ? 'active' : ''; ?>">
-                    <i class="fas fa-clock mr-3"></i>
-                    Compliance Monitoring
+                    <i class="fas fa-file-pdf mr-3"></i>
+                    Document Generation
                 </a>
                 <a href="?module=referral" class="sidebar-link block p-3 text-white rounded-lg <?php echo $module == 'referral' ? 'active' : ''; ?>">
                     <i class="fas fa-exchange-alt mr-3"></i>
@@ -514,8 +519,8 @@ function getModuleSubtitle($module) {
             
             <!-- Status Toggle -->
             <div class="mt-8 pt-8 border-t border-blue-400/30">
-                <form method="POST" action="" class="mb-4">
-                    <button type="submit" name="toggle_status" class="w-full flex items-center p-3 rounded-lg <?php echo $is_active ? 'bg-green-500/20 text-green-300 hover:bg-green-500/30' : 'bg-red-500/20 text-red-300 hover:bg-red-500/30'; ?> transition-colors">
+                <div class="mb-4">
+                    <button class="w-full flex items-center p-3 rounded-lg <?php echo $is_active ? 'bg-green-500/20 text-green-300 hover:bg-green-500/30' : 'bg-red-500/20 text-red-300 hover:bg-red-500/30'; ?> transition-colors">
                         <i class="fas fa-power-off mr-3"></i>
                         <span class="font-medium flex-1 text-left">Status: <?php echo $is_active ? 'Active' : 'Inactive'; ?></span>
                         <div class="relative">
@@ -524,7 +529,7 @@ function getModuleSubtitle($module) {
                             </div>
                         </div>
                     </button>
-                </form>
+                </div>
                 
                 <a href="../logout.php" class="flex items-center p-3 text-blue-200 hover:text-white hover:bg-white/10 rounded-lg transition">
                     <i class="fas fa-sign-out-alt mr-3"></i>
@@ -670,7 +675,7 @@ function getModuleSubtitle($module) {
                 <?php endif; ?>
             </a>
             
-            <a href="?module=documents" class="flex flex-col items-center text-gray-600 <?php echo $module == 'documents' ? 'mobile-nav-active' : ''; ?>">
+            <a href="?module=compliance" class="flex flex-col items-center text-gray-600 <?php echo $module == 'compliance' ? 'mobile-nav-active' : ''; ?>">
                 <i class="fas fa-file-pdf text-xl"></i>
                 <span class="text-xs mt-1">Docs</span>
             </a>
@@ -816,5 +821,7 @@ function getModuleSubtitle($module) {
 </html>
 <?php
 // Close database connection
-$conn = null;
+if (isset($conn)) {
+    $conn = null;
+}
 ?>

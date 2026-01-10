@@ -217,12 +217,12 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                                     
                                     // Update last login
                                     $update_query = "UPDATE users SET last_login = NOW() WHERE id = :id";
-                                    $update_stmt = $conn->prepare($update_query);
-                                    $update_stmt->bindParam(':id', $user['id']);
-                                    $update_stmt->execute();
-                                    
-                                    // Redirect based on role
-                                    redirectUser($user['role']);
+                                        $update_stmt = $conn->prepare($update_query);
+                                        $update_stmt->bindParam(':id', $user['id']);
+                                        $update_stmt->execute();
+                                        
+                                        // Redirect based on role
+                                        redirectUser($user['role']);
                                 }
                             } else {
                                 // Account is not active or pending
@@ -270,627 +270,712 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="icon" type="image/png" href="../dec/images/10213.png">
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-            font-family: 'Poppins', sans-serif;
-        }
-        
-        body {
-            background: whitesmoke;
-            min-height: 100vh;
+<style>
+    * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+        font-family: 'Poppins', sans-serif;
+    }
+    
+    body {
+        background: whitesmoke;
+        min-height: 100vh;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        padding: 20px;
+    }
+    
+    /* Desktop Layout */
+    @media (min-width: 768px) {
+        .login-container {
             display: flex;
-            justify-content: center;
-            align-items: center;
-            padding: 20px;
-        }
-        
-        /* Desktop Layout */
-        @media (min-width: 768px) {
-            .login-container {
-                display: flex;
-                width: 100%;
-                max-width: 1000px;
-                min-height: 600px;
-                background: white;
-                border-radius: 30px;
-                overflow: hidden;
-                box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-                position: relative;
-            }
-            
-            .left-section {
-                flex: 1;
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                display: flex;
-                flex-direction: column;
-                justify-content: center;
-                align-items: center;
-                padding: 40px;
-                position: relative;
-                overflow: hidden;
-            }
-            
-            /* Wave Effect */
-            .left-section::after {
-                content: '';
-                position: absolute;
-                top: 0;
-                right: 0;
-                bottom: 0;
-                width: 120px;
-                background: #ffffff;
-                z-index: 5;
-                mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 150 1000' preserveAspectRatio='none'%3E%3Cpath fill='white' d='M0,0 C70,120 40,260 70,400 C100,550 40,700 70,850 C100,950 70,1000 0,1000 L150,1000 L150,0 Z'/%3E%3C/svg%3E");
-                -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 150 1000' preserveAspectRatio='none'%3E%3Cpath fill='white' d='M0,0 C70,120 40,260 70,400 C100,550 40,700 70,850 C100,950 70,1000 0,1000 L150,1000 L150,0 Z'/%3E%3C/svg%3E");
-                mask-size: 100% 100%;
-                -webkit-mask-size: 100% 100%;
-            }
-            
-            .left-section::before {
-                content: '';
-                position: absolute;
-                top: 0;
-                right: 40px;
-                bottom: 0;
-                width: 160px;
-                background: rgba(255, 255, 255, 0.25);
-                z-index: 2;
-                mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 150 1000' preserveAspectRatio='none'%3E%3Cpath fill='white' d='M0,0 C60,150 20,300 60,450 C100,600 20,750 60,900 C100,980 60,1000 0,1000 L150,1000 L150,0 Z'/%3E%3C/svg%3E");
-                -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 150 1000' preserveAspectRatio='none'%3E%3Cpath fill='white' d='M0,0 C60,150 20,300 60,450 C100,600 20,750 60,900 C100,980 60,1000 0,1000 L150,1000 L150,0 Z'/%3E%3C/svg%3E");
-                mask-size: 100% 100%;
-                -webkit-mask-size: 100% 100%;
-            }
-            
-            .left-section .wave-back {
-                content: '';
-                position: absolute;
-                top: 0;
-                right: 80px;
-                bottom: 0;
-                width: 200px;
-                background: rgba(0, 0, 0, 0.12);
-                z-index: 1;
-                mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 150 1000' preserveAspectRatio='none'%3E%3Cpath fill='white' d='M0,0 C40,180 10,350 40,550 C80,700 10,850 40,950 C80,1000 40,1000 0,1000 L150,1000 L150,0 Z'/%3E%3C/svg%3E");
-                -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 150 1000' preserveAspectRatio='none'%3E%3Cpath fill='white' d='M0,0 C40,180 10,350 40,550 C80,700 10,850 40,950 C80,1000 40,1000 0,1000 L150,1000 L150,0 Z'/%3E%3C/svg%3E");
-                mask-size: 100% 100%;
-                -webkit-mask-size: 100% 100%;
-            }
-            
-            .logo-container {
-                position: relative;
-                z-index: 10;
-                text-align: center;
-                color: white;
-                max-width: 350px;
-            }
-            
-            .logo-circle {
-                width: 100px;
-                height: 100px;
-                background: rgba(255, 255, 255, 0.15);
-                backdrop-filter: blur(10px);
-                border-radius: 50%;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                margin: 0 auto 30px;
-                border: 2px solid rgba(255, 255, 255, 0.25);
-            }
-            
-            .logo-circle img {
-                width: 60px;
-                height: 60px;
-                object-fit: contain;
-            }
-            
-            .logo-container h1 {
-                font-size: 32px;
-                font-weight: 700;
-                margin-bottom: 10px;
-                letter-spacing: -0.5px;
-            }
-            
-            .logo-container p {
-                font-size: 18px;
-                opacity: 0.9;
-                margin-bottom: 40px;
-            }
-            
-            .spacer {
-                height: 40px;
-                width: 100%;
-            }
-            
-            .right-section {
-                flex: 1;
-                display: flex;
-                flex-direction: column;
-                justify-content: center;
-                align-items: center;
-                padding: 40px;
-                background: white;
-            }
-            
-            .right-content {
-                max-width: 380px;
-                width: 100%;
-            }
-            
-            .form-header {
-                text-align: center;
-                margin-bottom: 40px;
-            }
-            
-            .form-header h2 {
-                font-size: 32px;
-                font-weight: 700;
-                color: #2d3748;
-                margin-bottom: 10px;
-            }
-            
-            .form-header p {
-                color: #718096;
-                font-size: 16px;
-            }
-        }
-        
-        /* Mobile Layout */
-        @media (max-width: 767px) {
-            body {
-                background: white;
-                padding: 0;
-            }
-            
-            .mobile-container {
-                width: 100%;
-                min-height: 100vh;
-                background: white;
-                display: flex;
-                flex-direction: column;
-            }
-            
-            .mobile-header {
-                flex-shrink: 0;
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                padding: 40px 30px 80px;
-                text-align: center;
-                color: white;
-                position: relative;
-                overflow: hidden;
-                z-index: 1;
-            }
-            
-            .mobile-header::after {
-                content: '';
-                position: absolute;
-                bottom: 0;
-                left: 0;
-                width: 100%;
-                height: 80px;
-                background: white;
-                z-index: 2;
-                mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1000 100' preserveAspectRatio='none'%3E%3Cpath fill='%23ffffff' d='M0,0 C400,100 600,100 1000,0 L1000,100 L0,100 Z' /%3E%3C/svg%3E");
-                -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1000 100' preserveAspectRatio='none'%3E%3Cpath fill='%23ffffff' d='M0,0 C400,100 600,100 1000,0 L1000,100 L0,100 Z' /%3E%3C/svg%3E");
-                mask-size: 100% 100%;
-                -webkit-mask-size: 100% 100%;
-                transform: translateY(80px);
-            }
-            
-            .mobile-logo-circle {
-                width: 80px;
-                height: 80px;
-                background: rgba(255, 255, 255, 0.15);
-                backdrop-filter: blur(10px);
-                border-radius: 50%;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                margin: 0 auto 20px;
-                border: 2px solid rgba(255, 255, 255, 0.25);
-                position: relative;
-                z-index: 3;
-            }
-            
-            .mobile-logo-circle img {
-                width: 50px;
-                height: 50px;
-                object-fit: contain;
-            }
-            
-            .mobile-header h1 {
-                font-size: 24px;
-                font-weight: 700;
-                margin-bottom: 5px;
-                position: relative;
-                z-index: 3;
-            }
-            
-            .mobile-header p {
-                font-size: 16px;
-                opacity: 0.9;
-                position: relative;
-                z-index: 3;
-            }
-            
-            .mobile-spacer {
-                height: 30px;
-                width: 100%;
-            }
-            
-            .mobile-form-container {
-                flex: 1;
-                padding: 40px 30px;
-                display: flex;
-                flex-direction: column;
-            }
-            
-            .mobile-form-header {
-                text-align: center;
-                margin-bottom: 30px;
-            }
-            
-            .mobile-form-header h2 {
-                font-size: 28px;
-                font-weight: 700;
-                color: #2d3748;
-                margin-bottom: 10px;
-            }
-            
-            .mobile-form-header p {
-                color: #718096;
-                font-size: 15px;
-            }
-        }
-        
-        /* Common Form Styles */
-        .form-group {
-            margin-bottom: 25px;
-        }
-        
-        .form-label {
-            display: block;
-            margin-bottom: 8px;
-            font-weight: 500;
-            color: #4a5568;
-            font-size: 14px;
-        }
-        
-        .input-group {
+            width: 100%;
+            max-width: 1000px;
+            min-height: 600px;
+            background: white;
+            border-radius: 30px;
+            overflow: hidden;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
             position: relative;
         }
         
-        .input-icon {
-            position: absolute;
-            left: 15px;
-            top: 50%;
-            transform: translateY(-50%);
-            color: #a0aec0;
-            z-index: 10;
-        }
-        
-        .form-input {
-            width: 100%;
-            padding: 15px 15px 15px 50px;
-            border: 2px solid #e2e8f0;
-            border-radius: 12px;
-            font-size: 16px;
-            transition: all 0.3s ease;
-            background: white;
-            color: #2d3748;
-        }
-        
-        .form-input:focus {
-            outline: none;
-            border-color: #667eea;
-            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-        }
-        
-        .password-toggle {
-            position: absolute;
-            right: 15px;
-            top: 50%;
-            transform: translateY(-50%);
-            background: none;
-            border: none;
-            color: #a0aec0;
-            cursor: pointer;
-            z-index: 10;
-            padding: 5px;
-        }
-        
-        .forgot-link {
-            display: block;
-            text-align: right;
-            color: #667eea;
-            text-decoration: none;
-            font-size: 14px;
-            margin-top: 8px;
-            font-weight: 500;
-        }
-        
-        .forgot-link:hover {
-            text-decoration: underline;
-        }
-        
-        .btn-login {
-            width: 100%;
-            padding: 16px;
-            background: linear-gradient(to right, #667eea, #764ba2);
-            color: white;
-            border: none;
-            border-radius: 12px;
-            font-size: 16px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s;
-            margin-top: 10px;
-        }
-        
-        .btn-login:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.3);
-        }
-        
-        .register-link {
-            text-align: center;
-            margin-top: 30px;
-            font-size: 15px;
-            color: #718096;
-        }
-        
-        .register-link a {
-            color: #667eea;
-            text-decoration: none;
-            font-weight: 600;
-            margin-left: 5px;
-        }
-        
-        .register-link a:hover {
-            text-decoration: underline;
-        }
-        
-        .alert {
-            padding: 15px;
-            border-radius: 12px;
-            margin-bottom: 25px;
-            animation: slideIn 0.3s ease-out;
+        .left-section {
+            flex: 1;
+            background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 50%, #1d4ed8 100%);
             display: flex;
-            align-items: center;
-        }
-        
-        @keyframes slideIn {
-            from { opacity: 0; transform: translateY(-10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        
-        .alert-error {
-            background-color: #fff5f5;
-            border: 1px solid #fed7d7;
-            color: #e53e3e;
-        }
-        
-        .alert-success {
-            background-color: #f0fff4;
-            border: 1px solid #c6f6d5;
-            color: #38a169;
-        }
-        
-        .alert i {
-            margin-right: 10px;
-            font-size: 18px;
-        }
-        
-        /* PIN Modal */
-        .pin-modal-overlay {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0, 0, 0, 0.8);
-            z-index: 9999;
-            justify-content: center;
-            align-items: center;
-            backdrop-filter: blur(5px);
-        }
-        
-        .pin-modal {
-            background: white;
-            border-radius: 20px;
-            padding: 30px;
-            max-width: 380px;
-            width: 90%;
-            text-align: center;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-            animation: modalFadeIn 0.3s ease-out;
-        }
-        
-        @keyframes modalFadeIn {
-            from { opacity: 0; transform: scale(0.9); }
-            to { opacity: 1; transform: scale(1); }
-        }
-        
-        .pin-modal-header {
-            margin-bottom: 20px;
-        }
-        
-        .pin-modal-header i {
-            font-size: 40px;
-            color: #667eea;
-            margin-bottom: 15px;
-        }
-        
-        .pin-modal-header h3 {
-            font-size: 22px;
-            font-weight: 600;
-            color: #2d3748;
-            margin-bottom: 8px;
-        }
-        
-        .pin-modal-header p {
-            color: #718096;
-            font-size: 14px;
-        }
-        
-        .pin-input-group {
-            display: flex;
-            justify-content: center;
-            gap: 10px;
-            margin: 25px 0;
-        }
-        
-        .pin-input {
-            width: 55px;
-            height: 55px;
-            text-align: center;
-            font-size: 24px;
-            font-weight: 600;
-            border: 2px solid #e2e8f0;
-            border-radius: 10px;
-            background: #f8fafc;
-            transition: all 0.2s;
-        }
-        
-        .pin-input:focus {
-            outline: none;
-            border-color: #667eea;
-            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-        }
-        
-        .btn-pin {
-            width: 100%;
-            padding: 14px;
-            background: linear-gradient(to right, #667eea, #764ba2);
-            color: white;
-            border: none;
-            border-radius: 12px;
-            font-size: 16px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s;
-            margin-top: 15px;
-        }
-        
-        .btn-pin:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.3);
-        }
-        
-        .pin-cancel {
-            background: #f1f5f9;
-            color: #4a5568;
-            margin-top: 10px;
-        }
-        
-        .pin-cancel:hover {
-            background: #e2e8f0;
-            transform: none;
-            box-shadow: none;
-        }
-        
-        .back-home {
-            position: absolute;
-            top: 20px;
-            left: 20px;
-            color: white;
-            text-decoration: none;
-            font-size: 14px;
-            display: flex;
-            align-items: center;
-            z-index: 10;
-            background: rgba(255, 255, 255, 0.1);
-            padding: 8px 16px;
-            border-radius: 8px;
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-        }
-        
-        .back-home:hover {
-            background: rgba(255, 255, 255, 0.2);
-        }
-        
-        .back-home i {
-            margin-right: 8px;
-        }
-        
-        /* Responsive adjustments */
-        @media (max-width: 480px) {
-            .mobile-header {
-                padding: 30px 20px 80px;
-            }
-            
-            .mobile-logo-circle {
-                width: 70px;
-                height: 70px;
-            }
-            
-            .mobile-logo-circle img {
-                width: 45px;
-                height: 45px;
-            }
-            
-            .mobile-header h1 {
-                font-size: 22px;
-            }
-            
-            .mobile-header p {
-                font-size: 15px;
-            }
-            
-            .mobile-form-container {
-                padding: 30px 20px;
-            }
-            
-            .mobile-form-header h2 {
-                font-size: 24px;
-            }
-            
-            .mobile-form-header p {
-                font-size: 14px;
-            }
-            
-            .pin-input {
-                width: 50px;
-                height: 50px;
-                font-size: 22px;
-            }
-        }
-        
-        /* Loading overlay */
-        .loading-overlay {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(255, 255, 255, 0.95);
-            z-index: 9998;
-            justify-content: center;
-            align-items: center;
             flex-direction: column;
-            backdrop-filter: blur(5px);
+            justify-content: center;
+            align-items: center;
+            padding: 40px;
+            position: relative;
+            overflow: hidden;
         }
         
-        .spinner {
-            width: 50px;
-            height: 50px;
-            border: 3px solid #e2e8f0;
-            border-top: 3px solid #667eea;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-            margin-bottom: 15px;
+        /* Wave Effect */
+        .left-section::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            right: 0;
+            bottom: 0;
+            width: 120px;
+            background: #ffffff;
+            z-index: 5;
+            mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 150 1000' preserveAspectRatio='none'%3E%3Cpath fill='white' d='M0,0 C70,120 40,260 70,400 C100,550 40,700 70,850 C100,950 70,1000 0,1000 L150,1000 L150,0 Z'/%3E%3C/svg%3E");
+            -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 150 1000' preserveAspectRatio='none'%3E%3Cpath fill='white' d='M0,0 C70,120 40,260 70,400 C100,550 40,700 70,850 C100,950 70,1000 0,1000 L150,1000 L150,0 Z'/%3E%3C/svg%3E");
+            mask-size: 100% 100%;
+            -webkit-mask-size: 100% 100%;
         }
         
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
+        .left-section::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            right: 40px;
+            bottom: 0;
+            width: 160px;
+            background: rgba(255, 255, 255, 0.25);
+            z-index: 2;
+            mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 150 1000' preserveAspectRatio='none'%3E%3Cpath fill='white' d='M0,0 C60,150 20,300 60,450 C100,600 20,750 60,900 C100,980 60,1000 0,1000 L150,1000 L150,0 Z'/%3E%3C/svg%3E");
+            -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 150 1000' preserveAspectRatio='none'%3E%3Cpath fill='white' d='M0,0 C60,150 20,300 60,450 C100,600 20,750 60,900 C100,980 60,1000 0,1000 L150,1000 L150,0 Z'/%3E%3C/svg%3E");
+            mask-size: 100% 100%;
+            -webkit-mask-size: 100% 100%;
         }
-    </style>
+        
+        .left-section .wave-back {
+            content: '';
+            position: absolute;
+            top: 0;
+            right: 80px;
+            bottom: 0;
+            width: 200px;
+            background: rgba(0, 0, 0, 0.12);
+            z-index: 1;
+            mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 150 1000' preserveAspectRatio='none'%3E%3Cpath fill='white' d='M0,0 C40,180 10,350 40,550 C80,700 10,850 40,950 C80,1000 40,1000 0,1000 L150,1000 L150,0 Z'/%3E%3C/svg%3E");
+            -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 150 1000' preserveAspectRatio='none'%3E%3Cpath fill='white' d='M0,0 C40,180 10,350 40,550 C80,700 10,850 40,950 C80,1000 40,1000 0,1000 L150,1000 L150,0 Z'/%3E%3C/svg%3E");
+            mask-size: 100% 100%;
+            -webkit-mask-size: 100% 100%;
+        }
+        
+        .logo-container {
+            position: relative;
+            z-index: 10;
+            text-align: center;
+            color: white;
+            max-width: 350px;
+        }
+        
+        .logo-circle img {
+            width: 300px;
+            height: 300px;
+            object-fit: contain;
+            filter: drop-shadow(0 0 20px white)
+                    drop-shadow(0 0 40px white);
+        }
+        
+        .logo-container h1 {
+            font-size: 32px;
+            font-weight: 700;
+            margin-bottom: 10px;
+            letter-spacing: -0.5px;
+        }
+        
+        .logo-container p {
+            font-size: 18px;
+            opacity: 0.9;
+            margin-bottom: 40px;
+        }
+        
+        .spacer {
+            height: 40px;
+            width: 100%;
+        }
+        
+        .right-section {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 40px;
+            background: white;
+        }
+        
+        .right-content {
+            max-width: 380px;
+            width: 100%;
+        }
+        
+        .form-header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+        
+        .form-header h2 {
+            font-size: 32px;
+            font-weight: 700;
+            color: #2d3748;
+            margin-bottom: 10px;
+        }
+        
+        .form-header p {
+            color: #718096;
+            font-size: 16px;
+        }
+    }
+    
+    /* Mobile Layout */
+ /* Mobile Layout */
+@media (max-width: 767px) {
+    body {
+        background: white;
+        padding: 0;
+    }
+    
+    .mobile-container {
+        width: 100%;
+        min-height: 100vh;
+        background: white;
+        display: flex;
+        flex-direction: column;
+    }
+    
+    .mobile-header {
+        flex-shrink: 0;
+        background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 50%, #1d4ed8 100%);
+        padding: 50px 30px 100px; /* Slightly increased top padding */
+        text-align: center;
+        color: white;
+        position: relative;
+        overflow: hidden;
+        z-index: 1;
+    }
+    
+    /* Wave container */
+    .wave-separator-index {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        width: 100%;
+        height: 80px;
+        z-index: 2;
+        pointer-events: none;
+    }
+    
+    .wave-separator-index svg {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        width: 100%;
+        height: 80px;
+        display: block;
+    }
+    
+    /* UPDATED: Larger logo without circle, with white shadow */
+    .mobile-logo-circle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 20px;
+    position: relative;
+    z-index: 3;
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    backdrop-filter: none;
+    /* Container size constraints */
+    width: 100%;
+    max-width: 300px;
+    height: auto;
+    aspect-ratio: 1; /* Makes it square */
+    }
+    
+    .mobile-logo-circle img {
+        width: 150px; /* Makes it responsive to container */
+            height: 150px;
+            max-width: 100%;
+            object-fit: contain;
+            filter: drop-shadow(0 0 20px rgba(255, 255, 255, 0.8))
+                drop-shadow(0 0 40px rgba(255, 255, 255, 0.6));
+    }
+    .mobile-logo-circle img:hover {
+    filter:
+        drop-shadow(0 0 35px rgba(255,255,255,1))
+        drop-shadow(0 0 70px rgba(255,255,255,0.8))
+        drop-shadow(0 0 120px rgba(255,255,255,0.6));
+}
+    .mobile-header h1 {
+        font-size: 26px; /* Slightly larger font */
+        font-weight: 700;
+        margin-bottom: 8px;
+        position: relative;
+        z-index: 4;
+    }
+    
+    .mobile-header p {
+        font-size: 17px; /* Slightly larger font */
+        opacity: 0.9;
+        position: relative;
+        z-index: 4;
+        margin-bottom: 20px;
+    }
+    
+    /* Adjust the form container */
+    .mobile-form-container {
+          flex: 1;
+    padding: 40px 30px;
+    display: flex;
+    flex-direction: column;
+    background: white;
+    position: relative;
+    z-index: 1;
+    margin-top: 0;
+    padding-top: 20px;
+    border-radius: 30px 30px 0 0;
+    box-shadow: 0 -5px 20px rgba(0, 0, 0, 0.05);
+    }
+    
+    .mobile-form-header {
+        text-align: center;
+        margin-bottom: 30px;
+    }
+    
+    .mobile-form-header h2 {
+        font-size: 28px;
+        font-weight: 700;
+        color: #2d3748;
+        margin-bottom: 10px;
+    }
+    
+    .mobile-form-header p {
+        color: #718096;
+        font-size: 15px;
+    }
+
+    
+    /* Adjust the form container */
+    .mobile-form-container {
+        flex: 1;
+        padding: 40px 30px;
+        display: flex;
+        flex-direction: column;
+        background: white;
+        position: relative;
+        z-index: 1;
+        margin-top: 0;
+        padding-top: 20px;
+        border-radius: 30px 30px 0 0;
+        box-shadow: 0 -5px 20px rgba(0, 0, 0, 0.05);
+    }
+    
+    .mobile-form-header {
+        text-align: center;
+        margin-bottom: 30px;
+    }
+    
+    .mobile-form-header h2 {
+        font-size: 28px;
+        font-weight: 700;
+        color: #2d3748;
+        margin-bottom: 10px;
+    }
+    
+    .mobile-form-header p {
+        color: #718096;
+        font-size: 15px;
+    }
+
+    
+    /* Adjust the form container - NO negative margin */
+    .mobile-form-container {
+        flex: 1;
+        padding: 40px 30px;
+        display: flex;
+        flex-direction: column;
+        background: white;
+        position: relative;
+        z-index: 1;
+        margin-top: 0; /* Remove negative margin */
+        padding-top: 20px; /* Reduced top padding */
+        border-radius: 30px 30px 0 0;
+        box-shadow: 0 -5px 20px rgba(0, 0, 0, 0.05);
+    }
+    
+    .mobile-form-header {
+        text-align: center;
+        margin-bottom: 30px;
+    }
+    
+    .mobile-form-header h2 {
+        font-size: 28px;
+        font-weight: 700;
+        color: #2d3748;
+        margin-bottom: 10px;
+    }
+    
+    .mobile-form-header p {
+        color: #718096;
+        font-size: 15px;
+    }
+}
+    
+    /* Common Form Styles */
+    .form-group {
+        margin-bottom: 25px;
+    }
+    
+    .form-label {
+        display: block;
+        margin-bottom: 8px;
+        font-weight: 500;
+        color: #4a5568;
+        font-size: 14px;
+    }
+    
+    .input-group {
+        position: relative;
+    }
+    
+    .input-icon {
+        position: absolute;
+        left: 15px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: #a0aec0;
+        z-index: 10;
+    }
+    
+    .form-input {
+        width: 100%;
+        padding: 15px 15px 15px 50px;
+        border: 2px solid #e2e8f0;
+        border-radius: 12px;
+        font-size: 16px;
+        transition: all 0.3s ease;
+        background: white;
+        color: #2d3748;
+    }
+    
+    .form-input:focus {
+        outline: none;
+        border-color: #1a4f8c;
+        box-shadow: 0 0 0 3px rgba(26, 79, 140, 0.1);
+    }
+    
+    .password-toggle {
+        position: absolute;
+        right: 15px;
+        top: 50%;
+        transform: translateY(-50%);
+        background: none;
+        border: none;
+        color: #a0aec0;
+        cursor: pointer;
+        z-index: 10;
+        padding: 5px;
+    }
+    
+    .forgot-link {
+        display: block;
+        text-align: right;
+        color: #1a4f8c;
+        text-decoration: none;
+        font-size: 14px;
+        margin-top: 8px;
+        font-weight: 500;
+    }
+    
+    .forgot-link:hover {
+        text-decoration: underline;
+    }
+    
+    .btn-login {
+        width: 100%;
+        padding: 16px;
+        background: linear-gradient(to right, #1e40af, #1d4ed8);
+        color: white;
+        border: none;
+        border-radius: 12px;
+        font-size: 16px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s;
+        margin-top: 10px;
+    }
+    
+    .btn-login:hover {
+        transform: translateY(-2px);
+        background: linear-gradient(to right, #1d4ed8, #1e3a8a);
+    }
+    
+    .register-link {
+        text-align: center;
+        margin-top: 30px;
+        font-size: 15px;
+        color: #718096;
+    }
+    
+    .register-link a {
+        color: #1a4f8c;
+        text-decoration: none;
+        font-weight: 600;
+        margin-left: 5px;
+    }
+    
+    .register-link a:hover {
+        text-decoration: underline;
+    }
+    
+    .alert {
+        padding: 15px;
+        border-radius: 12px;
+        margin-bottom: 25px;
+        animation: slideIn 0.3s ease-out;
+        display: flex;
+        align-items: center;
+    }
+    
+    @keyframes slideIn {
+        from { opacity: 0; transform: translateY(-10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    
+    .alert-error {
+        background-color: #fff5f5;
+        border: 1px solid #fed7d7;
+        color: #e53e3e;
+    }
+    
+    .alert-success {
+        background-color: #f0fff4;
+        border: 1px solid #c6f6d5;
+        color: #38a169;
+    }
+    
+    .alert i {
+        margin-right: 10px;
+        font-size: 18px;
+    }
+    
+    /* PIN Modal */
+    .pin-modal-overlay {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.8);
+        z-index: 9999;
+        justify-content: center;
+        align-items: center;
+        backdrop-filter: blur(5px);
+    }
+    
+    .pin-modal {
+        background: white;
+        border-radius: 20px;
+        padding: 30px;
+        max-width: 380px;
+        width: 90%;
+        text-align: center;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        animation: modalFadeIn 0.3s ease-out;
+    }
+    
+    @keyframes modalFadeIn {
+        from { opacity: 0; transform: scale(0.9); }
+        to { opacity: 1; transform: scale(1); }
+    }
+    
+    .pin-modal-header {
+        margin-bottom: 20px;
+    }
+    
+    .pin-modal-header i {
+        font-size: 40px;
+        color: #1a4f8c;
+        margin-bottom: 15px;
+    }
+    
+    .pin-modal-header h3 {
+        font-size: 22px;
+        font-weight: 600;
+        color: #2d3748;
+        margin-bottom: 8px;
+    }
+    
+    .pin-modal-header p {
+        color: #718096;
+        font-size: 14px;
+    }
+    
+    .pin-input-group {
+        display: flex;
+        justify-content: center;
+        gap: 10px;
+        margin: 25px 0;
+    }
+    
+    .pin-input {
+        width: 55px;
+        height: 55px;
+        text-align: center;
+        font-size: 24px;
+        font-weight: 600;
+        border: 2px solid #e2e8f0;
+        border-radius: 10px;
+        background: #f8fafc;
+        transition: all 0.2s;
+    }
+    
+    .pin-input:focus {
+        outline: none;
+        border-color: #1a4f8c;
+        box-shadow: 0 0 0 3px rgba(26, 79, 140, 0.1);
+    }
+    
+    .btn-pin {
+        width: 100%;
+        padding: 14px;
+        background: linear-gradient(to right, #1e40af, #1d4ed8);
+        border-radius: 12px;
+        font-size: 16px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s;
+        margin-top: 15px;
+    }
+    
+    .btn-pin:hover {
+        transform: translateY(-2px);
+        background: linear-gradient(to right, #1d4ed8, #1e3a8a);
+    }
+    
+    .pin-cancel {
+        background: #f1f5f9;
+        color: #4a5568;
+        margin-top: 10px;
+    }
+    
+    .pin-cancel:hover {
+        background: #e2e8f0;
+        transform: none;
+        box-shadow: none;
+    }
+    
+    .back-home {
+        position: absolute;
+        top: 30px;
+        left: 30px;
+        color: white;
+        text-decoration: none;
+        font-size: 24px;
+        display: flex;
+        align-items: center;
+        z-index: 10;
+        padding: 12px 16px;
+        background: rgba(255, 255, 255, 0.15);
+        border-radius: 12px;
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        transition: all 0.3s ease;
+        width: auto;
+        min-width: 60px;
+        height: 50px;
+    }
+    
+   .back-home:hover {
+        background: rgba(255, 255, 255, 0.25);
+        transform: translateX(-5px);
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+    }
+
+    .back-home i {
+        margin-right: 10px;
+        font-size: 22px;
+        width: 24px;
+    }
+    
+    /* Responsive adjustments */
+@media (max-width: 480px) {
+    .mobile-header {
+        padding: 30px 20px 80px;
+    }
+    
+    /* Updated for smaller screens */
+    .mobile-logo-circle {
+        width: 90px;
+        height: 90px;
+    }
+    
+    .mobile-logo-circle img {
+        width: 70px;
+        height: 70px;
+        filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.5))
+               drop-shadow(0 0 15px rgba(255, 255, 255, 0.3));
+    }
+    
+    .mobile-header h1 {
+        font-size: 22px;
+    }
+    
+    .mobile-header p {
+        font-size: 15px;
+    }
+    
+    .mobile-form-container {
+        padding: 30px 20px;
+    }
+    
+    .mobile-form-header h2 {
+        font-size: 24px;
+    }
+    
+    .mobile-form-header p {
+        font-size: 14px;
+    }
+    
+    .pin-input {
+        width: 50px;
+        height: 50px;
+        font-size: 22px;
+    }
+}
+    
+    /* Loading overlay */
+    .loading-overlay {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(255, 255, 255, 0.95);
+        z-index: 9998;
+        justify-content: center;
+        align-items: center;
+        flex-direction: column;
+        backdrop-filter: blur(5px);
+    }
+    
+    .spinner {
+        width: 50px;
+        height: 50px;
+        border: 3px solid #e2e8f0;
+        border-top: 3px solid #1a4f8c;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin-bottom: 15px;
+    }
+    
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+</style>
     
 </head>
 <body>
@@ -947,16 +1032,13 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     <div class="login-container hidden md:flex">
         <div class="left-section">
             <a href="index.php" class="back-home">
-                <i class="fas fa-arrow-left"></i>Back to Home
+                <i class="fas fa-long-arrow-alt-left"></i>
             </a>
             
             <div class="logo-container">
                 <div class="logo-circle">
                     <img src="../dec/images/10213.png" alt="LEIR Logo">
                 </div>
-                <h1>Law Enforcement and Incident Report</h1>
-                <p>Secure Login Portal</p>
-                <div class="spacer"></div>
             </div>
         </div>
         
@@ -964,7 +1046,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             <div class="right-content">
                 <div class="form-header">
                     <h2>Welcome Back</h2>
-                    <p>Login to your account</p>
+                    <p>Sign In to your account</p>
                 </div>
                 
                 <?php if ($error && !$showPinModal): ?>
@@ -1023,28 +1105,30 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     
                     <div class="register-link">
                         Don't have an account? 
-                        <a href="register.php">Citizen Sign Up</a> | 
-                        <a href="register_personnel.php">Personnel Sign Up</a>
+                        <a href="register.php">Sign Up</a> 
                     </div>
                 </form>
             </div>
         </div>
     </div>
     
-    <div class="mobile-container md:hidden">
-        <div class="mobile-header">
-            <div class="mobile-logo-circle">
-                <img src="../dec/images/10213.png" alt="LEIR Logo">
-            </div>
-            <h1>Law Enforcement and Incident Report</h1>
-            <p>Secure Login Portal</p>
-            <div class="mobile-spacer"></div>
+<div class="mobile-container md:hidden">
+    <div class="mobile-header">
+        <div class="mobile-logo-circle">
+            <img src="../dec/images/10213.png" alt="LEIR Logo">
         </div>
         
+        <!-- Add the wave separator from index.php -->
+        <div class="wave-separator-index">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 100" preserveAspectRatio="none">
+                <path fill="white" fill-opacity="1" d="M0,80L48,75C96,70,192,60,288,55C384,50,480,50,576,55C672,60,768,70,864,75C960,80,1056,80,1152,75C1248,70,1344,60,1392,55L1440,50L1440,100L1392,100C1344,100,1248,100,1152,100C1056,100,960,100,864,100C768,100,672,100,576,100C480,100,384,100,288,100C192,100,96,100,48,100L0,100Z"></path>
+            </svg>
+        </div>
+    </div>
         <div class="mobile-form-container">
             <div class="mobile-form-header">
                 <h2>Welcome Back</h2>
-                <p>Login to your account</p>
+                <p>Sign in to your account</p>
             </div>
             
             <?php if ($error && !$showPinModal): ?>
@@ -1095,9 +1179,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 
                 <div class="register-link">
                     Don't have an account? 
-                    <a href="register.php">Citizen Sign Up</a> | 
-                    <a href="register_personnel.php">Personnel Sign Up</a>
-                </div>
+                    <a href="register.php">Sign Up</a>        
+                     </div>
             </form>
         </div>
     </div>

@@ -375,8 +375,8 @@ if (empty($error) && $is_minor) {
             .register-container {
                 display: flex;
                 width: 100%;
-                max-width: 1200px;
-                min-height: 700px;
+                max-width: 1000px;
+                min-height: 600px;
                 background: white;
                 border-radius: 30px;
                 overflow: hidden;
@@ -386,7 +386,7 @@ if (empty($error) && $is_minor) {
             
             .left-section {
                 flex: 1;
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 50%, #1d4ed8 100%);
                 display: flex;
                 flex-direction: column;
                 justify-content: center;
@@ -420,7 +420,6 @@ if (empty($error) && $is_minor) {
                 bottom: 0;
                 width: 160px;
                 background: rgba(255, 255, 255, 0.25);
-                z-index: 2;
                 mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 150 1000' preserveAspectRatio='none'%3E%3Cpath fill='white' d='M0,0 C60,150 20,300 60,450 C100,600 20,750 60,900 C100,980 60,1000 0,1000 L150,1000 L150,0 Z'/%3E%3C/svg%3E");
                 -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 150 1000' preserveAspectRatio='none'%3E%3Cpath fill='white' d='M0,0 C60,150 20,300 60,450 C100,600 20,750 60,900 C100,980 60,1000 0,1000 L150,1000 L150,0 Z'/%3E%3C/svg%3E");
                 mask-size: 100% 100%;
@@ -449,24 +448,14 @@ if (empty($error) && $is_minor) {
                 color: white;
                 max-width: 350px;
             }
-            
-            .logo-circle {
-                width: 100px;
-                height: 100px;
-                background: rgba(255, 255, 255, 0.15);
-                backdrop-filter: blur(10px);
-                border-radius: 50%;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                margin: 0 auto 30px;
-                border: 2px solid rgba(255, 255, 255, 0.25);
-            }
+        
             
             .logo-circle img {
-                width: 60px;
-                height: 60px;
+                width: 300px;
+                height: 300px;
                 object-fit: contain;
+                filter: drop-shadow(0 0 20px white)
+                        drop-shadow(0 0 40px white);
             }
             
             .logo-container h1 {
@@ -510,13 +499,13 @@ if (empty($error) && $is_minor) {
             }
             
             .right-section {
-                flex: 1.5;
+                flex: 1;
                 display: flex;
                 flex-direction: column;
                 padding: 40px;
                 background: white;
                 overflow-y: auto;
-                max-height: 700px;
+                max-height: 600px;
             }
             
             .form-header {
@@ -554,8 +543,7 @@ if (empty($error) && $is_minor) {
     
     .mobile-header {
         flex-shrink: 0;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        padding: 40px 30px 80px;
+background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 50%, #1d4ed8 100%);        padding: 40px 30px 80px;
         text-align: center;
         color: white;
         position: relative;
@@ -565,20 +553,20 @@ if (empty($error) && $is_minor) {
     
     /* Mobile Wave Effect - Similar to desktop */
     .mobile-header::after {
-        content: '';
-        position: absolute;
-        bottom: 0;
-        left: 0;
-        width: 100%;
-        height: 120px;
-        background: white;
-        z-index: 2;
-        mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 200'%3E%3Cpath fill='white' d='M0 0 C150 60 300 -40 450 20 C600 80 750 -20 900 40 C1050 100 1125 0 1200 60 L1200 200 L0 200 Z'/%3E%3C/svg%3E");
--webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 200'%3E%3Cpath fill='white' d='M0 0 C150 60 300 -40 450 20 C600 80 750 -20 900 40 C1050 100 1125 0 1200 60 L1200 200 L0 200 Z'/%3E%3C/svg%3E");
-mask-size: 100% 200px;
-
-        transform: translateY(80px);
-    }
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 120px;
+    background: white;
+    z-index: 2;
+    mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 200'%3E%3Cpath fill='white' d='M0 0 C150 60 300 -40 450 20 C600 80 750 -20 900 40 C1050 100 1125 0 1200 60 L1200 200 L0 200 Z'/%3E%3C/svg%3E");
+    -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 200'%3E%3Cpath fill='white' d='M0 0 C150 60 300 -40 450 20 C600 80 750 -20 900 40 C1050 100 1125 0 1200 60 L1200 200 L0 200 Z'/%3E%3C/svg%3E");
+    mask-size: 100% 200px;
+    -webkit-mask-size: 100% 200px;
+    transform: translateY(80px);
+}
     
     /* Second wave layer for depth */
     .mobile-header::before {
@@ -588,7 +576,7 @@ mask-size: 100% 200px;
         left: 0;
         width: 100%;
         height: 140px;
-        background: rgba(255, 255, 255, 0.25);
+         background: rgba(255, 255, 255, 0.25);      
         z-index: 1;
         mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 120' preserveAspectRatio='none'%3E%3Cpath fill='%23ffffff' d='M321.39,56.44c58-10.79,114.16-30.13,172-41.86,82.39-16.72,168.19-17.73,250.45-.39C823.78,31,906.67,72,985.66,92.83c70.05,18.48,146.53,26.09,214.34,3V0H0V27.35A600.21,600.21,0,0,0,321.39,56.44Z'/%3E%3C/svg%3E");
         -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 120' preserveAspectRatio='none'%3E%3Cpath fill='%23ffffff' d='M321.39,56.44c58-10.79,114.16-30.13,172-41.86,82.39-16.72,168.19-17.73,250.45-.39C823.78,31,906.67,72,985.66,92.83c70.05,18.48,146.53,26.09,214.34,3V0H0V27.35A600.21,600.21,0,0,0,321.39,56.44Z'/%3E%3C/svg%3E");
@@ -652,28 +640,29 @@ mask-size: 100% 200px;
     }
     
     .mobile-features {
-        display: flex;
-        justify-content: center;
-        gap: 15px;
-        flex-wrap: wrap;
-        margin-top: 20px;
-        position: relative;
-        z-index: 3;
+         display: flex;
+    justify-content: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-top: 20px;
+    position: relative;
+    z-index: 4;
     }
     
     .mobile-feature {
-        display: flex;
-        align-items: center;
-        background: rgba(255, 255, 255, 0.1);
-        padding: 8px 12px;
-        border-radius: 20px;
-        font-size: 12px;
-        backdrop-filter: blur(10px);
+     display: flex;
+    align-items: center;
+    background: rgba(255, 255, 255, 0.1);
+    padding: 8px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
     }
     
     .mobile-feature i {
-        margin-right: 5px;
-        font-size: 10px;
+       margin-right: 5px;
+    font-size: 10px;
     }
     
     .mobile-form-container {
@@ -754,8 +743,8 @@ mask-size: 100% 200px;
         
         .form-input:focus, .form-select:focus, .form-textarea:focus {
             outline: none;
-            border-color: #667eea;
-            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+            border-color: #1a4f8c;
+            box-shadow: 0 0 0 3px rgba(26, 79, 140, 0.1);
         }
         
         .form-grid {
@@ -788,8 +777,8 @@ mask-size: 100% 200px;
         .btn-submit {
             width: 100%;
             padding: 16px;
-            background: linear-gradient(to right, #667eea, #764ba2);
             color: white;
+            background: linear-gradient(to right, #1e40af, #1d4ed8);
             border: none;
             border-radius: 12px;
             font-size: 16px;
@@ -801,7 +790,7 @@ mask-size: 100% 200px;
         
         .btn-submit:hover {
             transform: translateY(-2px);
-            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.3);
+            background: linear-gradient(to right, #1d4ed8, #1e3a8a);
         }
         
         .btn-submit:disabled {
@@ -819,7 +808,7 @@ mask-size: 100% 200px;
         }
         
         .login-link a {
-            color: #667eea;
+            color: #1a4f8c;
             text-decoration: none;
             font-weight: 600;
             margin-left: 5px;
@@ -871,13 +860,13 @@ mask-size: 100% 200px;
         }
         
         .file-upload-area:hover, .file-upload-area.dragover {
-            border-color: #667eea;
+            border-color: #1a4f8c;
             background: #edf2f7;
         }
         
         .file-upload-area i {
             font-size: 40px;
-            color: #667eea;
+            color: #1a4f8c;
             margin-bottom: 15px;
         }
         
@@ -924,34 +913,43 @@ mask-size: 100% 200px;
         }
         
         .back-home {
-            position: absolute;
-            top: 20px;
-            left: 20px;
-            color: white;
-            text-decoration: none;
-            font-size: 14px;
-            display: flex;
-            align-items: center;
-            z-index: 10;
-            background: rgba(255, 255, 255, 0.1);
-            padding: 8px 16px;
-            border-radius: 8px;
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.2);
+                position: absolute;
+                top: 30px;
+                left: 30px;
+                color: white;
+                text-decoration: none;
+                font-size: 24px;
+                display: flex;
+                align-items: center;
+                z-index: 10;
+                padding: 12px 16px;
+                background: rgba(255, 255, 255, 0.15);
+                border-radius: 12px;
+                backdrop-filter: blur(10px);
+                border: 1px solid rgba(255, 255, 255, 0.2);
+                transition: all 0.3s ease;
+                width: auto;
+                min-width: 60px;
+                height: 50px;
         }
         
         .back-home:hover {
-            background: rgba(255, 255, 255, 0.2);
+                background: rgba(255, 255, 255, 0.25);
+                transform: translateX(-5px);
+                box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
         }
         
         .back-home i {
-            margin-right: 8px;
+                margin-right: 10px;
+                font-size: 22px;
+                width: 24px;
         }
         
         /* Responsive adjustments */
         @media (max-width: 480px) {
             .mobile-header {
                 padding: 30px 20px 80px;
+                
             }
             
             .mobile-logo-circle {
@@ -1005,7 +1003,7 @@ mask-size: 100% 200px;
             width: 50px;
             height: 50px;
             border: 3px solid #e2e8f0;
-            border-top: 3px solid #667eea;
+            border-top: 3px solid #1a4f8c;
             border-radius: 50%;
             animation: spin 1s linear infinite;
             margin-bottom: 15px;
@@ -1051,7 +1049,7 @@ mask-size: 100% 200px;
         }
         
         .terms-checkbox a {
-            color: #667eea;
+            color: #1a4f8c;
             text-decoration: none;
             font-weight: 500;
         }
@@ -1114,41 +1112,18 @@ mask-size: 100% 200px;
     <div class="register-container hidden md:flex">
         <div class="left-section">
             <a href="index.php" class="back-home">
-                <i class="fas fa-arrow-left"></i>Back to Home
-            </a>
+            <i class="fas fa-long-arrow-alt-left"></i>            </a>
             
             <div class="logo-container">
                 <div class="logo-circle">
-                    <img src="../dec/images/10213.png" alt="BLUEBACK Logo">
-                </div>
-                <h1>Citizen Registration</h1>
-                <p>Register as a citizen for incident reporting</p>
-                
-                <div class="features">
-                    <div class="feature-item">
-                        <i class="fas fa-shield-alt"></i>
-                        <span>Secure & Protected Data</span>
-                    </div>
-                    <div class="feature-item">
-                        <i class="fas fa-bolt"></i>
-                        <span>Quick Incident Reporting</span>
-                    </div>
-                    <div class="feature-item">
-                        <i class="fas fa-bell"></i>
-                        <span>Real-time Notifications</span>
-                    </div>
-                    <div class="feature-item">
-                        <i class="fas fa-headset"></i>
-                        <span>24/7 Support Available</span>
-                    </div>
-                </div>
+                    <img src="../dec/images/10213.png">
+                </div>                
             </div>
         </div>
         
         <div class="right-section">
             <div class="form-header">
-                <h2>Citizen Account Registration</h2>
-                <p>Fill in your details to register as a citizen</p>
+                <h2>Sign Up</h2>
             </div>
             
             <?php if ($error): ?>
@@ -1162,7 +1137,7 @@ mask-size: 100% 200px;
                 <div class="alert alert-success">
                     <i class="fas fa-check-circle"></i>
                     <?php echo htmlspecialchars($success); ?>
-                    <p style="margin-top: 10px;"><a href="login.php" style="font-weight: 600; color: #667eea;">Click here to login</a></p>
+                    <p style="margin-top: 10px;"><a href="login.php" style="font-weight: 600; color: #1a4f8c;">Click here to login</a></p>
                 </div>
             <?php endif; ?>
             
@@ -1492,20 +1467,15 @@ mask-size: 100% 200px;
                      <div class="terms-checkbox">
                     <input type="checkbox" id="terms" name="terms" required>
                                 <label for="terms">
-                                        I agree to the <a href="#" style="color: #667eea;">Terms of Service</a> and 
-                                        <a href="#" style="color: #667eea;">Privacy Policy</a> of BLUEBACK Incident Reporting System.
+                                        I agree to the <a href="#" style="color: #1a4f8c;">Terms of Service</a> and 
+                                        <a href="#" style="color: #1a4f8c;">Privacy Policy</a> of Law Enforcement Incident Reporting System.
                                         I understand that my account needs to be verified before I can access all features.
                                     </label>
                                 </div>
                                 <div class="error-message" id="terms_error"></div>
                                 
-                                <div class="security-badge">
-                                    <i class="fas fa-shield-alt"></i>
-                                    <span>Your data is protected with 256-bit encryption</span>
-                                </div>
-                                
                                 <button type="submit" class="btn-submit" id="submitButton">
-                                    <i class="fas fa-user-plus mr-2"></i>Register as Citizen
+                                    <i class="fas fa-user-plus mr-2"></i>Sign Up
                                 </button>
                                 
                                 <div class="login-link">
@@ -1522,31 +1492,13 @@ mask-size: 100% 200px;
         <div class="mobile-wave-back"></div>
         
         <div class="mobile-logo-circle">
-            <img src="../dec/images/10213.png" alt="BLUEBACK Logo">
-        </div>
-        <h1>Citizen Registration</h1>
-        <p>Register as a citizen for incident reporting</p>
-        
-        <div class="mobile-features">
-            <div class="mobile-feature">
-                <i class="fas fa-shield-alt"></i>Secure
-            </div>
-            <div class="mobile-feature">
-                <i class="fas fa-bolt"></i>Quick
-            </div>
-            <div class="mobile-feature">
-                <i class="fas fa-bell"></i>Real-time
-            </div>
-            <div class="mobile-feature">
-                <i class="fas fa-headset"></i>24/7 Support
-            </div>
+            <img src="../dec/images/10213.png">
         </div>
     </div>
     
         <div class="mobile-form-container">
             <div class="mobile-form-header">
-                <h2>Citizen Account Registration</h2>
-                <p>Fill in your details to register as a citizen</p>
+                <h2>Sign up</h2>
             </div>
             
             <?php if ($error): ?>
@@ -1560,7 +1512,7 @@ mask-size: 100% 200px;
                 <div class="alert alert-success">
                     <i class="fas fa-check-circle"></i>
                     <?php echo htmlspecialchars($success); ?>
-                    <p style="margin-top: 10px;"><a href="login.php" style="font-weight: 600; color: #667eea;">Click here to login</a></p>
+                    <p style="margin-top: 10px;"><a href="login.php" style="font-weight: 600; color: #1a4f8c;">Click here to login</a></p>
                 </div>
             <?php endif; ?>
             
@@ -1896,16 +1848,12 @@ mask-size: 100% 200px;
                 <div class="terms-checkbox">
                     <input type="checkbox" id="mobile_terms" name="terms" required>
                     <label for="mobile_terms">
-                        I agree to the <a href="#" style="color: #667eea;">Terms of Service</a> and 
-                        <a href="#" style="color: #667eea;">Privacy Policy</a> of BLUEBACK.
+                        I agree to the <a href="#" style="color: #1a4f8c;">Terms of Service</a> and 
+                        <a href="#" style="color: #1a4f8c;">Privacy Policy</a> of Law Enforcement and Incident Reporting.
+                         I understand that my account needs to be verified before I can access all features.
                     </label>
                 </div>
                 <div class="error-message" id="mobile_terms_error"></div>
-                
-                <div class="security-badge">
-                    <i class="fas fa-shield-alt"></i>
-                    <span>Your data is protected with encryption</span>
-                </div>
                 
                 <button type="submit" class="btn-submit" id="mobileSubmitButton">
                     <i class="fas fa-user-plus mr-2"></i>Register as Citizen
