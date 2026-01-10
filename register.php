@@ -1116,7 +1116,7 @@ background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 50%, #1d4ed8 100%);     
             
             <div class="logo-container">
                 <div class="logo-circle">
-                    <img src="../dec/images/10213.png">
+                    <img src="images/10213.png">
                 </div>                
             </div>
         </div>
@@ -1492,7 +1492,7 @@ background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 50%, #1d4ed8 100%);     
         <div class="mobile-wave-back"></div>
         
         <div class="mobile-logo-circle">
-            <img src="../dec/images/10213.png">
+            <img src="images/10213.png">
         </div>
     </div>
     
