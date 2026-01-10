@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: localhost:3307
--- Generation Time: Jan 07, 2026 at 12:03 PM
+-- Generation Time: Jan 10, 2026 at 01:37 AM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -81,6 +81,27 @@ CREATE TABLE `announcements` (
 -- --------------------------------------------------------
 
 --
+-- Table structure for table `api_integrations`
+--
+
+CREATE TABLE `api_integrations` (
+  `id` int(11) NOT NULL,
+  `api_name` varchar(100) NOT NULL,
+  `api_key` varchar(255) NOT NULL,
+  `api_secret` varchar(255) DEFAULT NULL,
+  `endpoint` varchar(255) DEFAULT NULL,
+  `status` enum('active','inactive','testing') DEFAULT 'testing',
+  `last_sync` timestamp NULL DEFAULT NULL,
+  `sync_status` enum('success','failed','pending') DEFAULT 'pending',
+  `sync_message` text DEFAULT NULL,
+  `created_by` int(11) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
 -- Table structure for table `barangay_personnel_master_codes`
 --
 
@@ -123,7 +144,12 @@ CREATE TABLE `barangay_personnel_registrations` (
 
 INSERT INTO `barangay_personnel_registrations` (`id`, `user_id`, `admin_id`, `master_code`, `master_code_used`, `master_code_used_at`, `is_active`, `created_at`, `updated_at`) VALUES
 (1, 1007, 1001, '5981', 0, NULL, 1, '2026-01-03 17:32:35', '2026-01-03 17:32:35'),
-(2, 1008, 1001, '4939', 1, '2026-01-06 18:37:39', 1, '2026-01-03 17:51:52', '2026-01-06 18:37:39');
+(2, 1008, 1001, '4939', 1, '2026-01-06 18:37:39', 1, '2026-01-03 17:51:52', '2026-01-06 18:37:39'),
+(3, 1009, 1001, '6152', 1, '2026-01-07 15:24:17', 1, '2026-01-07 15:23:41', '2026-01-07 15:24:17'),
+(4, 1010, 1001, '5556', 1, '2026-01-08 20:31:46', 1, '2026-01-08 20:31:07', '2026-01-08 20:31:46'),
+(5, 1011, 1001, '6762', 1, '2026-01-08 20:45:25', 1, '2026-01-08 20:44:19', '2026-01-08 20:45:25'),
+(6, 1012, 1001, '4151', 1, '2026-01-09 20:11:04', 1, '2026-01-09 20:10:34', '2026-01-09 20:11:04'),
+(7, 1013, 1001, '2660', 1, '2026-01-09 20:44:55', 1, '2026-01-09 20:44:21', '2026-01-09 20:44:55');
 
 -- --------------------------------------------------------
 
@@ -156,6 +182,80 @@ INSERT INTO `barangay_positions` (`id`, `position_name`, `role_id`, `description
 -- --------------------------------------------------------
 
 --
+-- Table structure for table `captain_hearings`
+--
+
+CREATE TABLE `captain_hearings` (
+  `id` int(11) NOT NULL,
+  `report_id` int(11) NOT NULL,
+  `hearing_date` date NOT NULL,
+  `hearing_time` time NOT NULL,
+  `location` varchar(255) NOT NULL,
+  `participants` text DEFAULT NULL,
+  `notes` text DEFAULT NULL,
+  `scheduled_by` int(11) NOT NULL,
+  `status` enum('scheduled','completed','cancelled','rescheduled') DEFAULT 'scheduled',
+  `reminders_sent` tinyint(1) DEFAULT 0,
+  `last_reminder_sent` datetime DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `case_approvals`
+--
+
+CREATE TABLE `case_approvals` (
+  `id` int(11) NOT NULL,
+  `report_id` int(11) NOT NULL,
+  `approved_by` int(11) NOT NULL,
+  `resolution_type` enum('mediated_settlement','arbitration_award','dismissed','referred_out','other') NOT NULL,
+  `resolution_notes` text DEFAULT NULL,
+  `digital_signature` text DEFAULT NULL,
+  `approved_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `ip_address` varchar(45) DEFAULT NULL,
+  `user_agent` text DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `data_transfer_logs`
+--
+
+CREATE TABLE `data_transfer_logs` (
+  `id` int(11) NOT NULL,
+  `api_name` varchar(100) DEFAULT NULL,
+  `operation` varchar(50) DEFAULT NULL,
+  `status` enum('success','failed') DEFAULT NULL,
+  `records_count` int(11) DEFAULT 0,
+  `message` text DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `evidence_handovers`
+--
+
+CREATE TABLE `evidence_handovers` (
+  `id` int(11) NOT NULL,
+  `tanod_id` int(11) NOT NULL,
+  `item_description` text NOT NULL,
+  `item_type` varchar(100) DEFAULT NULL,
+  `handover_to` int(11) NOT NULL,
+  `handover_date` datetime DEFAULT NULL,
+  `recipient_acknowledged` tinyint(1) DEFAULT 0,
+  `chain_of_custody` text DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
 -- Table structure for table `file_encryption_logs`
 --
 
@@ -171,6 +271,22 @@ CREATE TABLE `file_encryption_logs` (
   `last_decrypted_by` int(11) DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `login_history`
+--
+
+CREATE TABLE `login_history` (
+  `id` int(11) NOT NULL,
+  `user_id` int(11) NOT NULL,
+  `login_time` datetime NOT NULL,
+  `ip_address` varchar(45) DEFAULT NULL,
+  `user_agent` text DEFAULT NULL,
+  `success` tinyint(1) DEFAULT 1,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
 
@@ -222,12 +338,31 @@ CREATE TABLE `notifications` (
   `user_id` int(11) NOT NULL,
   `title` varchar(255) NOT NULL,
   `message` text NOT NULL,
-  `type` enum('info','success','warning','error') DEFAULT 'info',
+  `type` varchar(50) DEFAULT NULL,
   `is_read` tinyint(1) DEFAULT 0,
   `related_id` int(11) DEFAULT NULL,
   `related_type` varchar(50) DEFAULT NULL,
-  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `read_at` datetime DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `patrol_routes`
+--
+
+CREATE TABLE `patrol_routes` (
+  `id` int(11) NOT NULL,
+  `route_name` varchar(100) NOT NULL,
+  `zone_assigned` varchar(50) NOT NULL,
+  `description` text DEFAULT NULL,
+  `waypoints` text DEFAULT NULL,
+  `estimated_time` decimal(5,2) DEFAULT NULL,
+  `priority_level` enum('low','medium','high') DEFAULT 'medium',
+  `is_active` tinyint(1) DEFAULT 1,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
 
@@ -249,13 +384,16 @@ CREATE TABLE `reports` (
   `witnesses` text DEFAULT NULL,
   `category` enum('incident','complaint','blotter') DEFAULT 'incident',
   `evidence_files` text DEFAULT NULL,
-  `status` enum('pending','assigned','investigating','resolved','referred','closed') DEFAULT 'pending',
+  `status` enum('pending','pending_field_verification','assigned','investigating','resolved','referred','closed') DEFAULT 'pending',
+  `verification_notes` text DEFAULT NULL,
+  `verification_date` datetime DEFAULT NULL,
+  `verified_by` int(11) DEFAULT NULL,
+  `assigned_tanod` int(11) DEFAULT NULL,
   `priority` enum('low','medium','high','critical') DEFAULT 'medium',
   `assigned_to` int(11) DEFAULT NULL,
   `resolution` text DEFAULT NULL,
   `resolution_date` datetime DEFAULT NULL,
   `referred_to` varchar(100) DEFAULT NULL,
-  `pin_code` varchar(4) DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   `submitted_by` int(11) DEFAULT NULL,
@@ -264,22 +402,26 @@ CREATE TABLE `reports` (
   `longitude` decimal(11,8) DEFAULT NULL,
   `is_anonymous` tinyint(1) DEFAULT 0,
   `allow_public` tinyint(1) DEFAULT 0,
-  `escalation_level` int(11) DEFAULT 0
+  `escalation_level` int(11) DEFAULT 0,
+  `evidence_path` varchar(255) DEFAULT NULL,
+  `needs_verification` tinyint(1) DEFAULT 0,
+  `last_status_change` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
 -- Dumping data for table `reports`
 --
 
-INSERT INTO `reports` (`id`, `report_number`, `user_id`, `report_type_id`, `title`, `description`, `location`, `incident_date`, `report_date`, `involved_persons`, `witnesses`, `category`, `evidence_files`, `status`, `priority`, `assigned_to`, `resolution`, `resolution_date`, `referred_to`, `pin_code`, `created_at`, `updated_at`, `submitted_by`, `barangay`, `latitude`, `longitude`, `is_anonymous`, `allow_public`, `escalation_level`) VALUES
-(10001, 'RPT-20260104-C43F37', 1003, 6, 'fire wiwiwwiwi', 'may sunog na nangyari kaninang alas sais ng umaga.', 'dyan', '2026-01-04 17:19:00', '2026-01-05 00:19:59', '', '', 'incident', NULL, 'pending', 'high', NULL, NULL, NULL, NULL, '1234', '2026-01-04 16:19:59', '2026-01-04 16:19:59', NULL, 'Block 8 lot 2 6D Towerville', NULL, NULL, 1, 0, 0),
-(10002, 'RPT-20260104-50A765', 1003, 164, 'ysa', 'mga basura nag kalat.', 'ghgc', '2026-01-04 17:29:00', '2026-01-05 00:30:05', '', '', 'complaint', NULL, 'pending', 'medium', NULL, NULL, NULL, NULL, '1234', '2026-01-04 16:30:05', '2026-01-04 16:30:05', NULL, 'Block 8 lot 2 6D Towerville', NULL, NULL, 1, 0, 0),
-(10004, 'RPT-20260104-4DC6B2', 1003, 164, 'Basura', 'basura nag kakalat', 'ggd', '2026-01-04 18:01:00', '2026-01-05 01:02:23', '', '', 'complaint', NULL, 'pending', 'medium', NULL, NULL, NULL, NULL, '2456', '2026-01-04 17:02:23', '2026-01-04 17:02:23', NULL, 'Block 8 lot 2 6D Towerville', NULL, NULL, 0, 0, 0),
-(10005, 'RPT-20260105-9B0B25', 1003, 11, 'Ingay', 'Itong kapit bahay namin na si Jeff Paray, 11:52 pm na nagkakantahan o videoke pa rin sila, napaka ingay. Sinaway na ni Hanah pero pinakyuhan lang siya ni Jeff.', 'Silang', '2026-01-05 23:59:00', '2026-01-06 00:00:28', '', '', 'complaint', NULL, 'pending', 'low', NULL, NULL, NULL, NULL, '1234', '2026-01-05 16:00:28', '2026-01-05 16:00:28', NULL, 'Block 8 lot 2 6D Towerville', NULL, NULL, 0, 0, 0),
-(10006, 'RPT-20260105-A63CBA', 1003, 72, 'yay', 'may saksakan na nangyari', 'jjkjhk', '2026-01-05 19:56:00', '2026-01-06 02:57:08', '', '', 'incident', '[{\"original_name\":\"Blue and White Simple Corporate Letterhead.png\",\"encrypted_name\":\"encrypted_1767639428_695c098414075_Blue and White Simple Corporate Letterhead.png\",\"file_type\":\"png\",\"file_size\":102358,\"encryption_key_hash\":\"dd5aaf0ba30faee45db2b88214916c4e5b5717d5c5872e6df695c63fffa7ca16\",\"original_hash\":\"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855\",\"iv\":\"f23c1baeacf99860d3d27a176ccb9acc\"}]', 'pending', 'high', NULL, NULL, NULL, NULL, '1234', '2026-01-05 18:57:08', '2026-01-05 18:57:08', NULL, 'Block 8 lot 2 6D Towerville', NULL, NULL, 0, 0, 0),
-(10007, 'RPT-20260106-F95802', 1003, 7, 'Theft Report', 'may nag nakaw ng mga alahas', 'aS', '2026-01-06 10:35:00', '2026-01-06 17:35:32', '', '', 'incident', NULL, 'pending', 'high', NULL, NULL, NULL, NULL, '', '2026-01-06 09:35:32', '2026-01-06 09:35:32', NULL, 'Block 8 lot 2 6D Towerville', NULL, NULL, 1, 0, 0),
-(10008, 'RPT-20260106-21CF9A', 1003, 72, 'Stabbing Report', 'may nag saksakan', 'aa', '2026-01-06 10:37:00', '2026-01-06 17:38:02', '', '', 'incident', NULL, 'pending', 'high', NULL, NULL, NULL, NULL, '', '2026-01-06 09:38:02', '2026-01-06 09:38:02', NULL, 'Block 8 lot 2 6D Towerville', NULL, NULL, 1, 0, 0),
-(10009, 'RPT-20260106-BF3CEA', 1003, 50, 'Theft Report', 'nadukutan ng wallet at cellphone', 'asdads', '2026-01-06 21:17:00', '2026-01-07 04:18:30', '', '', 'incident', '[{\"original_name\":\"im.jpeg\",\"encrypted_name\":\"1767730710_695d6e1685d57_im.jpeg\",\"file_type\":\"jpeg\",\"file_size\":254002,\"encryption_key_hash\":null,\"original_hash\":\"e600dcfcb3ea9fd5300121b822e895710472ca2ec278178ab82ca0b5ad6f8055\",\"iv\":null}]', 'pending', 'medium', NULL, NULL, NULL, NULL, '', '2026-01-06 20:18:30', '2026-01-06 20:18:30', NULL, 'Block 8 lot 2 6D Towerville', NULL, NULL, 0, 0, 0);
+INSERT INTO `reports` (`id`, `report_number`, `user_id`, `report_type_id`, `title`, `description`, `location`, `incident_date`, `report_date`, `involved_persons`, `witnesses`, `category`, `evidence_files`, `status`, `verification_notes`, `verification_date`, `verified_by`, `assigned_tanod`, `priority`, `assigned_to`, `resolution`, `resolution_date`, `referred_to`, `created_at`, `updated_at`, `submitted_by`, `barangay`, `latitude`, `longitude`, `is_anonymous`, `allow_public`, `escalation_level`, `evidence_path`, `needs_verification`, `last_status_change`) VALUES
+(10001, 'RPT-20260104-C43F37', 1003, 6, 'fire wiwiwwiwi', 'may sunog na nangyari kaninang alas sais ng umaga.', 'dyan', '2026-01-04 17:19:00', '2026-01-05 00:19:59', '', '', 'incident', NULL, 'pending_field_verification', NULL, NULL, NULL, NULL, 'high', NULL, NULL, NULL, NULL, '2026-01-04 16:19:59', '2026-01-08 12:03:48', NULL, 'Block 8 lot 2 6D Towerville', NULL, NULL, 1, 0, 0, NULL, 0, '2026-01-09 20:18:34'),
+(10002, 'RPT-20260104-50A765', 1003, 164, 'ysa', 'mga basura nag kalat.', 'ghgc', '2026-01-04 17:29:00', '2026-01-05 00:30:05', '', '', 'complaint', NULL, 'pending', NULL, NULL, NULL, NULL, 'medium', NULL, NULL, NULL, NULL, '2026-01-04 16:30:05', '2026-01-04 16:30:05', NULL, 'Block 8 lot 2 6D Towerville', NULL, NULL, 1, 0, 0, NULL, 0, '2026-01-09 20:18:34'),
+(10004, 'RPT-20260104-4DC6B2', 1003, 164, 'Basura', 'basura nag kakalat', 'ggd', '2026-01-04 18:01:00', '2026-01-05 01:02:23', '', '', 'complaint', NULL, 'pending', NULL, NULL, NULL, NULL, 'medium', NULL, NULL, NULL, NULL, '2026-01-04 17:02:23', '2026-01-04 17:02:23', NULL, 'Block 8 lot 2 6D Towerville', NULL, NULL, 0, 0, 0, NULL, 0, '2026-01-09 20:18:34'),
+(10005, 'RPT-20260105-9B0B25', 1003, 11, 'Ingay', 'Itong kapit bahay namin na si Jeff Paray, 11:52 pm na nagkakantahan o videoke pa rin sila, napaka ingay. Sinaway na ni Hanah pero pinakyuhan lang siya ni Jeff.', 'Silang', '2026-01-05 23:59:00', '2026-01-06 00:00:28', '', '', 'complaint', NULL, 'pending', NULL, NULL, NULL, NULL, 'low', NULL, NULL, NULL, NULL, '2026-01-05 16:00:28', '2026-01-05 16:00:28', NULL, 'Block 8 lot 2 6D Towerville', NULL, NULL, 0, 0, 0, NULL, 0, '2026-01-09 20:18:34'),
+(10006, 'RPT-20260105-A63CBA', 1003, 72, 'yay', 'may saksakan na nangyari', 'jjkjhk', '2026-01-05 19:56:00', '2026-01-06 02:57:08', '', '', 'incident', '[{\"original_name\":\"Blue and White Simple Corporate Letterhead.png\",\"encrypted_name\":\"encrypted_1767639428_695c098414075_Blue and White Simple Corporate Letterhead.png\",\"file_type\":\"png\",\"file_size\":102358,\"encryption_key_hash\":\"dd5aaf0ba30faee45db2b88214916c4e5b5717d5c5872e6df695c63fffa7ca16\",\"original_hash\":\"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855\",\"iv\":\"f23c1baeacf99860d3d27a176ccb9acc\"}]', 'pending_field_verification', NULL, NULL, NULL, NULL, 'high', NULL, NULL, NULL, NULL, '2026-01-05 18:57:08', '2026-01-08 12:03:48', NULL, 'Block 8 lot 2 6D Towerville', NULL, NULL, 0, 0, 0, NULL, 0, '2026-01-09 20:18:34'),
+(10007, 'RPT-20260106-F95802', 1003, 7, 'Theft Report', 'may nag nakaw ng mga alahas', 'aS', '2026-01-06 10:35:00', '2026-01-06 17:35:32', '', '', 'incident', NULL, 'pending_field_verification', NULL, NULL, NULL, NULL, 'high', NULL, NULL, NULL, NULL, '2026-01-06 09:35:32', '2026-01-08 12:03:48', NULL, 'Block 8 lot 2 6D Towerville', NULL, NULL, 1, 0, 0, NULL, 0, '2026-01-09 20:18:34'),
+(10008, 'RPT-20260106-21CF9A', 1003, 72, 'Stabbing Report', 'may nag saksakan', 'aa', '2026-01-06 10:37:00', '2026-01-06 17:38:02', '', '', 'incident', NULL, 'pending_field_verification', NULL, NULL, NULL, NULL, 'high', NULL, NULL, NULL, NULL, '2026-01-06 09:38:02', '2026-01-08 12:03:48', NULL, 'Block 8 lot 2 6D Towerville', NULL, NULL, 1, 0, 0, NULL, 0, '2026-01-09 20:18:34'),
+(10009, 'RPT-20260106-BF3CEA', 1003, 50, 'Theft Report', 'nadukutan ng wallet at cellphone', 'asdads', '2026-01-06 21:17:00', '2026-01-07 04:18:30', '', '', 'incident', '[{\"original_name\":\"im.jpeg\",\"encrypted_name\":\"1767730710_695d6e1685d57_im.jpeg\",\"file_type\":\"jpeg\",\"file_size\":254002,\"encryption_key_hash\":null,\"original_hash\":\"e600dcfcb3ea9fd5300121b822e895710472ca2ec278178ab82ca0b5ad6f8055\",\"iv\":null}]', 'pending', NULL, NULL, NULL, NULL, 'medium', NULL, NULL, NULL, NULL, '2026-01-06 20:18:30', '2026-01-06 20:18:30', NULL, 'Block 8 lot 2 6D Towerville', NULL, NULL, 0, 0, 0, NULL, 0, '2026-01-09 20:18:34'),
+(10010, 'RPT-20260107-2F9535', 1003, 170, 'Land Dispute Report', 'agawan sa lupa', 'bahaya', '2026-01-07 13:44:00', '2026-01-07 20:44:56', '', '', 'blotter', '[{\"original_name\":\"504896849_9887062978015746_9181476553568709558_n.jpg\",\"stored_name\":\"1767789896_695e5548178bf_504896849_9887062978015746_9181476553568709558_n.jpg\",\"path\":\"uploads\\/reports\\/user_1003\\/1767789896_695e5548178bf_504896849_9887062978015746_9181476553568709558_n.jpg\",\"file_type\":\"jpg\",\"file_size\":626135,\"encrypted\":false}]', 'pending', NULL, NULL, NULL, NULL, 'medium', NULL, NULL, NULL, NULL, '2026-01-07 12:44:56', '2026-01-07 12:44:56', NULL, 'Block 8 lot 2 6D Towerville', NULL, NULL, 0, 0, 0, NULL, 0, '2026-01-09 20:18:34');
 
 -- --------------------------------------------------------
 
@@ -327,7 +469,8 @@ INSERT INTO `report_status_history` (`id`, `report_id`, `status`, `updated_by`, 
 (6, 10006, 'pending', NULL, 'Report submitted by citizen', '2026-01-05 18:57:08', NULL, NULL, NULL),
 (7, 10007, 'pending', NULL, 'Report submitted by citizen', '2026-01-06 09:35:32', NULL, NULL, NULL),
 (8, 10008, 'pending', NULL, 'Report submitted by citizen', '2026-01-06 09:38:02', NULL, NULL, NULL),
-(9, 10009, 'pending', NULL, 'Report submitted by citizen', '2026-01-06 20:18:30', NULL, NULL, NULL);
+(9, 10009, 'pending', NULL, 'Report submitted by citizen', '2026-01-06 20:18:30', NULL, NULL, NULL),
+(10, 10010, 'pending', NULL, 'Report submitted by citizen', '2026-01-07 12:44:56', NULL, NULL, NULL);
 
 -- --------------------------------------------------------
 
@@ -529,6 +672,26 @@ INSERT INTO `report_types` (`id`, `type_name`, `category`, `description`, `keywo
 -- --------------------------------------------------------
 
 --
+-- Table structure for table `report_vetting`
+--
+
+CREATE TABLE `report_vetting` (
+  `vetting_id` int(11) NOT NULL,
+  `report_id` int(11) NOT NULL,
+  `tanod_id` int(11) NOT NULL,
+  `location_verified` enum('Yes','Partial','No') NOT NULL DEFAULT 'No',
+  `facts_verified` enum('Confirmed','Partially Confirmed','Unconfirmed') NOT NULL DEFAULT 'Unconfirmed',
+  `verification_notes` text NOT NULL,
+  `recommendation` enum('Approved','Needs More Info','Rejected') NOT NULL DEFAULT 'Needs More Info',
+  `status` enum('Pending','In Progress','Completed') NOT NULL DEFAULT 'Pending',
+  `verification_date` timestamp NOT NULL DEFAULT current_timestamp(),
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
 -- Table structure for table `roles`
 --
 
@@ -550,6 +713,122 @@ INSERT INTO `roles` (`id`, `role_name`, `description`, `permissions`, `created_a
 (3, 'secretary', 'Barangay Secretary', 'manage_reports,view_reports,manage_announcements', '2025-12-06 05:28:32'),
 (4, 'lupon', 'Lupon Member', 'view_reports,manage_reports', '2025-12-06 05:28:32'),
 (5, 'tanod', 'Barangay Tanod', 'view_reports,update_reports_status', '2025-12-06 05:28:32');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `system_config`
+--
+
+CREATE TABLE `system_config` (
+  `id` int(11) NOT NULL,
+  `config_key` varchar(100) NOT NULL,
+  `config_value` text DEFAULT NULL,
+  `config_type` enum('string','number','boolean','json') DEFAULT 'string',
+  `description` text DEFAULT NULL,
+  `updated_by` int(11) DEFAULT NULL,
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `system_config`
+--
+
+INSERT INTO `system_config` (`id`, `config_key`, `config_value`, `config_type`, `description`, `updated_by`, `updated_at`, `created_at`) VALUES
+(1, 'classification_threshold', '0.7', 'string', 'AI model confidence threshold for police classification', NULL, '2026-01-09 21:18:50', '2026-01-09 21:18:50'),
+(2, 'system_timezone', 'Asia/Manila', 'string', 'System timezone', NULL, '2026-01-09 21:18:50', '2026-01-09 21:18:50'),
+(3, 'data_retention_days', '90', 'string', 'Days to keep audit logs', NULL, '2026-01-09 21:18:50', '2026-01-09 21:18:50');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `tanod_duty_logs`
+--
+
+CREATE TABLE `tanod_duty_logs` (
+  `id` int(11) NOT NULL,
+  `user_id` int(11) NOT NULL,
+  `clock_in` datetime NOT NULL,
+  `clock_out` datetime DEFAULT NULL,
+  `location_lat` decimal(10,8) DEFAULT NULL,
+  `location_lng` decimal(11,8) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `tanod_duty_logs`
+--
+
+INSERT INTO `tanod_duty_logs` (`id`, `user_id`, `clock_in`, `clock_out`, `location_lat`, `location_lng`, `created_at`) VALUES
+(1, 1010, '2026-01-09 04:35:14', '2026-01-09 04:35:15', NULL, NULL, '2026-01-08 20:35:14'),
+(2, 1009, '2026-01-10 05:08:08', '2026-01-10 06:38:15', NULL, NULL, '2026-01-09 21:08:08'),
+(3, 1009, '2026-01-10 06:38:15', '2026-01-10 06:38:26', NULL, NULL, '2026-01-09 22:38:15'),
+(4, 1009, '2026-01-10 07:43:14', '2026-01-10 07:43:14', NULL, NULL, '2026-01-09 23:43:14'),
+(5, 1009, '2026-01-10 07:43:21', '2026-01-10 07:43:52', NULL, NULL, '2026-01-09 23:43:21'),
+(6, 1009, '2026-01-10 07:43:52', '2026-01-10 07:44:12', NULL, NULL, '2026-01-09 23:43:52'),
+(7, 1009, '2026-01-10 07:44:12', NULL, NULL, NULL, '2026-01-09 23:44:12');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `tanod_incidents`
+--
+
+CREATE TABLE `tanod_incidents` (
+  `id` int(11) NOT NULL,
+  `user_id` int(11) NOT NULL,
+  `location` text NOT NULL,
+  `latitude` decimal(10,8) DEFAULT NULL,
+  `longitude` decimal(11,8) DEFAULT NULL,
+  `incident_type` varchar(100) DEFAULT NULL,
+  `description` text DEFAULT NULL,
+  `witnesses` text DEFAULT NULL,
+  `action_taken` text DEFAULT NULL,
+  `status` varchar(50) DEFAULT 'pending',
+  `reported_at` datetime DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `reviewed_at` datetime DEFAULT NULL,
+  `reviewed_by` int(11) DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `tanod_schedules`
+--
+
+CREATE TABLE `tanod_schedules` (
+  `id` int(11) NOT NULL,
+  `user_id` int(11) NOT NULL,
+  `schedule_date` date NOT NULL,
+  `shift_start` time NOT NULL,
+  `shift_end` time NOT NULL,
+  `shift_type` varchar(50) DEFAULT NULL,
+  `patrol_route` text DEFAULT NULL,
+  `assigned_by` int(11) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `tanod_status`
+--
+
+CREATE TABLE `tanod_status` (
+  `user_id` int(11) NOT NULL,
+  `status` varchar(50) DEFAULT 'Off-Duty',
+  `last_updated` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `tanod_status`
+--
+
+INSERT INTO `tanod_status` (`user_id`, `status`, `last_updated`) VALUES
+(1009, 'On-Duty', '2026-01-09 23:44:12'),
+(1010, 'Off-Duty', '2026-01-08 20:35:15');
 
 -- --------------------------------------------------------
 
@@ -605,12 +884,17 @@ CREATE TABLE `users` (
 INSERT INTO `users` (`id`, `first_name`, `middle_name`, `last_name`, `suffix`, `sex`, `birthday`, `age`, `permanent_address`, `contact_number`, `emergency_contact`, `emergency_number`, `id_verification_path`, `email`, `username`, `password`, `user_type`, `role`, `position_id`, `date_appointed`, `term_end`, `office_hours`, `barangay`, `status`, `is_active`, `created_at`, `updated_at`, `last_login`, `pin_code`, `master_code`, `is_master_code_used`, `master_code_used_at`, `reset_token`, `reset_token_expiry`, `is_online`, `profile_picture`, `notification_token`, `wants_notifications`) VALUES
 (1001, 'System', '', 'Administrator', '', 'Male', '1990-01-01', 34, 'Barangay Hall, City Hall Compound', '9123456789', NULL, NULL, NULL, 'admin@leir.com', 'admin', 'hello11.', 'barangay_member', 'admin', NULL, NULL, NULL, NULL, 'LGU-4', 'active', 1, '2025-12-06 05:32:10', '2025-12-07 14:13:06', NULL, '1234', NULL, 0, NULL, NULL, NULL, 1, NULL, NULL, 1),
 (1002, 'Juan', 'Santos', 'Dela Cruz', 'Jr', 'Male', '1985-05-15', 39, '123 Main Street, Barangay 1, City', '9123456780', NULL, NULL, NULL, 'citizen@example.com', 'citizen', 'hello11.', 'citizen', 'citizen', NULL, NULL, NULL, NULL, 'Barangay 1', 'active', 1, '2025-12-06 05:32:10', '2025-12-07 14:13:06', NULL, NULL, NULL, 0, NULL, NULL, NULL, 1, NULL, NULL, 1),
-(1003, 'cla', '', 'galvez', '', 'Female', '2002-12-01', 23, 'Block 8  Towerville', '09978407627', 'clarisa galvez', '09978407625', 'uploads/ids/6935f6f75f045_1765144311.jpg', 'ysa@gmail.com', 'ysa', '$2y$10$ErRqKYCyQD2sBpZv.w2NiudfPvT89YSsiTvHn2i6Ylc6D1ztKOKym', 'citizen', 'citizen', NULL, NULL, NULL, NULL, 'Block 8 lot 2 6D Towerville', 'active', 1, '2025-12-07 21:51:51', '2026-01-07 10:35:25', '2026-01-07 10:35:25', NULL, NULL, 0, NULL, NULL, NULL, 1, '1765476337_693b07f17c86f_4f4053396ad983bb501fd6eae285bedd.jpg', NULL, 1),
+(1003, 'cla', '', 'galvez', '', 'Female', '2002-12-01', 23, 'Block 8  Towerville', '09978407627', 'clarisa galvez', '09978407625', 'uploads/ids/6935f6f75f045_1765144311.jpg', 'ysa@gmail.com', 'ysa', '$2y$10$ErRqKYCyQD2sBpZv.w2NiudfPvT89YSsiTvHn2i6Ylc6D1ztKOKym', 'citizen', 'citizen', NULL, NULL, NULL, NULL, 'Block 8 lot 2 6D Towerville', 'active', 1, '2025-12-07 21:51:51', '2026-01-09 17:17:48', '2026-01-09 17:17:48', NULL, NULL, 0, NULL, NULL, NULL, 1, '1765476337_693b07f17c86f_4f4053396ad983bb501fd6eae285bedd.jpg', NULL, 1),
 (1004, 'angelo', 'galvez', 'pabericio', '', 'Male', '2009-10-22', 16, 'Block 8 lot 2 6D Towerville', '09978407622', 'clarisa galvez', '09978407628', 'uploads/ids/6935f95ce533d_1765144924.jpeg', 'ysagalv5@gmail.com', 'cris', '$2y$10$mT0NIt.Ag.ohJtojwKgdnOB/w9JMSpROhQShWXGaQvgHkJeChVnBO', 'citizen', 'citizen', NULL, NULL, NULL, NULL, 'Block 8 lot 2 6D Towerville', 'active', 0, '2025-12-07 22:02:04', '2025-12-08 08:19:25', '2025-12-08 08:06:36', NULL, NULL, 0, NULL, NULL, NULL, 1, NULL, NULL, 1),
 (1005, 'Clarisa', 'Galvez', 'Manangan', '', 'Female', '2002-03-11', 23, 'Block 110', '09978407689', NULL, NULL, NULL, 'ysagalvez@gmail.com', 'clarisg', '$2y$10$Z5aPzVJE.ponvcbFJJ4oS.6IALC5jnaTCIFbNihF8YjCsIrwKMdnG', 'barangay_member', 'secretary', NULL, NULL, NULL, NULL, 'Block 110', 'active', 1, '2026-01-03 16:34:21', '2026-01-06 18:14:29', NULL, NULL, '1019', 0, NULL, NULL, NULL, 1, NULL, NULL, 1),
 (1006, 'Ysabel', '', 'Gal', '', 'Female', '2001-09-23', 24, '6D', '08976545678', NULL, NULL, NULL, 'ysagalv@gmail.com', 'ysag', '$2y$10$VqqQIuPWdyi.Lz86F/QGselYVD5UGtU98VJ5M8AtbAxsJ2kTGKq46', 'barangay_member', 'admin', NULL, NULL, NULL, NULL, '6D', 'active', 1, '2026-01-03 16:45:12', '2026-01-03 16:45:12', NULL, NULL, NULL, 0, NULL, NULL, NULL, 1, NULL, NULL, 1),
 (1007, 'JR', '', 'RACELIS', '', 'Male', '2001-11-13', 24, 'BLOCK 7', '09865434567', NULL, NULL, NULL, 'Jr@gmail.com', 'jr', '$2y$10$bUtOO.9WDZNnYcwLjoVNN.GJ74c8V7bazXPB.v1rzlFmVdoHV7/Ma', 'barangay_member', 'captain', NULL, NULL, NULL, NULL, 'BLOCK 7', 'pending', 1, '2026-01-03 17:32:35', '2026-01-03 17:32:35', NULL, NULL, '5981', 0, NULL, NULL, NULL, 1, NULL, NULL, 1),
-(1008, 'hanah', '', 'magnaye', '', 'Female', '2000-09-07', 25, 'talipapa', '09875678923', NULL, NULL, NULL, 'hanah@gmail.com', 'hanah', '$2y$10$ztzCxhIh82YzPdtHM4.syOWDRe04MxxWrdCNC7RdutzrIjstoVWCi', 'barangay_member', 'secretary', NULL, NULL, NULL, NULL, 'talipapa', 'pending', 1, '2026-01-03 17:51:52', '2026-01-06 19:46:43', '2026-01-06 18:37:39', NULL, '4939', 1, '2026-01-06 18:37:39', NULL, NULL, 1, '1767728803_695d66a356987_504896849_9887062978015746_9181476553568709558_n.jpg', NULL, 1);
+(1008, 'hanah', '', 'magnaye', '', 'Female', '2000-09-07', 25, 'talipapa', '09875678923', NULL, NULL, NULL, 'hanah@gmail.com', 'hanah', '$2y$10$ztzCxhIh82YzPdtHM4.syOWDRe04MxxWrdCNC7RdutzrIjstoVWCi', 'barangay_member', 'secretary', NULL, NULL, NULL, NULL, 'talipapa', 'pending', 1, '2026-01-03 17:51:52', '2026-01-09 19:38:49', '2026-01-09 19:38:49', NULL, '4939', 1, '2026-01-06 18:37:39', NULL, NULL, 1, '1767728803_695d66a356987_504896849_9887062978015746_9181476553568709558_n.jpg', NULL, 1),
+(1009, 'Jeff', '', 'Paray', '', 'Male', '1998-12-02', 27, 'Phase 9 Wakwak Street', '09823456785', NULL, NULL, NULL, 'jeff@gmail.com', 'jeff', '$2y$10$6vaUPPfOrZfokIxW3zYA7evdkMw7OX01r4THlroZDngQ0sB4jHaCq', 'barangay_member', 'tanod', NULL, NULL, NULL, NULL, 'Phase 9 Wakwak Street', 'active', 1, '2026-01-07 15:23:41', '2026-01-09 21:08:03', '2026-01-09 21:08:03', NULL, '6152', 1, '2026-01-07 15:24:17', NULL, NULL, 1, NULL, NULL, 1),
+(1010, 'Abo', '', 'Magnaye', 'Jr', 'Male', '2003-12-25', 22, 'Block 9 Lot 78 QC', '09876543278', NULL, NULL, NULL, 'magnaye@gmail.com', 'mj', '$2y$10$jw4FHv5c6mKG0baOspWX3OKyYGqCbIszO.WJ781bNJJSO9KZXEeXG', 'barangay_member', 'tanod', NULL, NULL, NULL, NULL, 'Block 9 Lot 78 QC', 'active', 1, '2026-01-08 20:31:07', '2026-01-09 11:50:32', '2026-01-09 11:50:32', NULL, '5556', 1, '2026-01-08 20:31:46', NULL, NULL, 1, NULL, NULL, 1),
+(1011, 'Isagani', '', 'Viray', 'II', 'Male', '2000-06-05', 25, 'Block 98 Lot 972', '09876543234', NULL, NULL, NULL, 'isagani@gmail.com', 'isagani', '$2y$10$/JOwLGfhiOONLC3QyZ.dgOWy8kC4pYNT01Rvi.Poz58QkhJrrvlOq', 'barangay_member', 'tanod', NULL, NULL, NULL, NULL, 'Block 98 Lot 972', 'active', 1, '2026-01-08 20:44:19', '2026-01-08 20:45:25', '2026-01-08 20:45:25', NULL, '6762', 1, '2026-01-08 20:45:25', NULL, NULL, 1, NULL, NULL, 1),
+(1012, 'John Rey', 'Racelis', 'manangan', '', 'Male', '2001-11-13', 24, 'Block 7 Lot 4 Loma de Gato', '09543456786', NULL, NULL, NULL, 'rey@gmail.com', 'JayR', '$2y$10$t7R3wxMVWOn2sopCVrbSPO.lPPsdLYyPOg8kqh5paP9wucPg5VUdO', 'barangay_member', 'captain', NULL, NULL, NULL, NULL, 'Block 7 Lot 4 Loma de Gato', 'active', 1, '2026-01-09 20:10:34', '2026-01-09 20:13:43', '2026-01-09 20:13:43', NULL, '4151', 1, '2026-01-09 20:11:04', NULL, NULL, 1, NULL, NULL, 1),
+(1013, 'Clarisa', 'Galvez', 'Manangan', '', 'Female', '1982-03-11', 43, 'Block 98 Lot 75 Bulacan', '09987567895', NULL, NULL, NULL, 'ysagalvez5@gmail.com', 'clang', '$2y$10$rTn7Qi3l2zvb9DH.3FnRIO7SAhcg6lX3RF1vZbTX/XG81Z90OgLMW', 'barangay_member', 'admin', NULL, NULL, NULL, NULL, 'Block 98 Lot 75 Bulacan', 'active', 1, '2026-01-09 20:44:21', '2026-01-09 23:07:56', '2026-01-09 23:07:56', NULL, '2660', 1, '2026-01-09 20:44:55', NULL, NULL, 1, NULL, NULL, 1);
 
 -- --------------------------------------------------------
 
@@ -722,6 +1006,13 @@ ALTER TABLE `announcements`
   ADD KEY `idx_announcements_barangay_active` (`barangay`,`is_active`,`created_at`);
 
 --
+-- Indexes for table `api_integrations`
+--
+ALTER TABLE `api_integrations`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `unique_api_name` (`api_name`);
+
+--
 -- Indexes for table `barangay_personnel_master_codes`
 --
 ALTER TABLE `barangay_personnel_master_codes`
@@ -745,6 +1036,37 @@ ALTER TABLE `barangay_positions`
   ADD KEY `barangay_positions_ibfk_1` (`role_id`);
 
 --
+-- Indexes for table `captain_hearings`
+--
+ALTER TABLE `captain_hearings`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `report_id` (`report_id`),
+  ADD KEY `scheduled_by` (`scheduled_by`),
+  ADD KEY `idx_captain_hearings_date` (`hearing_date`,`status`);
+
+--
+-- Indexes for table `case_approvals`
+--
+ALTER TABLE `case_approvals`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `approved_by` (`approved_by`),
+  ADD KEY `idx_case_approvals_report` (`report_id`,`approved_at`);
+
+--
+-- Indexes for table `data_transfer_logs`
+--
+ALTER TABLE `data_transfer_logs`
+  ADD PRIMARY KEY (`id`);
+
+--
+-- Indexes for table `evidence_handovers`
+--
+ALTER TABLE `evidence_handovers`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `tanod_id` (`tanod_id`),
+  ADD KEY `handover_to` (`handover_to`);
+
+--
 -- Indexes for table `file_encryption_logs`
 --
 ALTER TABLE `file_encryption_logs`
@@ -753,6 +1075,13 @@ ALTER TABLE `file_encryption_logs`
   ADD KEY `idx_report` (`report_id`),
   ADD KEY `idx_key` (`encryption_key`),
   ADD KEY `idx_file_encryption_report` (`report_id`,`encryption_key`);
+
+--
+-- Indexes for table `login_history`
+--
+ALTER TABLE `login_history`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `user_id` (`user_id`);
 
 --
 -- Indexes for table `lost_found_items`
@@ -775,7 +1104,17 @@ ALTER TABLE `messages`
 --
 ALTER TABLE `notifications`
   ADD PRIMARY KEY (`id`),
-  ADD KEY `user_id` (`user_id`);
+  ADD KEY `user_id` (`user_id`),
+  ADD KEY `idx_notifications_user_read` (`user_id`,`is_read`),
+  ADD KEY `idx_notifications_created` (`created_at`),
+  ADD KEY `idx_notifications_related` (`related_type`,`related_id`);
+
+--
+-- Indexes for table `patrol_routes`
+--
+ALTER TABLE `patrol_routes`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_active_route` (`is_active`,`priority_level`);
 
 --
 -- Indexes for table `reports`
@@ -792,7 +1131,12 @@ ALTER TABLE `reports`
   ADD KEY `idx_reports_created` (`created_at`),
   ADD KEY `idx_reports_type` (`report_type_id`),
   ADD KEY `submitted_by` (`submitted_by`),
-  ADD KEY `idx_reports_user_status_date` (`user_id`,`status`,`created_at`);
+  ADD KEY `idx_reports_user_status_date` (`user_id`,`status`,`created_at`),
+  ADD KEY `fk_reports_verified_by` (`verified_by`),
+  ADD KEY `idx_reports_status` (`status`),
+  ADD KEY `idx_reports_needs_verification` (`needs_verification`),
+  ADD KEY `idx_reports_assigned_tanod` (`assigned_tanod`),
+  ADD KEY `idx_reports_verification_date` (`verification_date`);
 
 --
 -- Indexes for table `report_attachments`
@@ -829,11 +1173,55 @@ ALTER TABLE `report_types`
   ADD KEY `idx_severity` (`severity_level`);
 
 --
+-- Indexes for table `report_vetting`
+--
+ALTER TABLE `report_vetting`
+  ADD PRIMARY KEY (`vetting_id`),
+  ADD UNIQUE KEY `updated_at` (`updated_at`),
+  ADD UNIQUE KEY `tanod_id` (`tanod_id`),
+  ADD UNIQUE KEY `report_id` (`report_id`);
+
+--
 -- Indexes for table `roles`
 --
 ALTER TABLE `roles`
   ADD PRIMARY KEY (`id`),
   ADD UNIQUE KEY `role_name` (`role_name`);
+
+--
+-- Indexes for table `system_config`
+--
+ALTER TABLE `system_config`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `config_key` (`config_key`);
+
+--
+-- Indexes for table `tanod_duty_logs`
+--
+ALTER TABLE `tanod_duty_logs`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `user_id` (`user_id`);
+
+--
+-- Indexes for table `tanod_incidents`
+--
+ALTER TABLE `tanod_incidents`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `user_id` (`user_id`),
+  ADD KEY `reported_at` (`reported_at`);
+
+--
+-- Indexes for table `tanod_schedules`
+--
+ALTER TABLE `tanod_schedules`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `user_id` (`user_id`);
+
+--
+-- Indexes for table `tanod_status`
+--
+ALTER TABLE `tanod_status`
+  ADD PRIMARY KEY (`user_id`);
 
 --
 -- Indexes for table `users`
@@ -905,10 +1293,16 @@ ALTER TABLE `announcements`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
 
 --
+-- AUTO_INCREMENT for table `api_integrations`
+--
+ALTER TABLE `api_integrations`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
 -- AUTO_INCREMENT for table `barangay_personnel_registrations`
 --
 ALTER TABLE `barangay_personnel_registrations`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=8;
 
 --
 -- AUTO_INCREMENT for table `barangay_positions`
@@ -917,9 +1311,39 @@ ALTER TABLE `barangay_positions`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=8;
 
 --
+-- AUTO_INCREMENT for table `captain_hearings`
+--
+ALTER TABLE `captain_hearings`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `case_approvals`
+--
+ALTER TABLE `case_approvals`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `data_transfer_logs`
+--
+ALTER TABLE `data_transfer_logs`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `evidence_handovers`
+--
+ALTER TABLE `evidence_handovers`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
 -- AUTO_INCREMENT for table `file_encryption_logs`
 --
 ALTER TABLE `file_encryption_logs`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `login_history`
+--
+ALTER TABLE `login_history`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
 
 --
@@ -941,10 +1365,16 @@ ALTER TABLE `notifications`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
 
 --
+-- AUTO_INCREMENT for table `patrol_routes`
+--
+ALTER TABLE `patrol_routes`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
 -- AUTO_INCREMENT for table `reports`
 --
 ALTER TABLE `reports`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=10010;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=10011;
 
 --
 -- AUTO_INCREMENT for table `report_attachments`
@@ -956,7 +1386,7 @@ ALTER TABLE `report_attachments`
 -- AUTO_INCREMENT for table `report_status_history`
 --
 ALTER TABLE `report_status_history`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=10;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=11;
 
 --
 -- AUTO_INCREMENT for table `report_timeline`
@@ -971,16 +1401,46 @@ ALTER TABLE `report_types`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=179;
 
 --
+-- AUTO_INCREMENT for table `report_vetting`
+--
+ALTER TABLE `report_vetting`
+  MODIFY `vetting_id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
 -- AUTO_INCREMENT for table `roles`
 --
 ALTER TABLE `roles`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=7;
 
 --
+-- AUTO_INCREMENT for table `system_config`
+--
+ALTER TABLE `system_config`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
+
+--
+-- AUTO_INCREMENT for table `tanod_duty_logs`
+--
+ALTER TABLE `tanod_duty_logs`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=8;
+
+--
+-- AUTO_INCREMENT for table `tanod_incidents`
+--
+ALTER TABLE `tanod_incidents`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `tanod_schedules`
+--
+ALTER TABLE `tanod_schedules`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+
+--
 -- AUTO_INCREMENT for table `users`
 --
 ALTER TABLE `users`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=1009;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=1014;
 
 --
 -- AUTO_INCREMENT for table `user_citizen_details`
@@ -1037,11 +1497,38 @@ ALTER TABLE `barangay_personnel_registrations`
   ADD CONSTRAINT `barangay_personnel_registrations_ibfk_2` FOREIGN KEY (`admin_id`) REFERENCES `users` (`id`) ON DELETE CASCADE;
 
 --
+-- Constraints for table `captain_hearings`
+--
+ALTER TABLE `captain_hearings`
+  ADD CONSTRAINT `captain_hearings_ibfk_1` FOREIGN KEY (`report_id`) REFERENCES `reports` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `captain_hearings_ibfk_2` FOREIGN KEY (`scheduled_by`) REFERENCES `users` (`id`) ON DELETE CASCADE;
+
+--
+-- Constraints for table `case_approvals`
+--
+ALTER TABLE `case_approvals`
+  ADD CONSTRAINT `case_approvals_ibfk_1` FOREIGN KEY (`report_id`) REFERENCES `reports` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `case_approvals_ibfk_2` FOREIGN KEY (`approved_by`) REFERENCES `users` (`id`) ON DELETE CASCADE;
+
+--
+-- Constraints for table `evidence_handovers`
+--
+ALTER TABLE `evidence_handovers`
+  ADD CONSTRAINT `evidence_handovers_ibfk_1` FOREIGN KEY (`tanod_id`) REFERENCES `users` (`id`),
+  ADD CONSTRAINT `evidence_handovers_ibfk_2` FOREIGN KEY (`handover_to`) REFERENCES `users` (`id`);
+
+--
 -- Constraints for table `file_encryption_logs`
 --
 ALTER TABLE `file_encryption_logs`
   ADD CONSTRAINT `file_encryption_logs_ibfk_1` FOREIGN KEY (`report_id`) REFERENCES `reports` (`id`) ON DELETE CASCADE,
   ADD CONSTRAINT `file_encryption_logs_ibfk_2` FOREIGN KEY (`last_decrypted_by`) REFERENCES `users` (`id`) ON DELETE SET NULL;
+
+--
+-- Constraints for table `login_history`
+--
+ALTER TABLE `login_history`
+  ADD CONSTRAINT `login_history_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE;
 
 --
 -- Constraints for table `lost_found_items`
@@ -1067,6 +1554,8 @@ ALTER TABLE `notifications`
 -- Constraints for table `reports`
 --
 ALTER TABLE `reports`
+  ADD CONSTRAINT `fk_reports_assigned_tanod` FOREIGN KEY (`assigned_tanod`) REFERENCES `users` (`id`) ON DELETE SET NULL,
+  ADD CONSTRAINT `fk_reports_verified_by` FOREIGN KEY (`verified_by`) REFERENCES `users` (`id`) ON DELETE SET NULL,
   ADD CONSTRAINT `reports_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
   ADD CONSTRAINT `reports_ibfk_2` FOREIGN KEY (`report_type_id`) REFERENCES `report_types` (`id`),
   ADD CONSTRAINT `reports_ibfk_3` FOREIGN KEY (`assigned_to`) REFERENCES `users` (`id`) ON DELETE SET NULL,
@@ -1091,6 +1580,37 @@ ALTER TABLE `report_status_history`
 ALTER TABLE `report_timeline`
   ADD CONSTRAINT `report_timeline_ibfk_1` FOREIGN KEY (`report_id`) REFERENCES `reports` (`id`) ON DELETE CASCADE,
   ADD CONSTRAINT `report_timeline_ibfk_2` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`) ON DELETE CASCADE;
+
+--
+-- Constraints for table `report_vetting`
+--
+ALTER TABLE `report_vetting`
+  ADD CONSTRAINT `report_vetting_ibfk_1` FOREIGN KEY (`report_id`) REFERENCES `reports` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
+  ADD CONSTRAINT `report_vetting_ibfk_2` FOREIGN KEY (`tanod_id`) REFERENCES `users` (`id`) ON DELETE CASCADE ON UPDATE CASCADE;
+
+--
+-- Constraints for table `tanod_duty_logs`
+--
+ALTER TABLE `tanod_duty_logs`
+  ADD CONSTRAINT `tanod_duty_logs_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`);
+
+--
+-- Constraints for table `tanod_incidents`
+--
+ALTER TABLE `tanod_incidents`
+  ADD CONSTRAINT `tanod_incidents_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`);
+
+--
+-- Constraints for table `tanod_schedules`
+--
+ALTER TABLE `tanod_schedules`
+  ADD CONSTRAINT `tanod_schedules_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`);
+
+--
+-- Constraints for table `tanod_status`
+--
+ALTER TABLE `tanod_status`
+  ADD CONSTRAINT `tanod_status_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`);
 
 --
 -- Constraints for table `user_citizen_details`
