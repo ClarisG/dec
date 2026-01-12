@@ -122,122 +122,122 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         if (empty($error)) {
             $hashed_password = password_hash($password, PASSWORD_DEFAULT);
             
- // Handle file upload for ID verification
-$id_verification_path = null;
-$guardian_id_path = null;
-$id_type = $is_minor ? 'school_id' : 'barangay_id';
-
-// Create upload directories if they don't exist
-$uploads_dir = __DIR__ . '/uploads';
-$ids_dir = $uploads_dir . '/ids';
-$guardian_ids_dir = $uploads_dir . '/guardian_ids';
-
-if (!file_exists($uploads_dir)) {
-    mkdir($uploads_dir, 0777, true);
-}
-if (!file_exists($ids_dir)) {
-    mkdir($ids_dir, 0777, true);
-}
-if (!file_exists($guardian_ids_dir)) {
-    mkdir($guardian_ids_dir, 0777, true);
-}
-
-// Determine which file input to check based on user type
-if ($is_minor) {
-    // For minors: Check for school_id_verification
-    $file_input_name = 'school_id_verification';
-} else {
-    // For adults: Check for id_verification
-    $file_input_name = 'id_verification';
-}
-
-// Check if file was uploaded
-if (isset($_FILES[$file_input_name]) && $_FILES[$file_input_name]['error'] !== UPLOAD_ERR_NO_FILE) {
-    
-    if ($_FILES[$file_input_name]['error'] == UPLOAD_ERR_OK) {
-        $file_extension = pathinfo($_FILES[$file_input_name]['name'], PATHINFO_EXTENSION);
-        $filename = uniqid() . '_' . time() . '.' . $file_extension;
-        $destination = 'uploads/ids/' . $filename;
-        
-        $allowed_extensions = ['jpg', 'jpeg', 'png', 'pdf'];
-        if (in_array(strtolower($file_extension), $allowed_extensions) &&
-            $_FILES[$file_input_name]['size'] <= 5 * 1024 * 1024) {
+            // Handle file upload for ID verification
+            $id_verification_path = null;
+            $guardian_id_path = null;
+            $id_type = $is_minor ? 'school_id' : 'barangay_id';
             
-            if (move_uploaded_file($_FILES[$file_input_name]['tmp_name'], $destination)) {
-                $id_verification_path = $destination;
-            } else {
-                $error = "Failed to upload ID. Please try again.";
+            // Create upload directories if they don't exist
+            $uploads_dir = __DIR__ . '/uploads';
+            $ids_dir = $uploads_dir . '/ids';
+            $guardian_ids_dir = $uploads_dir . '/guardian_ids';
+            
+            if (!file_exists($uploads_dir)) {
+                mkdir($uploads_dir, 0777, true);
             }
-        } else {
-            $error = "Invalid file type or size. Only JPG, PNG, PDF up to 5MB are allowed.";
-        }
-    } else {
-        // Check what the actual error is
-        switch ($_FILES[$file_input_name]['error']) {
-            case UPLOAD_ERR_INI_SIZE:
-            case UPLOAD_ERR_FORM_SIZE:
-                $error = "File is too large. Maximum size is 5MB.";
-                break;
-            case UPLOAD_ERR_PARTIAL:
-                $error = "File was only partially uploaded.";
-                break;
-            case UPLOAD_ERR_NO_TMP_DIR:
-                $error = "Missing temporary folder.";
-                break;
-            case UPLOAD_ERR_CANT_WRITE:
-                $error = "Failed to write file to disk.";
-                break;
-            case UPLOAD_ERR_EXTENSION:
-                $error = "A PHP extension stopped the file upload.";
-                break;
-            default:
-                $error = "Unknown upload error (Error code: " . $_FILES[$file_input_name]['error'] . ").";
-                break;
-        }
-    }
-} else {
-    $error = $is_minor ? "School ID upload is required for minors." : "Barangay ID upload is required for adults.";
-}
-
-// Upload guardian's barangay ID for minors (only if first upload succeeded)
-if (empty($error) && $is_minor) {
-    if (isset($_FILES['guardian_id_verification']) && $_FILES['guardian_id_verification']['error'] !== UPLOAD_ERR_NO_FILE) {
-        
-        if ($_FILES['guardian_id_verification']['error'] == UPLOAD_ERR_OK) {
-            $file_extension = pathinfo($_FILES['guardian_id_verification']['name'], PATHINFO_EXTENSION);
-            $filename = 'guardian_' . uniqid() . '_' . time() . '.' . $file_extension;
-            $destination = 'uploads/guardian_ids/' . $filename;
+            if (!file_exists($ids_dir)) {
+                mkdir($ids_dir, 0777, true);
+            }
+            if (!file_exists($guardian_ids_dir)) {
+                mkdir($guardian_ids_dir, 0777, true);
+            }
             
-            $allowed_extensions = ['jpg', 'jpeg', 'png', 'pdf'];
-            if (in_array(strtolower($file_extension), $allowed_extensions) &&
-                $_FILES['guardian_id_verification']['size'] <= 5 * 1024 * 1024) {
+            // Determine which file input to check based on user type
+            if ($is_minor) {
+                // For minors: Check for school_id_verification
+                $file_input_name = 'school_id_verification';
+            } else {
+                // For adults: Check for id_verification
+                $file_input_name = 'id_verification';
+            }
+            
+            // Check if file was uploaded
+            if (isset($_FILES[$file_input_name]) && $_FILES[$file_input_name]['error'] !== UPLOAD_ERR_NO_FILE) {
                 
-                if (move_uploaded_file($_FILES['guardian_id_verification']['tmp_name'], $destination)) {
-                    $guardian_id_path = $destination;
+                if ($_FILES[$file_input_name]['error'] == UPLOAD_ERR_OK) {
+                    $file_extension = pathinfo($_FILES[$file_input_name]['name'], PATHINFO_EXTENSION);
+                    $filename = uniqid() . '_' . time() . '.' . $file_extension;
+                    $destination = 'uploads/ids/' . $filename;
+                    
+                    $allowed_extensions = ['jpg', 'jpeg', 'png', 'pdf'];
+                    if (in_array(strtolower($file_extension), $allowed_extensions) &&
+                        $_FILES[$file_input_name]['size'] <= 5 * 1024 * 1024) {
+                        
+                        if (move_uploaded_file($_FILES[$file_input_name]['tmp_name'], $destination)) {
+                            $id_verification_path = $destination;
+                        } else {
+                            $error = "Failed to upload ID. Please try again.";
+                        }
+                    } else {
+                        $error = "Invalid file type or size. Only JPG, PNG, PDF up to 5MB are allowed.";
+                    }
                 } else {
-                    $error = "Failed to upload guardian's ID. Please try again.";
+                    // Check what the actual error is
+                    switch ($_FILES[$file_input_name]['error']) {
+                        case UPLOAD_ERR_INI_SIZE:
+                        case UPLOAD_ERR_FORM_SIZE:
+                            $error = "File is too large. Maximum size is 5MB.";
+                            break;
+                        case UPLOAD_ERR_PARTIAL:
+                            $error = "File was only partially uploaded.";
+                            break;
+                        case UPLOAD_ERR_NO_TMP_DIR:
+                            $error = "Missing temporary folder.";
+                            break;
+                        case UPLOAD_ERR_CANT_WRITE:
+                            $error = "Failed to write file to disk.";
+                            break;
+                        case UPLOAD_ERR_EXTENSION:
+                            $error = "A PHP extension stopped the file upload.";
+                            break;
+                        default:
+                            $error = "Unknown upload error (Error code: " . $_FILES[$file_input_name]['error'] . ").";
+                            break;
+                    }
                 }
             } else {
-                $error = "Invalid file type or size for guardian's ID. Only JPG, PNG, PDF up to 5MB are allowed.";
+                $error = $is_minor ? "School ID upload is required for minors." : "Barangay ID upload is required for adults.";
             }
-        } else {
-            switch ($_FILES['guardian_id_verification']['error']) {
-                case UPLOAD_ERR_INI_SIZE:
-                case UPLOAD_ERR_FORM_SIZE:
-                    $error = "Guardian's file is too large. Maximum size is 5MB.";
-                    break;
-                case UPLOAD_ERR_PARTIAL:
-                    $error = "Guardian's file was only partially uploaded.";
-                    break;
-                default:
-                    $error = "Error uploading guardian's ID. Please try again.";
-                    break;
+            
+            // Upload guardian's barangay ID for minors (only if first upload succeeded)
+            if (empty($error) && $is_minor) {
+                if (isset($_FILES['guardian_id_verification']) && $_FILES['guardian_id_verification']['error'] !== UPLOAD_ERR_NO_FILE) {
+                    
+                    if ($_FILES['guardian_id_verification']['error'] == UPLOAD_ERR_OK) {
+                        $file_extension = pathinfo($_FILES['guardian_id_verification']['name'], PATHINFO_EXTENSION);
+                        $filename = 'guardian_' . uniqid() . '_' . time() . '.' . $file_extension;
+                        $destination = 'uploads/guardian_ids/' . $filename;
+                        
+                        $allowed_extensions = ['jpg', 'jpeg', 'png', 'pdf'];
+                        if (in_array(strtolower($file_extension), $allowed_extensions) &&
+                            $_FILES['guardian_id_verification']['size'] <= 5 * 1024 * 1024) {
+                            
+                            if (move_uploaded_file($_FILES['guardian_id_verification']['tmp_name'], $destination)) {
+                                $guardian_id_path = $destination;
+                            } else {
+                                $error = "Failed to upload guardian's ID. Please try again.";
+                            }
+                        } else {
+                            $error = "Invalid file type or size for guardian's ID. Only JPG, PNG, PDF up to 5MB are allowed.";
+                        }
+                    } else {
+                        switch ($_FILES['guardian_id_verification']['error']) {
+                            case UPLOAD_ERR_INI_SIZE:
+                            case UPLOAD_ERR_FORM_SIZE:
+                                $error = "Guardian's file is too large. Maximum size is 5MB.";
+                                break;
+                            case UPLOAD_ERR_PARTIAL:
+                                $error = "Guardian's file was only partially uploaded.";
+                                break;
+                            default:
+                                $error = "Error uploading guardian's ID. Please try again.";
+                                break;
+                        }
+                    }
+                } else {
+                    $error = "Guardian's Barangay ID upload is required for minors.";
+                }
             }
-        }
-    } else {
-        $error = "Guardian's Barangay ID upload is required for minors.";
-    }
-}
             
             // Extract barangay from address
             $barangay = 'Unknown';
@@ -448,7 +448,6 @@ if (empty($error) && $is_minor) {
                 color: white;
                 max-width: 350px;
             }
-        
             
             .logo-circle img {
                 width: 300px;
@@ -526,172 +525,139 @@ if (empty($error) && $is_minor) {
             }
         }
         
-        /* Mobile Layout */
-@media (max-width: 767px) {
-    body {
-        background: white;
-        padding: 0;
-    }
-    
-    .mobile-container {
-        width: 100%;
-        min-height: 100vh;
-        background: white;
-        display: flex;
-        flex-direction: column;
-    }
-    
-    .mobile-header {
-        flex-shrink: 0;
-background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 50%, #1d4ed8 100%);        padding: 40px 30px 80px;
-        text-align: center;
-        color: white;
-        position: relative;
-        overflow: hidden;
-        z-index: 1;
-    }
-    
-    /* Mobile Wave Effect - Similar to desktop */
-    .mobile-header::after {
-    content: '';
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    width: 100%;
-    height: 120px;
-    background: white;
-    z-index: 2;
-    mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 200'%3E%3Cpath fill='white' d='M0 0 C150 60 300 -40 450 20 C600 80 750 -20 900 40 C1050 100 1125 0 1200 60 L1200 200 L0 200 Z'/%3E%3C/svg%3E");
-    -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 200'%3E%3Cpath fill='white' d='M0 0 C150 60 300 -40 450 20 C600 80 750 -20 900 40 C1050 100 1125 0 1200 60 L1200 200 L0 200 Z'/%3E%3C/svg%3E");
-    mask-size: 100% 200px;
-    -webkit-mask-size: 100% 200px;
-    transform: translateY(80px);
-}
-    
-    /* Second wave layer for depth */
-    .mobile-header::before {
-        content: '';
-        position: absolute;
-        bottom: 10px;
-        left: 0;
-        width: 100%;
-        height: 140px;
-         background: rgba(255, 255, 255, 0.25);      
-        z-index: 1;
-        mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 120' preserveAspectRatio='none'%3E%3Cpath fill='%23ffffff' d='M321.39,56.44c58-10.79,114.16-30.13,172-41.86,82.39-16.72,168.19-17.73,250.45-.39C823.78,31,906.67,72,985.66,92.83c70.05,18.48,146.53,26.09,214.34,3V0H0V27.35A600.21,600.21,0,0,0,321.39,56.44Z'/%3E%3C/svg%3E");
-        -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 120' preserveAspectRatio='none'%3E%3Cpath fill='%23ffffff' d='M321.39,56.44c58-10.79,114.16-30.13,172-41.86,82.39-16.72,168.19-17.73,250.45-.39C823.78,31,906.67,72,985.66,92.83c70.05,18.48,146.53,26.09,214.34,3V0H0V27.35A600.21,600.21,0,0,0,321.39,56.44Z'/%3E%3C/svg%3E");
-        mask-size: 1200px 140px;
-        -webkit-mask-size: 1200px 140px;
-        transform: translateY(70px);
-    }
-    
-    /* Third wave layer for background effect */
-    .mobile-header .mobile-wave-back {
-        content: '';
-        position: absolute;
-        bottom: 20px;
-        left: 0;
-        width: 100%;
-        height: 160px;
-        background: rgba(0, 0, 0, 0.12);
-        z-index: 0;
-        mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 120' preserveAspectRatio='none'%3E%3Cpath fill='%23ffffff' d='M0,0V5.63C149.93,59,314.09,71.32,475.83,42.57c43-7.64,84.23-20.12,127.61-26.46,59-8.63,112.48,12.24,165.56,35.4C827.93,77.22,886,95.24,951.2,90c86.53-7,172.46-45.71,248.8-84.81V0Z'/%3E%3C/svg%3E");
-        -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 120' preserveAspectRatio='none'%3E%3Cpath fill='%23ffffff' d='M0,0V5.63C149.93,59,314.09,71.32,475.83,42.57c43-7.64,84.23-20.12,127.61-26.46,59-8.63,112.48,12.24,165.56,35.4C827.93,77.22,886,95.24,951.2,90c86.53-7,172.46-45.71,248.8-84.81V0Z'/%3E%3C/svg%3E");
-        mask-size: 1200px 160px;
-        -webkit-mask-size: 1200px 160px;
-        transform: translateY(60px);
-    }
-    
-    .mobile-logo-circle {
-        width: 80px;
-        height: 80px;
-        background: rgba(255, 255, 255, 0.15);
-        backdrop-filter: blur(10px);
-        border-radius: 50%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        margin: 0 auto 20px;
-        border: 2px solid rgba(255, 255, 255, 0.25);
-        position: relative;
-        z-index: 3;
-    }
-    
-    .mobile-logo-circle img {
-        width: 50px;
-        height: 50px;
-        object-fit: contain;
-    }
-    
-    .mobile-header h1 {
-        font-size: 24px;
-        font-weight: 700;
-        margin-bottom: 5px;
-        position: relative;
-        z-index: 3;
-    }
-    
-    .mobile-header p {
-        font-size: 16px;
-        opacity: 0.9;
-        position: relative;
-        z-index: 3;
-        margin-bottom: 20px;
-    }
-    
-    .mobile-features {
-         display: flex;
-    justify-content: center;
-    gap: 10px;
-    flex-wrap: wrap;
-    margin-top: 20px;
-    position: relative;
-    z-index: 4;
-    }
-    
-    .mobile-feature {
-     display: flex;
-    align-items: center;
-    background: rgba(255, 255, 255, 0.1);
-    padding: 8px 12px;
-    border-radius: 20px;
-    font-size: 12px;
-    backdrop-filter: blur(10px);
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    }
-    
-    .mobile-feature i {
-       margin-right: 5px;
-    font-size: 10px;
-    }
-    
-    .mobile-form-container {
-        flex: 1;
-        padding: 40px 20px;
-        display: flex;
-        flex-direction: column;
-        position: relative;
-        z-index: 3;
-        background: white;
-    }
-    
-    .mobile-form-header {
-        text-align: center;
-        margin-bottom: 30px;
-    }
-    
-    .mobile-form-header h2 {
-        font-size: 28px;
-        font-weight: 700;
-        color: #2d3748;
-        margin-bottom: 10px;
-    }
-    
-    .mobile-form-header p {
-        color: #718096;
-        font-size: 15px;
-    }
-}
+        /* Mobile Layout - UPDATED TO MATCH login.php */
+        @media (max-width: 767px) {
+            body {
+                background: white;
+                padding: 0;
+            }
+            
+            .mobile-container {
+                width: 100%;
+                min-height: 100vh;
+                background: white;
+                display: flex;
+                flex-direction: column;
+            }
+            
+            .mobile-header {
+                flex-shrink: 0;
+                background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 50%, #1d4ed8 100%);
+                padding: 50px 30px 100px;
+                text-align: center;
+                color: white;
+                position: relative;
+                overflow: hidden;
+                z-index: 1;
+            }
+            
+            /* Wave container - matching login.php */
+            .wave-separator-index {
+                position: absolute;
+                bottom: 0;
+                left: 0;
+                width: 100%;
+                height: 80px;
+                z-index: 2;
+                pointer-events: none;
+            }
+            
+            .wave-separator-index svg {
+                position: absolute;
+                bottom: 0;
+                left: 0;
+                width: 100%;
+                height: 80px;
+                display: block;
+            }
+            
+            /* UPDATED: Larger logo without circle, with white shadow - matching login.php */
+            .mobile-logo-circle {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                margin: 0 auto 20px;
+                position: relative;
+                z-index: 3;
+                background: transparent;
+                border: none;
+                border-radius: 0;
+                backdrop-filter: none;
+                width: 100%;
+                max-width: 300px;
+                height: auto;
+                aspect-ratio: 1;
+            }
+            
+            .mobile-logo-circle img {
+                width: 150px;
+                height: 150px;
+                max-width: 100%;
+                object-fit: contain;
+                filter: drop-shadow(0 0 20px rgba(255, 255, 255, 0.8))
+                       drop-shadow(0 0 40px rgba(255, 255, 255, 0.6));
+            }
+            
+            .mobile-logo-circle img:hover {
+                filter: drop-shadow(0 0 35px rgba(255,255,255,1))
+                       drop-shadow(0 0 70px rgba(255,255,255,0.8))
+                       drop-shadow(0 0 120px rgba(255,255,255,0.6));
+            }
+            
+            .mobile-header h1 {
+                font-size: 26px;
+                font-weight: 700;
+                margin-bottom: 8px;
+                position: relative;
+                z-index: 4;
+            }
+            
+            .mobile-header p {
+                font-size: 17px;
+                opacity: 0.9;
+                position: relative;
+                z-index: 4;
+                margin-bottom: 20px;
+            }
+            
+            /* Adjust the form container */
+            .mobile-form-container {
+                flex: 1;
+                padding: 40px 30px;
+                display: flex;
+                flex-direction: column;
+                background: white;
+                position: relative;
+                z-index: 1;
+                margin-top: 0;
+                padding-top: 20px;
+                border-radius: 30px 30px 0 0;
+                box-shadow: 0 -5px 20px rgba(0, 0, 0, 0.05);
+            }
+            
+            .mobile-form-header {
+                text-align: center;
+                margin-bottom: 30px;
+            }
+            
+            .mobile-form-header h2 {
+                font-size: 28px;
+                font-weight: 700;
+                color: #2d3748;
+                margin-bottom: 10px;
+            }
+            
+            .mobile-form-header p {
+                color: #718096;
+                font-size: 15px;
+            }
+            
+            /* Remove mobile-features styles */
+            .mobile-features,
+            .mobile-feature {
+                display: none;
+            }
+        }
         
         /* Common Form Styles */
         .form-group {
@@ -913,53 +879,54 @@ background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 50%, #1d4ed8 100%);     
         }
         
         .back-home {
-                position: absolute;
-                top: 30px;
-                left: 30px;
-                color: white;
-                text-decoration: none;
-                font-size: 24px;
-                display: flex;
-                align-items: center;
-                z-index: 10;
-                padding: 12px 16px;
-                background: rgba(255, 255, 255, 0.15);
-                border-radius: 12px;
-                backdrop-filter: blur(10px);
-                border: 1px solid rgba(255, 255, 255, 0.2);
-                transition: all 0.3s ease;
-                width: auto;
-                min-width: 60px;
-                height: 50px;
+            position: absolute;
+            top: 30px;
+            left: 30px;
+            color: white;
+            text-decoration: none;
+            font-size: 24px;
+            display: flex;
+            align-items: center;
+            z-index: 10;
+            padding: 12px 16px;
+            background: rgba(255, 255, 255, 0.15);
+            border-radius: 12px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            transition: all 0.3s ease;
+            width: auto;
+            min-width: 60px;
+            height: 50px;
         }
         
         .back-home:hover {
-                background: rgba(255, 255, 255, 0.25);
-                transform: translateX(-5px);
-                box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+            background: rgba(255, 255, 255, 0.25);
+            transform: translateX(-5px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
         }
         
         .back-home i {
-                margin-right: 10px;
-                font-size: 22px;
-                width: 24px;
+            margin-right: 10px;
+            font-size: 22px;
+            width: 24px;
         }
         
         /* Responsive adjustments */
         @media (max-width: 480px) {
             .mobile-header {
                 padding: 30px 20px 80px;
-                
             }
             
             .mobile-logo-circle {
-                width: 70px;
-                height: 70px;
+                width: 90px;
+                height: 90px;
             }
             
             .mobile-logo-circle img {
-                width: 45px;
-                height: 45px;
+                width: 70px;
+                height: 70px;
+                filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.5))
+                       drop-shadow(0 0 15px rgba(255, 255, 255, 0.3));
             }
             
             .mobile-header h1 {
@@ -1112,11 +1079,12 @@ background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 50%, #1d4ed8 100%);     
     <div class="register-container hidden md:flex">
         <div class="left-section">
             <a href="index.php" class="back-home">
-            <i class="fas fa-long-arrow-alt-left"></i>            </a>
+                <i class="fas fa-long-arrow-alt-left"></i>
+            </a>
             
             <div class="logo-container">
                 <div class="logo-circle">
-                    <img src="images/10213.png">
+                    <img src="images/10213.png" alt="LEIR Logo">
                 </div>                
             </div>
         </div>
@@ -1463,39 +1431,48 @@ background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 50%, #1d4ed8 100%);     
                         <div class="error-message" id="guardian_id_verification_error"></div>
                     </div>
                 </div>
-                                
-                     <div class="terms-checkbox">
+                
+                <div class="terms-checkbox">
                     <input type="checkbox" id="terms" name="terms" required>
-                                <label for="terms">
-                                        I agree to the <a href="#" style="color: #1a4f8c;">Terms of Service</a> and 
-                                        <a href="#" style="color: #1a4f8c;">Privacy Policy</a> of Law Enforcement Incident Reporting System.
-                                        I understand that my account needs to be verified before I can access all features.
-                                    </label>
-                                </div>
-                                <div class="error-message" id="terms_error"></div>
-                                
-                                <button type="submit" class="btn-submit" id="submitButton">
-                                    <i class="fas fa-user-plus mr-2"></i>Sign Up
-                                </button>
-                                
-                                <div class="login-link">
-                                    Already have an account? 
-                                    <a href="login.php">Sign in here</a>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
-    
-    <div class="mobile-container md:hidden">
-    <div class="mobile-header">
-        <!-- Add the third wave layer -->
-        <div class="mobile-wave-back"></div>
-        
-        <div class="mobile-logo-circle">
-            <img src="images/10213.png">
+                    <label for="terms">
+                        I agree to the <a href="#" style="color: #1a4f8c;">Terms of Service</a> and 
+                        <a href="#" style="color: #1a4f8c;">Privacy Policy</a> of Law Enforcement Incident Reporting System.
+                        I understand that my account needs to be verified before I can access all features.
+                    </label>
+                </div>
+                <div class="error-message" id="terms_error"></div>
+                
+                <button type="submit" class="btn-submit" id="submitButton">
+                    <i class="fas fa-user-plus mr-2"></i>Sign Up
+                </button>
+                
+                <div class="login-link">
+                    Already have an account? 
+                    <a href="login.php">Sign in here</a>
+                </div>
+            </form>
         </div>
     </div>
     
+    <!-- MOBILE VIEW - UPDATED TO MATCH login.php -->
+    <div class="mobile-container md:hidden">
+        <div class="mobile-header">
+            <!-- Updated logo container -->
+            <div class="mobile-logo-circle">
+                <img src="images/10213.png" alt="LEIR Logo">
+            </div>
+            
+            <h1>Law Enforcement</h1>
+            <p>Incident Reporting System</p>
+            
+            <!-- Add the wave separator from login.php -->
+            <div class="wave-separator-index">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 100" preserveAspectRatio="none">
+                    <path fill="white" fill-opacity="1" d="M0,80L48,75C96,70,192,60,288,55C384,50,480,50,576,55C672,60,768,70,864,75C960,80,1056,80,1152,75C1248,70,1344,60,1392,55L1440,50L1440,100L1392,100C1344,100,1248,100,1152,100C1056,100,960,100,864,100C768,100,672,100,576,100C480,100,384,100,288,100C192,100,96,100,48,100L0,100Z"></path>
+                </svg>
+            </div>
+        </div>
+        
         <div class="mobile-form-container">
             <div class="mobile-form-header">
                 <h2>Sign up</h2>
@@ -1769,72 +1746,54 @@ background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 50%, #1d4ed8 100%);     
                     <i class="fas fa-file-upload mr-2"></i>Verification & Terms
                 </h3>
                 
-     <!-- Mobile Adult ID Upload -->
-<div class="form-group" id="mobileAdultIdSection">
-    <label class="form-label required">Barangay ID Verification</label>
-    <div class="file-upload-area" id="mobileFileUploadArea">
-        <i class="fas fa-id-card"></i>
-        <p style="font-weight: 500; margin: 10px 0;">Tap to upload your Barangay ID</p>
-        <p class="form-help">JPG, PNG or PDF (Max 5MB)</p>
-        <input type="file" id="mobile_id_verification" name="id_verification" 
-               accept=".jpg,.jpeg,.png,.pdf" class="hidden">
-    </div>
-    <div class="file-preview" id="mobileFilePreview">
-        <p style="font-weight: 500; color: #38a169;">
-            <i class="fas fa-check-circle mr-2"></i>
-            <span id="mobileFileName"></span> uploaded successfully
-        </p>
-    </div>
-    <div class="error-message" id="mobile_id_verification_error"></div>
-</div>
+                <!-- Mobile Adult ID Upload -->
+                <div class="form-group" id="mobileAdultIdSection">
+                    <label class="form-label required">Barangay ID Verification</label>
+                    <div class="file-upload-area" id="mobileFileUploadArea">
+                        <i class="fas fa-id-card"></i>
+                        <p style="font-weight: 500; margin: 10px 0;">Tap to upload your Barangay ID</p>
+                        <p class="form-help">JPG, PNG or PDF (Max 5MB)</p>
+                        <input type="file" id="mobile_id_verification" name="id_verification" 
+                               accept=".jpg,.jpeg,.png,.pdf" class="hidden">
+                    </div>
+                    <div class="file-preview" id="mobileFilePreview">
+                        <p style="font-weight: 500; color: #38a169;">
+                            <i class="fas fa-check-circle mr-2"></i>
+                            <span id="mobileFileName"></span> uploaded successfully
+                        </p>
+                    </div>
+                    <div class="error-message" id="mobile_id_verification_error"></div>
+                </div>
 
-<!-- Mobile Minor ID Uploads -->
-<div class="minor-section" id="mobileMinorIdSection">
-    <div class="form-group">
-        <label class="form-label required">School ID Verification</label>
-        <div class="file-upload-area" id="mobileSchoolFileUploadArea">
-            <i class="fas fa-graduation-cap"></i>
-            <p style="font-weight: 500; margin: 10px 0;">Tap to upload your School ID</p>
-            <p class="form-help">JPG, PNG or PDF (Max 5MB)</p>
-            <input type="file" id="mobile_school_id_verification" name="school_id_verification" 
-                   accept=".jpg,.jpeg,.png,.pdf" class="hidden">
-        </div>
-        <div class="file-preview" id="mobileSchoolFilePreview">
-            <p style="font-weight: 500; color: #38a169;">
-                <i class="fas fa-check-circle mr-2"></i>
-                <span id="mobileSchoolFileName"></span> uploaded successfully
-            </p>
-        </div>
-        <div class="error-message" id="mobile_school_id_verification_error"></div>
-    </div>
-    
-    <div class="form-group">
-        <label class="form-label required">Guardian's Barangay ID Verification</label>
-        <div class="file-upload-area" id="mobileGuardianFileUploadArea">
-            <i class="fas fa-id-card"></i>
-            <p style="font-weight: 500; margin: 10px 0;">Tap to upload Guardian's Barangay ID</p>
-            <p class="form-help">JPG, PNG or PDF (Max 5MB)</p>
-            <input type="file" id="mobile_guardian_id_verification" name="guardian_id_verification" 
-                   accept=".jpg,.jpeg,.png,.pdf" class="hidden">
-        </div>
-        <div class="file-preview" id="mobileGuardianFilePreview">
-            <p style="font-weight: 500; color: #38a169;">
-                <i class="fas fa-check-circle mr-2"></i>
-                <span id="mobileGuardianFileName"></span> uploaded successfully
-            </p>
-        </div>
-        <div class="error-message" id="mobile_guardian_id_verification_error"></div>
-    </div>
-</div>
- <div class="form-group">
-        <label class="form-label required">Guardian's Barangay ID Verification</label>
-        <div class="file-upload-area" id="mobileGuardianFileUploadArea">
-            <i class="fas fa-id-card"></i>
-            <p style="font-weight: 500; margin: 10px 0;">Tap to upload Guardian's Barangay ID</p>
-            <p class="form-help">JPG, PNG or PDF (Max 5MB)</p>
-            <input type="file" id="mobile_guardian_id_verification" name="guardian_id_verification" 
-                   accept=".jpg,.jpeg,.png,.pdf" class="hidden" required>
-        </div>
+                <!-- Mobile Minor ID Uploads -->
+                <div class="minor-section" id="mobileMinorIdSection">
+                    <div class="form-group">
+                        <label class="form-label required">School ID Verification</label>
+                        <div class="file-upload-area" id="mobileSchoolFileUploadArea">
+                            <i class="fas fa-graduation-cap"></i>
+                            <p style="font-weight: 500; margin: 10px 0;">Tap to upload your School ID</p>
+                            <p class="form-help">JPG, PNG or PDF (Max 5MB)</p>
+                            <input type="file" id="mobile_school_id_verification" name="school_id_verification" 
+                                   accept=".jpg,.jpeg,.png,.pdf" class="hidden">
+                        </div>
+                        <div class="file-preview" id="mobileSchoolFilePreview">
+                            <p style="font-weight: 500; color: #38a169;">
+                                <i class="fas fa-check-circle mr-2"></i>
+                                <span id="mobileSchoolFileName"></span> uploaded successfully
+                            </p>
+                        </div>
+                        <div class="error-message" id="mobile_school_id_verification_error"></div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label required">Guardian's Barangay ID Verification</label>
+                        <div class="file-upload-area" id="mobileGuardianFileUploadArea">
+                            <i class="fas fa-id-card"></i>
+                            <p style="font-weight: 500; margin: 10px 0;">Tap to upload Guardian's Barangay ID</p>
+                            <p class="form-help">JPG, PNG or PDF (Max 5MB)</p>
+                            <input type="file" id="mobile_guardian_id_verification" name="guardian_id_verification" 
+                                   accept=".jpg,.jpeg,.png,.pdf" class="hidden">
+                        </div>
                         <div class="file-preview" id="mobileGuardianFilePreview">
                             <p style="font-weight: 500; color: #38a169;">
                                 <i class="fas fa-check-circle mr-2"></i>
@@ -2100,7 +2059,8 @@ background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 50%, #1d4ed8 100%);     
         setupFileUpload('mobileFileUploadArea', 'mobile_id_verification', 'mobileFilePreview', 'mobileFileName', 'mobile_id_verification_error');
         setupFileUpload('mobileSchoolFileUploadArea', 'mobile_school_id_verification', 'mobileSchoolFilePreview', 'mobileSchoolFileName', 'mobile_school_id_verification_error');
         setupFileUpload('mobileGuardianFileUploadArea', 'mobile_guardian_id_verification', 'mobileGuardianFilePreview', 'mobileGuardianFileName', 'mobile_guardian_id_verification_error');
-                // Real-time validation
+        
+        // Real-time validation
         function validateField(fieldId, errorId, validationFn) {
             const field = document.getElementById(fieldId);
             if (!field) return;
