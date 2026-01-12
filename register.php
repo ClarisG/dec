@@ -16,6 +16,7 @@ if (isset($_SESSION['user_id'])) {
 
 // Include database configuration
 require_once 'config/database.php';
+require_once 'config/email_functions.php';
 
 $error = '';
 $success = '';
@@ -262,12 +263,12 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                         first_name, middle_name, last_name, suffix, sex, birthday, age,
                         permanent_address, contact_number, emergency_contact, emergency_number,
                         id_verification_path, email, username, password, role, barangay, status,
-                        is_active, pin_code, created_at, updated_at, user_type
+                        is_active, pin_code, created_at, updated_at, user_type, email_verified
                     ) VALUES (
                         :first_name, :middle_name, :last_name, :suffix, :sex, :birthday, :age,
                         :permanent_address, :contact_number, :emergency_contact, :emergency_number,
-                        :id_verification_path, :email, :username, :password, 'citizen', :barangay, 'active',
-                        1, NULL, NOW(), NOW(), 'citizen'
+                        :id_verification_path, :email, :username, :password, 'citizen', :barangay, 'pending',
+                        0, NULL, NOW(), NOW(), 'citizen', 0
                     )";
                     
                     $insert_stmt = $conn->prepare($insert_query);
@@ -293,6 +294,19 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     if ($insert_stmt->execute()) {
                         $user_id = $conn->lastInsertId();
                         
+                        // Generate verification token
+                        $verification_token = bin2hex(random_bytes(32));
+                        $verification_expiry = date('Y-m-d H:i:s', strtotime('+24 hours'));
+                        
+                        // Store verification token
+                        $update_token_query = "UPDATE users SET verification_token = :token, 
+                                              verification_expiry = :expiry WHERE id = :id";
+                        $update_stmt = $conn->prepare($update_token_query);
+                        $update_stmt->bindParam(':token', $verification_token);
+                        $update_stmt->bindParam(':expiry', $verification_expiry);
+                        $update_stmt->bindParam(':id', $user_id);
+                        $update_stmt->execute();
+                        
                         // Insert citizen details (ONLY for citizen users)
                         $citizen_query = "INSERT INTO user_citizen_details (
                             user_id, guardian_name, guardian_contact, id_type, 
@@ -311,8 +325,17 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                         $citizen_stmt->bindParam(':guardian_id_upload_path', $guardian_id_path);
                         
                         if ($citizen_stmt->execute()) {
+                            // Send verification email
+                            $verification_link = BASE_URL . "/verify_email.php?token=" . $verification_token;
+                            $email_sent = sendRegistrationEmail($email, $first_name . ' ' . $last_name, $verification_link);
+                            
                             $conn->commit();
-                            $success = "Registration successful! You can now login with your credentials.";
+                            
+                            if ($email_sent) {
+                                $success = "Registration successful! A verification email has been sent to your email address. Please verify your email before logging in.";
+                            } else {
+                                $success = "Registration successful! Please check your email for verification instructions. If you don't see it, check your spam folder.";
+                            }
                             $_POST = array(); // Clear form data
                         } else {
                             $conn->rollBack();
@@ -1067,6 +1090,33 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             margin-right: 10px;
             font-size: 18px;
         }
+        
+        /* Email verification notice */
+        .verification-notice {
+            background: #e0f2fe;
+            border: 2px solid #38bdf8;
+            border-radius: 12px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        
+        .verification-notice h4 {
+            color: #0369a1;
+            font-size: 18px;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+        }
+        
+        .verification-notice h4 i {
+            margin-right: 10px;
+        }
+        
+        .verification-notice p {
+            color: #0c4a6e;
+            font-size: 14px;
+            line-height: 1.5;
+        }
     </style>
 </head>
 <body>
@@ -1105,7 +1155,14 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 <div class="alert alert-success">
                     <i class="fas fa-check-circle"></i>
                     <?php echo htmlspecialchars($success); ?>
-                    <p style="margin-top: 10px;"><a href="login.php" style="font-weight: 600; color: #1a4f8c;">Click here to login</a></p>
+                    <div class="verification-notice" style="margin-top: 15px;">
+                        <h4><i class="fas fa-envelope"></i> Email Verification Required</h4>
+                        <p>Please check your email and click the verification link to activate your account. You won't be able to log in until you verify your email.</p>
+                        <p style="margin-top: 10px; font-size: 13px;">
+                            <strong>Note:</strong> If you don't see the email, check your spam folder.
+                        </p>
+                    </div>
+                    <p style="margin-top: 15px;"><a href="login.php" style="font-weight: 600; color: #1a4f8c;">Go to Login</a> | <a href="resend_verification.php" style="font-weight: 600; color: #dc2626; margin-left: 15px;">Resend Verification Email</a></p>
                 </div>
             <?php endif; ?>
             
@@ -1450,6 +1507,11 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     Already have an account? 
                     <a href="login.php">Sign in here</a>
                 </div>
+                
+                <div class="login-link" style="margin-top: 10px;">
+                    Forgot password? 
+                    <a href="forgot_password.php">Reset it here</a>
+                </div>
             </form>
         </div>
     </div>
@@ -1489,7 +1551,14 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 <div class="alert alert-success">
                     <i class="fas fa-check-circle"></i>
                     <?php echo htmlspecialchars($success); ?>
-                    <p style="margin-top: 10px;"><a href="login.php" style="font-weight: 600; color: #1a4f8c;">Click here to login</a></p>
+                    <div class="verification-notice" style="margin-top: 15px;">
+                        <h4><i class="fas fa-envelope"></i> Email Verification Required</h4>
+                        <p>Please check your email and click the verification link to activate your account. You won't be able to log in until you verify your email.</p>
+                        <p style="margin-top: 10px; font-size: 13px;">
+                            <strong>Note:</strong> If you don't see the email, check your spam folder.
+                        </p>
+                    </div>
+                    <p style="margin-top: 15px;"><a href="login.php" style="font-weight: 600; color: #1a4f8c;">Go to Login</a> | <a href="resend_verification.php" style="font-weight: 600; color: #dc2626; margin-left: 15px;">Resend Verification Email</a></p>
                 </div>
             <?php endif; ?>
             
@@ -1821,6 +1890,11 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 <div class="login-link">
                     Already have an account? 
                     <a href="login.php">Sign in here</a>
+                </div>
+                
+                <div class="login-link" style="margin-top: 10px;">
+                    Forgot password? 
+                    <a href="forgot_password.php">Reset it here</a>
                 </div>
             </form>
         </div>
