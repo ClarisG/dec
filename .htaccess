@@ -21,15 +21,3 @@ Options -Indexes
 Header set X-Content-Type-Options "nosniff"
 Header set X-Frame-Options "SAMEORIGIN"
 Header set X-XSS-Protection "1; mode=block"
-
-# Protect sensitive files
-<FilesMatch "^(config|phpmailer)">
-    Order Allow,Deny
-    Deny from all
-</FilesMatch>
-
-# Protect specific config files
-<FilesMatch "\.(config|php|inc|sql)$">
-    Order Deny,Allow
-    Deny from all
-</FilesMatch>
