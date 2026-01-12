@@ -430,8 +430,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     /* Mobile Layout */
  /* Mobile Layout */
 @media (max-width: 767px) {
-    body {/* Mobile Layout */
-@media (max-width: 767px) {
     body {
         background: white;
         padding: 0;
@@ -497,19 +495,18 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     
     .mobile-logo-circle img {
         width: 150px; /* Makes it responsive to container */
-        height: 150px;
-        max-width: 100%;
-        object-fit: contain;
-        filter: drop-shadow(0 0 20px rgba(255, 255, 255, 0.8))
-            drop-shadow(0 0 40px rgba(255, 255, 255, 0.6));
+            height: 150px;
+            max-width: 100%;
+            object-fit: contain;
+            filter: drop-shadow(0 0 20px rgba(255, 255, 255, 0.8))
+                drop-shadow(0 0 40px rgba(255, 255, 255, 0.6));
     }
     .mobile-logo-circle img:hover {
     filter:
         drop-shadow(0 0 35px rgba(255,255,255,1))
         drop-shadow(0 0 70px rgba(255,255,255,0.8))
         drop-shadow(0 0 120px rgba(255,255,255,0.6));
-    }
-    
+}
     .mobile-header h1 {
         font-size: 26px; /* Slightly larger font */
         font-weight: 700;
@@ -526,70 +523,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         margin-bottom: 20px;
     }
     
-    /* Adjust the form container - REMOVED BOX-SHADOW */
-    .mobile-form-container {
-        flex: 1;
-        padding: 40px 30px;
-        display: flex;
-        flex-direction: column;
-        background: white;
-        position: relative;
-        z-index: 1;
-        margin-top: 0;
-        padding-top: 20px;
-        border-radius: 30px 30px 0 0;
-        /* box-shadow: 0 -5px 20px rgba(0, 0, 0, 0.05); REMOVED THIS LINE */
-    }
-    
-    .mobile-form-header {
-        text-align: center;
-        margin-bottom: 30px;
-    }
-    
-    .mobile-form-header h2 {
-        font-size: 28px;
-        font-weight: 700;
-        color: #2d3748;
-        margin-bottom: 10px;
-    }
-    
-    .mobile-form-header p {
-        color: #718096;
-        font-size: 15px;
-    }
-    
-    /* Adjust the form container - NO negative margin */
-    .mobile-form-container {
-        flex: 1;
-        padding: 40px 30px;
-        display: flex;
-        flex-direction: column;
-        background: white;
-        position: relative;
-        z-index: 1;
-        margin-top: 0; /* Remove negative margin */
-        padding-top: 20px; /* Reduced top padding */
-        border-radius: 30px 30px 0 0;
-        /* box-shadow: 0 -5px 20px rgba(0, 0, 0, 0.05); REMOVED THIS LINE */
-    }
-    
-    .mobile-form-header {
-        text-align: center;
-        margin-bottom: 30px;
-    }
-    
-    .mobile-form-header h2 {
-        font-size: 28px;
-        font-weight: 700;
-        color: #2d3748;
-        margin-bottom: 10px;
-    }
-    
-    .mobile-form-header p {
-        color: #718096;
-        font-size: 15px;
-    }
-}
     /* Adjust the form container */
     .mobile-form-container {
           flex: 1;
