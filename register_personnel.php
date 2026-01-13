@@ -1354,8 +1354,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 
                 <div class="login-link">
                     Already have an account? 
-                    <a href="login.php">Sign in here</a> | 
-                    <a href="register.php" style="color: #4CAF50;">Citizen Registration</a>
+                    <a href="login.php">Sign in here</a> 
                 </div>
             </form>
             
@@ -1727,8 +1726,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 
                 <div class="login-link">
                     Already have an account? 
-                    <a href="login.php">Sign in here</a> | 
-                    <a href="register.php" style="color: #4CAF50;">Citizen Registration</a>
+                    <a href="login.php">Sign in here</a>  
                 </div>
             </form>
             
