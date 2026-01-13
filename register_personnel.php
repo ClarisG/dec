@@ -910,7 +910,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         }
         
         /* Role colors - KEEP AS IS */
-        .tanod-role { background: linear-gradient(135deg, #4CAF50, #2E7D32); }
+        .tanod-role { background: white; }
         .secretary-role { background: linear-gradient(135deg, #2196F3, #0D47A1); }
         .admin-role { background: linear-gradient(135deg, #9C27B0, #4A148C); }
         .captain-role { background: linear-gradient(135deg, #F44336, #B71C1C); }
