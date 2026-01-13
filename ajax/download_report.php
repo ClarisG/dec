@@ -110,7 +110,7 @@ try {
     $logo_path = null;
     $logo_url = null;
     $possible_logo_paths = [
-        __DIR__ . '/../images/10213.png',
+        __DIR__ . './../images/10213.png',
         __DIR__ . '/../images/logo.png',
         __DIR__ . '/../images/logo.jpg',
         __DIR__ . '/../images/barangay-logo.png',

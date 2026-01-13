@@ -1,5 +1,5 @@
 <?php
-// register_personnel.php - Personnel Registration (Tanod, Secretary, Admin, Captain)
+// register_personnel.php - Personnel Registration (Tanod, Secretary, Admin, Captain, Lupon, Super Admin)
 session_start();
 
 // Check if user is already logged in
@@ -11,6 +11,8 @@ if (isset($_SESSION['user_id'])) {
         case 'secretary': header("Location: sec/secretary_dashboard.php"); exit;
         case 'captain': header("Location: captain/captain_dashboard.php"); exit;
         case 'admin': header("Location: admin/admin_dashboard.php"); exit;
+        case 'lupon': header("Location: lupon/lupon_dashboard.php"); exit;
+        case 'super_admin': header("Location: super_admin/super_admin_dashboard.php"); exit;
     }
 }
 
@@ -41,7 +43,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         $username = trim($_POST['username']);
         $password = trim($_POST['password']);
         $confirm_password = trim($_POST['confirm_password']);
-        $role = trim($_POST['role']); // This will be 'tanod', 'secretary', 'admin', or 'captain'
+        $role = trim($_POST['role']); // This will be 'tanod', 'secretary', 'admin', 'captain', 'lupon', or 'super_admin'
         $terms = isset($_POST['terms']) ? $_POST['terms'] : false;
         
         // Calculate age if not provided
@@ -97,7 +99,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         }
         
         // Validate role
-        $valid_roles = ['tanod', 'secretary', 'admin', 'captain'];
+        $valid_roles = ['tanod', 'secretary', 'admin', 'captain', 'lupon', 'super_admin'];
         if (empty($error) && !in_array($role, $valid_roles)) {
             $error = "Please select a valid role.";
         }
@@ -191,7 +193,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                             'tanod' => 'Tanod',
                             'secretary' => 'Secretary',
                             'admin' => 'Administrator',
-                            'captain' => 'Barangay Captain'
+                            'captain' => 'Barangay Captain',
+                            'lupon' => 'Lupon Member',
+                            'super_admin' => 'Super Administrator'
                         ];
                         
                         $success = "{$role_titles[$role]} registration successful! Your 4-digit Master Code is: <strong style='font-size: 24px; color: #667eea;'>{$master_code}</strong><br><br>";
@@ -912,6 +916,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         .secretary-role { background: linear-gradient(135deg, #2196F3, #0D47A1); }
         .admin-role { background: linear-gradient(135deg, #9C27B0, #4A148C); }
         .captain-role { background: linear-gradient(135deg, #F44336, #B71C1C); }
+        .lupon-role { background: linear-gradient(135deg, #FF9800, #E65100); }
+        .super-admin-role { background: linear-gradient(135deg, #607D8B, #263238); }
         
         .role-grid {
             display: grid;
@@ -1124,6 +1130,26 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                         <div class="role-info">
                             <h4>Barangay Captain</h4>
                             <p>Barangay leadership and oversight</p>
+                        </div>
+                    </div>
+                    
+                    <div class="role-option lupon-role" data-role="lupon">
+                        <div class="role-icon lupon-role">
+                            <i class="fas fa-balance-scale"></i>
+                        </div>
+                        <div class="role-info">
+                            <h4>Lupon Member</h4>
+                            <p>Conflict resolution and mediation</p>
+                        </div>
+                    </div>
+                    
+                    <div class="role-option super-admin-role" data-role="super_admin">
+                        <div class="role-icon super-admin-role">
+                            <i class="fas fa-user-shield"></i>
+                        </div>
+                        <div class="role-info">
+                            <h4>Super Administrator</h4>
+                            <p>System-wide administration and control</p>
                         </div>
                     </div>
                 </div>
@@ -1490,6 +1516,26 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                         <div class="role-info">
                             <h4>Barangay Captain</h4>
                             <p>Barangay leadership</p>
+                        </div>
+                    </div>
+                    
+                    <div class="role-option lupon-role" data-role="lupon">
+                        <div class="role-icon lupon-role">
+                            <i class="fas fa-balance-scale"></i>
+                        </div>
+                        <div class="role-info">
+                            <h4>Lupon Member</h4>
+                            <p>Conflict resolution</p>
+                        </div>
+                    </div>
+                    
+                    <div class="role-option super-admin-role" data-role="super_admin">
+                        <div class="role-icon super-admin-role">
+                            <i class="fas fa-user-shield"></i>
+                        </div>
+                        <div class="role-info">
+                            <h4>Super Administrator</h4>
+                            <p>System-wide control</p>
                         </div>
                     </div>
                 </div>
