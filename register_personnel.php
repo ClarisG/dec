@@ -278,7 +278,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             
             .left-section {
                 flex: 1;
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 50%, #1d4ed8 100%);
                 display: flex;
                 flex-direction: column;
                 justify-content: center;
