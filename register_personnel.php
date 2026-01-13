@@ -326,23 +326,21 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 max-width: 350px;
             }
             
-            .logo-circle {
-                width: 100px;
-                height: 100px;
-                background: rgba(255, 255, 255, 0.15);
-                backdrop-filter: blur(10px);
-                border-radius: 50%;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                margin: 0 auto 30px;
-                border: 2px solid rgba(255, 255, 255, 0.25);
-            }
-            
+          .logo-circle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 30px;
+    width: 100%;
+    max-width: 300px;
+}
+
             .logo-circle img {
-                width: 60px;
-                height: 60px;
+                width: 200px;
+                height: 200px;
                 object-fit: contain;
+                filter: drop-shadow(0 0 20px white)
+                        drop-shadow(0 0 40px white);
             }
             
             .logo-container h1 {
@@ -469,28 +467,32 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 -webkit-mask-size: 1200px 140px;
                 transform: translateY(70px);
             }
-            
+                        
             .mobile-logo-circle {
-                width: 80px;
-                height: 80px;
-                background: rgba(255, 255, 255, 0.15);
-                backdrop-filter: blur(10px);
-                border-radius: 50%;
                 display: flex;
                 align-items: center;
                 justify-content: center;
                 margin: 0 auto 20px;
-                border: 2px solid rgba(255, 255, 255, 0.25);
                 position: relative;
                 z-index: 3;
+                background: transparent;
+                border: none;
+                border-radius: 0;
+                backdrop-filter: none;
+                width: 100%;
+                max-width: 200px;
+                height: auto;
+                aspect-ratio: 1;
             }
-            
+
             .mobile-logo-circle img {
-                width: 50px;
-                height: 50px;
+                width: 120px;
+                height: 120px;
+                max-width: 100%;
                 object-fit: contain;
+                filter: drop-shadow(0 0 20px rgba(255, 255, 255, 0.8))
+                    drop-shadow(0 0 40px rgba(255, 255, 255, 0.6));
             }
-            
             .mobile-header h1 {
                 font-size: 24px;
                 font-weight: 700;
@@ -993,12 +995,12 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     <div class="register-container hidden md:flex">
         <div class="left-section">
             <a href="index.php" class="back-home">
-                <i class="fas fa-arrow-left"></i>Back to Home
+            <i class="fas fa-long-arrow-alt-left"></i>
             </a>
             
             <div class="logo-container">
                 <div class="logo-circle">
-                    <img src="images/10213.png">
+             <img src="../dec/images/10213.png" alt="LEIR Logo">
                 </div>
             </div>
         </div>
@@ -1370,7 +1372,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     <div class="mobile-container md:hidden">
         <div class="mobile-header">
             <div class="mobile-logo-circle">
-                <img src="../dec/images/10213.png" alt="BLUEBACK Logo">
+            <img src="../dec/images/10213.png" alt="LEIR Logo">
             </div>
             <h1>Personnel Registration</h1>
             <p>Register as Barangay Personnel</p>
