@@ -337,7 +337,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
             .logo-circle img {
                 width: 300px;
-                height: 3cqb;
+                height: 300px;
                 object-fit: contain;
                 filter: drop-shadow(0 0 20px white)
                         drop-shadow(0 0 40px white);
@@ -412,177 +412,155 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         }
         
         /* Mobile Layout */
-     <!-- Mobile Layout -->
-@media (max-width: 767px) {
-    body {
-        background: white;
-        padding: 0;
-    }
-    
-    .mobile-container {
-        width: 100%;
-        min-height: 100vh;
-        background: white;
-        display: flex;
-        flex-direction: column;
-    }
-    
-    .mobile-header {
-        flex-shrink: 0;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        padding: 50px 30px 100px;
-        text-align: center;
-        color: white;
-        position: relative;
-        overflow: hidden;
-        z-index: 1;
-    }
-    
-    /* Wave container - matching register.php */
-    .wave-separator-index {
-        position: absolute;
-        bottom: 0;
-        left: 0;
-        width: 100%;
-        height: 80px;
-        z-index: 2;
-        pointer-events: none;
-    }
-    
-    .wave-separator-index svg {
-        position: absolute;
-        bottom: 0;
-        left: 0;
-        width: 100%;
-        height: 80px;
-        display: block;
-    }
-    
-    /* UPDATED: Larger logo without circle, with white shadow - matching register.php */
-    .mobile-logo-circle {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        margin: 0 auto 20px;
-        position: relative;
-        z-index: 3;
-        background: transparent;
-        border: none;
-        border-radius: 0;
-        backdrop-filter: none;
-        width: 100%;
-        max-width: 300px;
-        height: auto;
-        aspect-ratio: 1;
-    }
-    
-    .mobile-logo-circle img {
-        width: 150px;
-        height: 150px;
-        max-width: 100%;
-        object-fit: contain;
-        filter: drop-shadow(0 0 20px rgba(255, 255, 255, 0.8))
-               drop-shadow(0 0 40px rgba(255, 255, 255, 0.6));
-    }
-    
-    .mobile-logo-circle img:hover {
-        filter: drop-shadow(0 0 35px rgba(255,255,255,1))
-               drop-shadow(0 0 70px rgba(255,255,255,0.8))
-               drop-shadow(0 0 120px rgba(255, 255, 255, 0.6));
-    }
-    
-    .mobile-header h1 {
-        font-size: 26px;
-        font-weight: 700;
-        margin-bottom: 8px;
-        position: relative;
-        z-index: 4;
-    }
-    
-    .mobile-header p {
-        font-size: 17px;
-        opacity: 0.9;
-        position: relative;
-        z-index: 4;
-        margin-bottom: 20px;
-    }
-    
-    /* Remove mobile-features styles */
-    .mobile-features,
-    .mobile-feature {
-        display: none;
-    }
-    
-    .mobile-form-container {
-        flex: 1;
-        padding: 40px 30px;
-        display: flex;
-        flex-direction: column;
-        background: white;
-        position: relative;
-        z-index: 1;
-        margin-top: 0;
-        padding-top: 20px;
-        border-radius: 30px 30px 0 0;
-        box-shadow: 0 -5px 20px rgba(0, 0, 0, 0.05);
-    }
-    
-    .mobile-form-header {
-        text-align: center;
-        margin-bottom: 30px;
-    }
-    
-    .mobile-form-header h2 {
-        font-size: 28px;
-        font-weight: 700;
-        color: #2d3748;
-        margin-bottom: 10px;
-    }
-    
-    .mobile-form-header p {
-        color: #718096;
-        font-size: 15px;
-    }
-}
+        @media (max-width: 767px) {
+            body {
+                background: white;
+                padding: 0;
+            }
+            
+            .mobile-container {
+                width: 100%;
+                min-height: 100vh;
+                background: white;
+                display: flex;
+                flex-direction: column;
+            }
+            
+            .mobile-header {
+                flex-shrink: 0;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                padding: 40px 30px 80px;
+                text-align: center;
+                color: white;
+                position: relative;
+                overflow: hidden;
+                z-index: 1;
+            }
+            
+            .mobile-header::after {
+                content: '';
+                position: absolute;
+                bottom: 0;
+                left: 0;
+                width: 100%;
+                height: 120px;
+                background: white;
+                z-index: 2;
+                mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 200'%3E%3Cpath fill='white' d='M0 0 C150 60 300 -40 450 20 C600 80 750 -20 900 40 C1050 100 1125 0 1200 60 L1200 200 L0 200 Z'/%3E%3C/svg%3E");
+                -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 200'%3E%3Cpath fill='white' d='M0 0 C150 60 300 -40 450 20 C600 80 750 -20 900 40 C1050 100 1125 0 1200 60 L1200 200 L0 200 Z'/%3E%3C/svg%3E");
+                mask-size: 100% 200px;
+                transform: translateY(80px);
+            }
+            
+            .mobile-header::before {
+                content: '';
+                position: absolute;
+                bottom: 10px;
+                left: 0;
+                width: 100%;
+                height: 140px;
+                background: rgba(255, 255, 255, 0.25);
+                z-index: 1;
+                mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 120' preserveAspectRatio='none'%3E%3Cpath fill='%23ffffff' d='M321.39,56.44c58-10.79,114.16-30.13,172-41.86,82.39-16.72,168.19-17.73,250.45-.39C823.78,31,906.67,72,985.66,92.83c70.05,18.48,146.53,26.09,214.34,3V0H0V27.35A600.21,600.21,0,0,0,321.39,56.44Z'/%3E%3C/svg%3E");
+                -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 120' preserveAspectRatio='none'%3E%3Cpath fill='%23ffffff' d='M321.39,56.44c58-10.79,114.16-30.13,172-41.86,82.39-16.72,168.19-17.73,250.45-.39C823.78,31,906.67,72,985.66,92.83c70.05,18.48,146.53,26.09,214.34,3V0H0V27.35A600.21,600.21,0,0,0,321.39,56.44Z'/%3E%3C/svg%3E");
+                mask-size: 1200px 140px;
+                -webkit-mask-size: 1200px 140px;
+                transform: translateY(70px);
+            }
+                        
+            .mobile-logo-circle {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                margin: 0 auto 20px;
+                position: relative;
+                z-index: 3;
+                background: transparent;
+                border: none;
+                border-radius: 0;
+                backdrop-filter: none;
+                width: 100%;
+                max-width: 200px;
+                height: auto;
+                aspect-ratio: 1;
+            }
 
-/* Responsive adjustments for mobile */
-@media (max-width: 480px) {
-    .mobile-header {
-        padding: 30px 20px 80px;
-    }
-    
-    .mobile-logo-circle {
-        width: 90px;
-        height: 90px;
-    }
-    
-    .mobile-logo-circle img {
-        width: 70px;
-        height: 70px;
-        filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.5))
-               drop-shadow(0 0 15px rgba(255, 255, 255, 0.3));
-    }
-    
-    .mobile-header h1 {
-        font-size: 22px;
-    }
-    
-    .mobile-header p {
-        font-size: 15px;
-    }
-    
-    .mobile-form-container {
-        padding: 30px 20px;
-    }
-    
-    .mobile-form-header h2 {
-        font-size: 24px;
-    }
-    
-    .mobile-form-header p {
-        font-size: 14px;
-    }
-}
+            .mobile-logo-circle img {
+                width: 120px;
+                height: 120px;
+                max-width: 100%;
+                object-fit: contain;
+                filter: drop-shadow(0 0 20px rgba(255, 255, 255, 0.8))
+                    drop-shadow(0 0 40px rgba(255, 255, 255, 0.6));
+            }
+            .mobile-header h1 {
+                font-size: 24px;
+                font-weight: 700;
+                margin-bottom: 5px;
+                position: relative;
+                z-index: 3;
+            }
+            
+            .mobile-header p {
+                font-size: 16px;
+                opacity: 0.9;
+                position: relative;
+                z-index: 3;
+                margin-bottom: 20px;
+            }
+            
+            .mobile-features {
+                display: flex;
+                justify-content: center;
+                gap: 15px;
+                flex-wrap: wrap;
+                margin-top: 20px;
+                position: relative;
+                z-index: 3;
+            }
+            
+            .mobile-feature {
+                display: flex;
+                align-items: center;
+                background: rgba(255, 255, 255, 0.1);
+                padding: 8px 12px;
+                border-radius: 20px;
+                font-size: 12px;
+                backdrop-filter: blur(10px);
+            }
+            
+            .mobile-feature i {
+                margin-right: 5px;
+                font-size: 10px;
+            }
+            
+            .mobile-form-container {
+                flex: 1;
+                padding: 40px 20px;
+                display: flex;
+                flex-direction: column;
+                position: relative;
+                z-index: 3;
+                background: white;
+            }
+            
+            .mobile-form-header {
+                text-align: center;
+                margin-bottom: 30px;
+            }
+            
+            .mobile-form-header h2 {
+                font-size: 28px;
+                font-weight: 700;
+                color: #2d3748;
+                margin-bottom: 10px;
+            }
+            
+            .mobile-form-header p {
+                color: #718096;
+                font-size: 15px;
+            }
+        }
         
         /* Common Form Styles */
         .form-group {
@@ -1398,15 +1376,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             </div>
             <h1>Personnel Registration</h1>
             <p>Register as Barangay Personnel</p>
-             <!-- Add the wave separator from register.php -->
-        <div class="wave-separator-index">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 100" preserveAspectRatio="none">
-                <path fill="white" fill-opacity="1" d="M0,80L48,75C96,70,192,60,288,55C384,50,480,50,576,55C672,60,768,70,864,75C960,80,1056,80,1152,75C1248,70,1344,60,1392,55L1440,50L1440,100L1392,100C1344,100,1248,100,1152,100C1056,100,960,100,864,100C768,100,672,100,576,100C480,100,384,100,288,100C192,100,96,100,48,100L0,100Z"></path>
-            </svg>
-        </div>
-    </div>
-    
-    <div class="mobile-form-container">
             
             <div class="mobile-features">
                 <div class="mobile-feature">
