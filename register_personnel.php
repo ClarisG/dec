@@ -198,7 +198,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                             'super_admin' => 'Super Administrator'
                         ];
                         
-                        $success = "{$role_titles[$role]} registration successful! Your 4-digit Master Code is: <strong style='font-size: 24px; color: #667eea;'>{$master_code}</strong><br><br>";
+                        $success = "{$role_titles[$role]} registration successful! Your 4-digit Master Code is: <strong style='font-size: 24px; color: #1a4f8c;'>{$master_code}</strong><br><br>";
                         $success .= "<div style='background: #f0fff4; padding: 15px; border-radius: 8px; border-left: 4px solid #38a169; margin: 15px 0;'>";
                         $success .= "<strong><i class='fas fa-exclamation-circle'></i> Important:</strong> Save this Master Code! You will need it after entering your username and password during login.";
                         $success .= "</div>";
@@ -278,7 +278,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             
             .left-section {
                 flex: 1;
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 50%, #1d4ed8 100%);
                 display: flex;
                 flex-direction: column;
                 justify-content: center;
@@ -288,6 +288,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 overflow: hidden;
             }
             
+            /* Wave Effect - Matching register.php */
             .left-section::after {
                 content: '';
                 position: absolute;
@@ -311,9 +312,23 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 bottom: 0;
                 width: 160px;
                 background: rgba(255, 255, 255, 0.25);
-                z-index: 2;
                 mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 150 1000' preserveAspectRatio='none'%3E%3Cpath fill='white' d='M0,0 C60,150 20,300 60,450 C100,600 20,750 60,900 C100,980 60,1000 0,1000 L150,1000 L150,0 Z'/%3E%3C/svg%3E");
                 -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 150 1000' preserveAspectRatio='none'%3E%3Cpath fill='white' d='M0,0 C60,150 20,300 60,450 C100,600 20,750 60,900 C100,980 60,1000 0,1000 L150,1000 L150,0 Z'/%3E%3C/svg%3E");
+                mask-size: 100% 100%;
+                -webkit-mask-size: 100% 100%;
+            }
+            
+            .left-section .wave-back {
+                content: '';
+                position: absolute;
+                top: 0;
+                right: 80px;
+                bottom: 0;
+                width: 200px;
+                background: rgba(0, 0, 0, 0.12);
+                z-index: 1;
+                mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 150 1000' preserveAspectRatio='none'%3E%3Cpath fill='white' d='M0,0 C40,180 10,350 40,550 C80,700 10,850 40,950 C80,1000 40,1000 0,1000 L150,1000 L150,0 Z'/%3E%3C/svg%3E");
+                -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 150 1000' preserveAspectRatio='none'%3E%3Cpath fill='white' d='M0,0 C40,180 10,350 40,550 C80,700 10,850 40,950 C80,1000 40,1000 0,1000 L150,1000 L150,0 Z'/%3E%3C/svg%3E");
                 mask-size: 100% 100%;
                 -webkit-mask-size: 100% 100%;
             }
@@ -326,23 +341,12 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 max-width: 350px;
             }
             
-            .logo-circle {
-                width: 100px;
-                height: 100px;
-                background: rgba(255, 255, 255, 0.15);
-                backdrop-filter: blur(10px);
-                border-radius: 50%;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                margin: 0 auto 30px;
-                border: 2px solid rgba(255, 255, 255, 0.25);
-            }
-            
             .logo-circle img {
-                width: 60px;
-                height: 60px;
+                width: 300px;
+                height: 300px;
                 object-fit: contain;
+                filter: drop-shadow(0 0 20px white)
+                        drop-shadow(0 0 40px white);
             }
             
             .logo-container h1 {
@@ -413,7 +417,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             }
         }
         
-        /* Mobile Layout */
+        /* Mobile Layout - UPDATED TO MATCH register.php */
         @media (max-width: 767px) {
             body {
                 background: white;
@@ -430,8 +434,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             
             .mobile-header {
                 flex-shrink: 0;
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                padding: 40px 30px 80px;
+                background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 50%, #1d4ed8 100%);
+                padding: 50px 30px 100px;
                 text-align: center;
                 color: white;
                 position: relative;
@@ -439,107 +443,88 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 z-index: 1;
             }
             
-            .mobile-header::after {
-                content: '';
+            /* Wave container - matching register.php */
+            .wave-separator-index {
                 position: absolute;
                 bottom: 0;
                 left: 0;
                 width: 100%;
-                height: 120px;
-                background: white;
+                height: 80px;
                 z-index: 2;
-                mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 200'%3E%3Cpath fill='white' d='M0 0 C150 60 300 -40 450 20 C600 80 750 -20 900 40 C1050 100 1125 0 1200 60 L1200 200 L0 200 Z'/%3E%3C/svg%3E");
-                -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 200'%3E%3Cpath fill='white' d='M0 0 C150 60 300 -40 450 20 C600 80 750 -20 900 40 C1050 100 1125 0 1200 60 L1200 200 L0 200 Z'/%3E%3C/svg%3E");
-                mask-size: 100% 200px;
-                transform: translateY(80px);
+                pointer-events: none;
             }
             
-            .mobile-header::before {
-                content: '';
+            .wave-separator-index svg {
                 position: absolute;
-                bottom: 10px;
+                bottom: 0;
                 left: 0;
                 width: 100%;
-                height: 140px;
-                background: rgba(255, 255, 255, 0.25);
-                z-index: 1;
-                mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 120' preserveAspectRatio='none'%3E%3Cpath fill='%23ffffff' d='M321.39,56.44c58-10.79,114.16-30.13,172-41.86,82.39-16.72,168.19-17.73,250.45-.39C823.78,31,906.67,72,985.66,92.83c70.05,18.48,146.53,26.09,214.34,3V0H0V27.35A600.21,600.21,0,0,0,321.39,56.44Z'/%3E%3C/svg%3E");
-                -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 120' preserveAspectRatio='none'%3E%3Cpath fill='%23ffffff' d='M321.39,56.44c58-10.79,114.16-30.13,172-41.86,82.39-16.72,168.19-17.73,250.45-.39C823.78,31,906.67,72,985.66,92.83c70.05,18.48,146.53,26.09,214.34,3V0H0V27.35A600.21,600.21,0,0,0,321.39,56.44Z'/%3E%3C/svg%3E");
-                mask-size: 1200px 140px;
-                -webkit-mask-size: 1200px 140px;
-                transform: translateY(70px);
+                height: 80px;
+                display: block;
             }
             
+            /* UPDATED: Larger logo without circle, with white shadow - matching register.php */
             .mobile-logo-circle {
-                width: 80px;
-                height: 80px;
-                background: rgba(255, 255, 255, 0.15);
-                backdrop-filter: blur(10px);
-                border-radius: 50%;
                 display: flex;
                 align-items: center;
                 justify-content: center;
                 margin: 0 auto 20px;
-                border: 2px solid rgba(255, 255, 255, 0.25);
                 position: relative;
                 z-index: 3;
+                background: transparent;
+                border: none;
+                border-radius: 0;
+                backdrop-filter: none;
+                width: 100%;
+                max-width: 300px;
+                height: auto;
+                aspect-ratio: 1;
             }
             
             .mobile-logo-circle img {
-                width: 50px;
-                height: 50px;
+                width: 150px;
+                height: 150px;
+                max-width: 100%;
                 object-fit: contain;
+                filter: drop-shadow(0 0 20px rgba(255, 255, 255, 0.8))
+                       drop-shadow(0 0 40px rgba(255, 255, 255, 0.6));
+            }
+            
+            .mobile-logo-circle img:hover {
+                filter: drop-shadow(0 0 35px rgba(255,255,255,1))
+                       drop-shadow(0 0 70px rgba(255,255,255,0.8))
+                       drop-shadow(0 0 120px rgba(255,255,255,0.6));
             }
             
             .mobile-header h1 {
-                font-size: 24px;
+                font-size: 26px;
                 font-weight: 700;
-                margin-bottom: 5px;
+                margin-bottom: 8px;
                 position: relative;
-                z-index: 3;
+                z-index: 4;
             }
             
             .mobile-header p {
-                font-size: 16px;
+                font-size: 17px;
                 opacity: 0.9;
                 position: relative;
-                z-index: 3;
+                z-index: 4;
                 margin-bottom: 20px;
             }
             
-            .mobile-features {
-                display: flex;
-                justify-content: center;
-                gap: 15px;
-                flex-wrap: wrap;
-                margin-top: 20px;
-                position: relative;
-                z-index: 3;
-            }
-            
-            .mobile-feature {
-                display: flex;
-                align-items: center;
-                background: rgba(255, 255, 255, 0.1);
-                padding: 8px 12px;
-                border-radius: 20px;
-                font-size: 12px;
-                backdrop-filter: blur(10px);
-            }
-            
-            .mobile-feature i {
-                margin-right: 5px;
-                font-size: 10px;
-            }
-            
+            /* Adjust the form container */
             .mobile-form-container {
                 flex: 1;
-                padding: 40px 20px;
+                padding: 40px 30px;
                 display: flex;
                 flex-direction: column;
-                position: relative;
-                z-index: 3;
                 background: white;
+                position: relative;
+                z-index: 1;
+                margin-top: 0;
+                padding-top: 20px;
+                border-radius: 30px 30px 0 0;
+                box-shadow: 0 -5px 20px rgba(0, 0, 0, 0.05);
             }
             
             .mobile-form-header {
@@ -557,6 +542,12 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             .mobile-form-header p {
                 color: #718096;
                 font-size: 15px;
+            }
+            
+            /* Remove mobile-features styles */
+            .mobile-features,
+            .mobile-feature {
+                display: none;
             }
         }
         
@@ -610,8 +601,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         
         .form-input:focus, .form-select:focus, .form-textarea:focus {
             outline: none;
-            border-color: #667eea;
-            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+            border-color: #1a4f8c;
+            box-shadow: 0 0 0 3px rgba(26, 79, 140, 0.1);
         }
         
         .form-grid {
@@ -644,8 +635,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         .btn-submit {
             width: 100%;
             padding: 16px;
-            background: linear-gradient(to right, #667eea, #764ba2);
             color: white;
+            background: linear-gradient(to right, #1e40af, #1d4ed8);
             border: none;
             border-radius: 12px;
             font-size: 16px;
@@ -657,7 +648,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         
         .btn-submit:hover {
             transform: translateY(-2px);
-            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.3);
+            background: linear-gradient(to right, #1d4ed8, #1e3a8a);
         }
         
         .btn-submit:disabled {
@@ -675,7 +666,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         }
         
         .login-link a {
-            color: #667eea;
+            color: #1a4f8c;
             text-decoration: none;
             font-weight: 600;
             margin-left: 5px;
@@ -751,27 +742,118 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         
         .back-home {
             position: absolute;
-            top: 20px;
-            left: 20px;
+            top: 30px;
+            left: 30px;
             color: white;
             text-decoration: none;
-            font-size: 14px;
+            font-size: 24px;
             display: flex;
             align-items: center;
             z-index: 10;
-            background: rgba(255, 255, 255, 0.1);
-            padding: 8px 16px;
-            border-radius: 8px;
+            padding: 12px 16px;
+            background: rgba(255, 255, 255, 0.15);
+            border-radius: 12px;
             backdrop-filter: blur(10px);
             border: 1px solid rgba(255, 255, 255, 0.2);
+            transition: all 0.3s ease;
+            width: auto;
+            min-width: 60px;
+            height: 50px;
         }
         
         .back-home:hover {
-            background: rgba(255, 255, 255, 0.2);
+            background: rgba(255, 255, 255, 0.25);
+            transform: translateX(-5px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
         }
         
         .back-home i {
-            margin-right: 8px;
+            margin-right: 10px;
+            font-size: 22px;
+            width: 24px;
+        }
+        
+        /* Responsive adjustments */
+        @media (max-width: 480px) {
+            .mobile-header {
+                padding: 30px 20px 80px;
+            }
+            
+            .mobile-logo-circle {
+                width: 90px;
+                height: 90px;
+            }
+            
+            .mobile-logo-circle img {
+                width: 70px;
+                height: 70px;
+                filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.5))
+                       drop-shadow(0 0 15px rgba(255, 255, 255, 0.3));
+            }
+            
+            .mobile-header h1 {
+                font-size: 22px;
+            }
+            
+            .mobile-header p {
+                font-size: 15px;
+            }
+            
+            .mobile-form-container {
+                padding: 30px 20px;
+            }
+            
+            .mobile-form-header h2 {
+                font-size: 24px;
+            }
+            
+            .mobile-form-header p {
+                font-size: 14px;
+            }
+        }
+        
+        /* Loading overlay */
+        .loading-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(255, 255, 255, 0.95);
+            z-index: 9998;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            backdrop-filter: blur(5px);
+        }
+        
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 3px solid #e2e8f0;
+            border-top: 3px solid #1a4f8c;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 15px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .error-message {
+            color: #e53e3e;
+            font-size: 12px;
+            margin-top: 5px;
+            display: none;
+        }
+        
+        .form-help {
+            color: #718096;
+            font-size: 12px;
+            margin-top: 5px;
         }
         
         .terms-checkbox {
@@ -796,7 +878,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         }
         
         .terms-checkbox a {
-            color: #667eea;
+            color: #1a4f8c;
             text-decoration: none;
             font-weight: 500;
         }
@@ -822,50 +904,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             margin-right: 8px;
         }
         
-        .loading-overlay {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(255, 255, 255, 0.95);
-            z-index: 9998;
-            justify-content: center;
-            align-items: center;
-            flex-direction: column;
-            backdrop-filter: blur(5px);
-        }
-        
-        .spinner {
-            width: 50px;
-            height: 50px;
-            border: 3px solid #e2e8f0;
-            border-top: 3px solid #667eea;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-            margin-bottom: 15px;
-        }
-        
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-        
-        .error-message {
-            color: #e53e3e;
-            font-size: 12px;
-            margin-top: 5px;
-            display: none;
-        }
-        
-        .form-help {
-            color: #718096;
-            font-size: 12px;
-            margin-top: 5px;
-        }
-        
-        /* Role-specific styling - UPDATED WITH NEW BORDER COLORS */
+        /* Role-specific styling */
         .role-option {
             display: flex;
             align-items: center;
@@ -878,39 +917,13 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         }
         
         .role-option:hover {
-            border-color: #667eea;
+            border-color: #1a4f8c;
             background: #f7fafc;
         }
         
-        /* Default selected state */
         .role-option.selected {
-            border-color: #667eea;
+            border-color: #1a4f8c;
             background: #edf2f7;
-        }
-        
-        /* Role-specific border colors for selected state */
-        .role-option.selected.tanod-role {
-            border-color: #0000FF; /* Yellow */
-        }
-        
-        .role-option.selected.secretary-role {
-            border-color: #0000FF; /* Orange */
-        }
-        
-        .role-option.selected.admin-role {
-            border-color: #0000FF; /* Green */
-        }
-        
-        .role-option.selected.captain-role {
-            border-color: #0000FF; /* Blue */
-        }
-        
-        .role-option.selected.lupon-role {
-            border-color: #0000FF; /* Violet */
-        }
-        
-        .role-option.selected.super-admin-role {
-            border-color: #0000FF; /* Pink */
         }
         
         .role-icon {
@@ -937,13 +950,13 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             color: #718096;
         }
         
-        /* Role colors for icon background */
-        .tanod-role .role-icon { background: linear-gradient(135deg, #4CAF50, #2E7D32); }
-        .secretary-role .role-icon { background: linear-gradient(135deg, #2196F3, #0D47A1); }
-        .admin-role .role-icon { background: linear-gradient(135deg, #9C27B0, #4A148C); }
-        .captain-role .role-icon { background: linear-gradient(135deg, #F44336, #B71C1C); }
-        .lupon-role .role-icon { background: linear-gradient(135deg, #FF9800, #E65100); }
-        .super-admin-role .role-icon { background: linear-gradient(135deg, #607D8B, #263238); }
+        /* Role colors - Updated to blue theme */
+        .tanod-role { background: linear-gradient(135deg, #1e3a8a, #1e40af); }
+        .secretary-role { background: linear-gradient(135deg, #1e40af, #1d4ed8); }
+        .admin-role { background: linear-gradient(135deg, #1d4ed8, #3b82f6); }
+        .captain-role { background: linear-gradient(135deg, #3b82f6, #60a5fa); }
+        .lupon-role { background: linear-gradient(135deg, #60a5fa, #93c5fd); }
+        .super-admin-role { background: linear-gradient(135deg, #93c5fd, #bfdbfe); }
         
         .role-grid {
             display: grid;
@@ -982,7 +995,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             background: white;
             padding: 15px 30px;
             border-radius: 10px;
-            border: 3px dashed #667eea;
+            border: 3px dashed #1a4f8c;
             margin: 20px auto;
             display: inline-block;
             letter-spacing: 5px;
@@ -991,7 +1004,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         .login-button {
             display: inline-block;
             padding: 12px 30px;
-            background: linear-gradient(to right, #667eea, #764ba2);
+            background: linear-gradient(to right, #1e40af, #1d4ed8);
             color: white;
             border: none;
             border-radius: 10px;
@@ -1004,7 +1017,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         
         .login-button:hover {
             transform: translateY(-2px);
-            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.3);
+            background: linear-gradient(to right, #1d4ed8, #1e3a8a);
         }
     </style>
 </head>
@@ -1018,12 +1031,12 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     <div class="register-container hidden md:flex">
         <div class="left-section">
             <a href="index.php" class="back-home">
-                <i class="fas fa-arrow-left"></i>Back to Home
+                <i class="fas fa-long-arrow-alt-left"></i>
             </a>
             
             <div class="logo-container">
                 <div class="logo-circle">
-                    <img src="../dec/images/10213.png" alt="BLUEBACK Logo">
+                    <img src="../dec/images/10213.png" alt="LEIR Logo">
                 </div>
                 <h1>Personnel Registration</h1>
                 <p>Register as Barangay Personnel</p>
@@ -1120,7 +1133,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 
                 <div class="role-grid">
                     <div class="role-option tanod-role" data-role="tanod">
-                        <div class="role-icon">
+                        <div class="role-icon tanod-role">
                             <i class="fas fa-shield-alt"></i>
                         </div>
                         <div class="role-info">
@@ -1130,7 +1143,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     </div>
                     
                     <div class="role-option secretary-role" data-role="secretary">
-                        <div class="role-icon">
+                        <div class="role-icon secretary-role">
                             <i class="fas fa-file-alt"></i>
                         </div>
                         <div class="role-info">
@@ -1140,7 +1153,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     </div>
                     
                     <div class="role-option admin-role" data-role="admin">
-                        <div class="role-icon">
+                        <div class="role-icon admin-role">
                             <i class="fas fa-cogs"></i>
                         </div>
                         <div class="role-info">
@@ -1150,7 +1163,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     </div>
                     
                     <div class="role-option captain-role" data-role="captain">
-                        <div class="role-icon">
+                        <div class="role-icon captain-role">
                             <i class="fas fa-crown"></i>
                         </div>
                         <div class="role-info">
@@ -1160,7 +1173,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     </div>
                     
                     <div class="role-option lupon-role" data-role="lupon">
-                        <div class="role-icon">
+                        <div class="role-icon lupon-role">
                             <i class="fas fa-balance-scale"></i>
                         </div>
                         <div class="role-info">
@@ -1170,7 +1183,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     </div>
                     
                     <div class="role-option super-admin-role" data-role="super_admin">
-                        <div class="role-icon">
+                        <div class="role-icon super-admin-role">
                             <i class="fas fa-user-shield"></i>
                         </div>
                         <div class="role-info">
@@ -1386,8 +1399,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 <div class="terms-checkbox">
                     <input type="checkbox" id="terms" name="terms" required>
                     <label for="terms">
-                        I agree to the <a href="#" style="color: #667eea;">Terms of Service</a> and 
-                        <a href="#" style="color: #667eea;">Privacy Policy</a> of BLUEBACK Incident Reporting System.
+                        I agree to the <a href="#" style="color: #1a4f8c;">Terms of Service</a> and 
+                        <a href="#" style="color: #1a4f8c;">Privacy Policy</a> of Law Enforcement Incident Reporting System.
                         I understand that as barangay personnel, I have additional responsibilities and access privileges.
                     </label>
                 </div>
@@ -1405,7 +1418,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 <div class="login-link">
                     Already have an account? 
                     <a href="login.php">Sign in here</a> | 
-                    <a href="register.php" style="color: #4CAF50;">Citizen Registration</a>
+                    <a href="register.php" style="color: #38a169;">Citizen Registration</a>
                 </div>
             </form>
             
@@ -1413,27 +1426,22 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         </div>
     </div>
     
+    <!-- MOBILE VIEW - UPDATED TO MATCH register.php -->
     <div class="mobile-container md:hidden">
         <div class="mobile-header">
+            <!-- Updated logo container -->
             <div class="mobile-logo-circle">
-                <img src="../dec/images/10213.png" alt="BLUEBACK Logo">
+                <img src="../dec/images/10213.png" alt="LEIR Logo">
             </div>
+            
             <h1>Personnel Registration</h1>
             <p>Register as Barangay Personnel</p>
             
-            <div class="mobile-features">
-                <div class="mobile-feature">
-                    <i class="fas fa-shield-alt"></i>Security
-                </div>
-                <div class="mobile-feature">
-                    <i class="fas fa-bolt"></i>Management
-                </div>
-                <div class="mobile-feature">
-                    <i class="fas fa-bell"></i>Alerts
-                </div>
-                <div class="mobile-feature">
-                    <i class="fas fa-users"></i>Community
-                </div>
+            <!-- Add the wave separator from register.php -->
+            <div class="wave-separator-index">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 100" preserveAspectRatio="none">
+                    <path fill="white" fill-opacity="1" d="M0,80L48,75C96,70,192,60,288,55C384,50,480,50,576,55C672,60,768,70,864,75C960,80,1056,80,1152,75C1248,70,1344,60,1392,55L1440,50L1440,100L1392,100C1344,100,1248,100,1152,100C1056,100,960,100,864,100C768,100,672,100,576,100C480,100,384,100,288,100C192,100,96,100,48,100L0,100Z"></path>
+                </svg>
             </div>
         </div>
         
@@ -1506,7 +1514,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 
                 <div class="role-grid">
                     <div class="role-option tanod-role" data-role="tanod">
-                        <div class="role-icon">
+                        <div class="role-icon tanod-role">
                             <i class="fas fa-shield-alt"></i>
                         </div>
                         <div class="role-info">
@@ -1516,7 +1524,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     </div>
                     
                     <div class="role-option secretary-role" data-role="secretary">
-                        <div class="role-icon">
+                        <div class="role-icon secretary-role">
                             <i class="fas fa-file-alt"></i>
                         </div>
                         <div class="role-info">
@@ -1526,7 +1534,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     </div>
                     
                     <div class="role-option admin-role" data-role="admin">
-                        <div class="role-icon">
+                        <div class="role-icon admin-role">
                             <i class="fas fa-cogs"></i>
                         </div>
                         <div class="role-info">
@@ -1536,7 +1544,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     </div>
                     
                     <div class="role-option captain-role" data-role="captain">
-                        <div class="role-icon">
+                        <div class="role-icon captain-role">
                             <i class="fas fa-crown"></i>
                         </div>
                         <div class="role-info">
@@ -1546,7 +1554,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     </div>
                     
                     <div class="role-option lupon-role" data-role="lupon">
-                        <div class="role-icon">
+                        <div class="role-icon lupon-role">
                             <i class="fas fa-balance-scale"></i>
                         </div>
                         <div class="role-info">
@@ -1556,7 +1564,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     </div>
                     
                     <div class="role-option super-admin-role" data-role="super_admin">
-                        <div class="role-icon">
+                        <div class="role-icon super-admin-role">
                             <i class="fas fa-user-shield"></i>
                         </div>
                         <div class="role-info">
@@ -1764,8 +1772,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 <div class="terms-checkbox">
                     <input type="checkbox" id="mobile_terms" name="terms" required>
                     <label for="mobile_terms">
-                        I agree to the <a href="#" style="color: #667eea;">Terms of Service</a> and 
-                        <a href="#" style="color: #667eea;">Privacy Policy</a> of BLUEBACK.
+                        I agree to the <a href="#" style="color: #1a4f8c;">Terms of Service</a> and 
+                        <a href="#" style="color: #1a4f8c;">Privacy Policy</a> of Law Enforcement Incident Reporting System.
                     </label>
                 </div>
                 <div class="error-message" id="mobile_terms_error"></div>
@@ -1782,7 +1790,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 <div class="login-link">
                     Already have an account? 
                     <a href="login.php">Sign in here</a> | 
-                    <a href="register.php" style="color: #4CAF50;">Citizen Registration</a>
+                    <a href="register.php" style="color: #38a169;">Citizen Registration</a>
                 </div>
             </form>
             
