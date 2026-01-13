@@ -1421,8 +1421,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         
         <div class="mobile-form-container">
             <div class="mobile-form-header">
-                <h2>Personnel Account Registration</h2>
-                <p>Fill in your details to register as barangay personnel</p>
             </div>
             
             <?php if ($error): ?>
