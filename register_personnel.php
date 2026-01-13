@@ -336,8 +336,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 }
 
             .logo-circle img {
-                width: 200px;
-                height: 200px;
+                width: 300px;
+                height: 3cqb;
                 object-fit: contain;
                 filter: drop-shadow(0 0 20px white)
                         drop-shadow(0 0 40px white);
