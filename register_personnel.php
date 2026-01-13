@@ -890,15 +890,15 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         
         /* Role-specific border colors for selected state */
         .role-option.selected.tanod-role {
-            border-color: #FFD700; /* Yellow */
+            border-color: #0000FF; /* Yellow */
         }
         
         .role-option.selected.secretary-role {
-            border-color: #FFA500; /* Orange */
+            border-color: #0000FF; /* Orange */
         }
         
         .role-option.selected.admin-role {
-            border-color: #008000; /* Green */
+            border-color: #0000FF; /* Green */
         }
         
         .role-option.selected.captain-role {
@@ -906,11 +906,11 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         }
         
         .role-option.selected.lupon-role {
-            border-color: #EE82EE; /* Violet */
+            border-color: #0000FF; /* Violet */
         }
         
         .role-option.selected.super-admin-role {
-            border-color: #FFC0CB; /* Pink */
+            border-color: #0000FF; /* Pink */
         }
         
         .role-icon {
