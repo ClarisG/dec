@@ -865,7 +865,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             margin-top: 5px;
         }
         
-        /* Role-specific styling */
+        /* Role-specific styling - UPDATED WITH NEW BORDER COLORS */
         .role-option {
             display: flex;
             align-items: center;
@@ -882,40 +882,35 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             background: #f7fafc;
         }
         
+        /* Default selected state */
         .role-option.selected {
             border-color: #667eea;
             background: #edf2f7;
         }
         
-        /* UPDATED: Different border colors for each role when selected */
-        .role-option.tanod-role.selected {
+        /* Role-specific border colors for selected state */
+        .role-option.selected.tanod-role {
             border-color: #FFD700; /* Yellow */
-            box-shadow: 0 0 0 1px rgba(255, 215, 0, 0.2);
         }
         
-        .role-option.secretary-role.selected {
-            border-color: #FF8C00; /* Orange */
-            box-shadow: 0 0 0 1px rgba(255, 140, 0, 0.2);
+        .role-option.selected.secretary-role {
+            border-color: #FFA500; /* Orange */
         }
         
-        .role-option.admin-role.selected {
-            border-color: #32CD32; /* Green */
-            box-shadow: 0 0 0 1px rgba(50, 205, 50, 0.2);
+        .role-option.selected.admin-role {
+            border-color: #008000; /* Green */
         }
         
-        .role-option.captain-role.selected {
-            border-color: #4169E1; /* Blue */
-            box-shadow: 0 0 0 1px rgba(65, 105, 225, 0.2);
+        .role-option.selected.captain-role {
+            border-color: #0000FF; /* Blue */
         }
         
-        .role-option.lupon-role.selected {
+        .role-option.selected.lupon-role {
             border-color: #EE82EE; /* Violet */
-            box-shadow: 0 0 0 1px rgba(238, 130, 238, 0.2);
         }
         
-        .role-option.super-admin-role.selected {
-            border-color: #000000; /* Black */
-            box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.2);
+        .role-option.selected.super-admin-role {
+            border-color: #FFC0CB; /* Pink */
         }
         
         .role-icon {
@@ -942,13 +937,13 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             color: #718096;
         }
         
-        /* Role colors - Updated to match border colors */
-        .tanod-role { background: linear-gradient(135deg, #FFD700, #FFA500); } /* Yellow to Orange */
-        .secretary-role { background: linear-gradient(135deg, #FF8C00, #FF6347); } /* Orange to Tomato */
-        .admin-role { background: linear-gradient(135deg, #32CD32, #228B22); } /* Green to Forest Green */
-        .captain-role { background: linear-gradient(135deg, #4169E1, #0000FF); } /* Blue to Blue */
-        .lupon-role { background: linear-gradient(135deg, #EE82EE, #DA70D6); } /* Violet to Orchid */
-        .super-admin-role { background: linear-gradient(135deg, #000000, #434343); } /* Black to Dark Gray */
+        /* Role colors for icon background */
+        .tanod-role .role-icon { background: linear-gradient(135deg, #4CAF50, #2E7D32); }
+        .secretary-role .role-icon { background: linear-gradient(135deg, #2196F3, #0D47A1); }
+        .admin-role .role-icon { background: linear-gradient(135deg, #9C27B0, #4A148C); }
+        .captain-role .role-icon { background: linear-gradient(135deg, #F44336, #B71C1C); }
+        .lupon-role .role-icon { background: linear-gradient(135deg, #FF9800, #E65100); }
+        .super-admin-role .role-icon { background: linear-gradient(135deg, #607D8B, #263238); }
         
         .role-grid {
             display: grid;
@@ -1125,7 +1120,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 
                 <div class="role-grid">
                     <div class="role-option tanod-role" data-role="tanod">
-                        <div class="role-icon tanod-role">
+                        <div class="role-icon">
                             <i class="fas fa-shield-alt"></i>
                         </div>
                         <div class="role-info">
@@ -1135,7 +1130,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     </div>
                     
                     <div class="role-option secretary-role" data-role="secretary">
-                        <div class="role-icon secretary-role">
+                        <div class="role-icon">
                             <i class="fas fa-file-alt"></i>
                         </div>
                         <div class="role-info">
@@ -1145,7 +1140,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     </div>
                     
                     <div class="role-option admin-role" data-role="admin">
-                        <div class="role-icon admin-role">
+                        <div class="role-icon">
                             <i class="fas fa-cogs"></i>
                         </div>
                         <div class="role-info">
@@ -1155,7 +1150,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     </div>
                     
                     <div class="role-option captain-role" data-role="captain">
-                        <div class="role-icon captain-role">
+                        <div class="role-icon">
                             <i class="fas fa-crown"></i>
                         </div>
                         <div class="role-info">
@@ -1165,7 +1160,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     </div>
                     
                     <div class="role-option lupon-role" data-role="lupon">
-                        <div class="role-icon lupon-role">
+                        <div class="role-icon">
                             <i class="fas fa-balance-scale"></i>
                         </div>
                         <div class="role-info">
@@ -1175,7 +1170,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     </div>
                     
                     <div class="role-option super-admin-role" data-role="super_admin">
-                        <div class="role-icon super-admin-role">
+                        <div class="role-icon">
                             <i class="fas fa-user-shield"></i>
                         </div>
                         <div class="role-info">
@@ -1511,7 +1506,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 
                 <div class="role-grid">
                     <div class="role-option tanod-role" data-role="tanod">
-                        <div class="role-icon tanod-role">
+                        <div class="role-icon">
                             <i class="fas fa-shield-alt"></i>
                         </div>
                         <div class="role-info">
@@ -1521,7 +1516,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     </div>
                     
                     <div class="role-option secretary-role" data-role="secretary">
-                        <div class="role-icon secretary-role">
+                        <div class="role-icon">
                             <i class="fas fa-file-alt"></i>
                         </div>
                         <div class="role-info">
@@ -1531,7 +1526,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     </div>
                     
                     <div class="role-option admin-role" data-role="admin">
-                        <div class="role-icon admin-role">
+                        <div class="role-icon">
                             <i class="fas fa-cogs"></i>
                         </div>
                         <div class="role-info">
@@ -1541,7 +1536,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     </div>
                     
                     <div class="role-option captain-role" data-role="captain">
-                        <div class="role-icon captain-role">
+                        <div class="role-icon">
                             <i class="fas fa-crown"></i>
                         </div>
                         <div class="role-info">
@@ -1551,7 +1546,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     </div>
                     
                     <div class="role-option lupon-role" data-role="lupon">
-                        <div class="role-icon lupon-role">
+                        <div class="role-icon">
                             <i class="fas fa-balance-scale"></i>
                         </div>
                         <div class="role-info">
@@ -1561,7 +1556,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     </div>
                     
                     <div class="role-option super-admin-role" data-role="super_admin">
-                        <div class="role-icon super-admin-role">
+                        <div class="role-icon">
                             <i class="fas fa-user-shield"></i>
                         </div>
                         <div class="role-info">
