@@ -865,57 +865,54 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         
         /* Role-specific styling */
         .role-option {
-            display: flex;
-            align-items: center;
-            padding: 15px;
-            border: 2px solid #e2e8f0;
-            border-radius: 12px;
-            margin-bottom: 10px;
-            cursor: pointer;
-            transition: all 0.3s;
-        }
+        display: flex;
+        align-items: center;
+        padding: 15px;
+        border: 2px solid #e2e8f0;
+        border-radius: 12px;
+        margin-bottom: 10px;
+        cursor: pointer;
+        transition: all 0.3s;
+        background-color: white; /* Add white background to the role option */
+    }
         
         .role-option:hover {
-            border-color: #1a4f8c;
-            background: #f7fafc;
-        }
+    border-color: #667eea;
+    background: #f7fafc;
+}
         
-        .role-option.selected {
-            border-color: #1a4f8c;
-            background: #edf2f7;
-        }
+   .role-option.selected {
+    border-color: #667eea;
+    background: #edf2f7;
+}
         
-        .role-icon {
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin-right: 15px;
-            color: white;
-            font-size: 18px;
-        }
+      .role-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 15px;
+    color: white;
+    font-size: 18px;
+}
         
-        .role-info h4 {
-            font-size: 16px;
-            font-weight: 600;
-            color: #2d3748;
-            margin-bottom: 5px;
-        }
-        
-        .role-info p {
-            font-size: 13px;
-            color: #718096;
-        }
+   .role-info h4 {
+    font-size: 16px;
+    font-weight: 600;
+    color: #2d3748;
+    margin-bottom: 5px;
+}
+
+.role-info p {
+    font-size: 13px;
+    color: #718096;
+}
         
         /* Role colors - KEEP AS IS */
-        .tanod-role { background: white; }
-        .secretary-role { background: linear-gradient(135deg, #2196F3, #0D47A1); }
-        .admin-role { background: linear-gradient(135deg, #9C27B0, #4A148C); }
-        .captain-role { background: linear-gradient(135deg, #F44336, #B71C1C); }
-        .lupon-role { background: linear-gradient(135deg, #FF9800, #E65100); }
-        .super-admin-role { background: linear-gradient(135deg, #607D8B, #263238); }
+       
+        
         
         .role-grid {
             display: grid;
@@ -929,7 +926,12 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 grid-template-columns: 1fr;
             }
         }
-        
+        .tanod-role { background: linear-gradient(135deg, #4CAF50, #2E7D32); }
+.secretary-role { background: linear-gradient(135deg, #2196F3, #0D47A1); }
+.admin-role { background: linear-gradient(135deg, #9C27B0, #4A148C); }
+.captain-role { background: linear-gradient(135deg, #F44336, #B71C1C); }
+.lupon-role { background: linear-gradient(135deg, #FF9800, #E65100); }
+.super-admin-role { background: linear-gradient(135deg, #607D8B, #263238); }
         /* Success message box */
         .success-box {
             background: linear-gradient(135deg, #f0fff4 0%, #c6f6d5 100%);
