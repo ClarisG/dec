@@ -910,8 +910,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         }
         
         /* Role colors - KEEP AS IS */
-        .tanod-role { background: linear-gradient(135deg, #e9f0e9, #edf1ed); }
-        .secretary-role { background: linear-gradient(135deg, #e9f0e9, #edf1ed); }
+        .tanod-role { background: linear-gradient(135deg, #4CAF50, #2E7D32); }
+        .secretary-role { background: linear-gradient(135deg, #2196F3, #0D47A1); }
         .admin-role { background: linear-gradient(135deg, #9C27B0, #4A148C); }
         .captain-role { background: linear-gradient(135deg, #F44336, #B71C1C); }
         .lupon-role { background: linear-gradient(135deg, #FF9800, #E65100); }
