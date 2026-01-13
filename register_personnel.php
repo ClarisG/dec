@@ -646,7 +646,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         .btn-submit {
             width: 100%;
             padding: 16px;
-            background: linear-gradient(to right, #667eea, #764ba2);
+            background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 50%, #1d4ed8 100%);
             color: white;
             border: none;
             border-radius: 12px;
@@ -968,7 +968,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         .login-button {
             display: inline-block;
             padding: 12px 30px;
-            background: linear-gradient(to right, #667eea, #764ba2);
+            background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 50%, #1d4ed8 100%);
             color: white;
             border: none;
             border-radius: 10px;
