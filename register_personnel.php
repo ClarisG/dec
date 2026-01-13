@@ -198,7 +198,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                             'super_admin' => 'Super Administrator'
                         ];
                         
-                        $success = "{$role_titles[$role]} registration successful! Your 4-digit Master Code is: <strong style='font-size: 24px; color: #1d4ed8;'>{$master_code}</strong><br><br>";
+                        $success = "{$role_titles[$role]} registration successful! Your 4-digit Master Code is: <strong style='font-size: 24px; color: #667eea;'>{$master_code}</strong><br><br>";
                         $success .= "<div style='background: #f0fff4; padding: 15px; border-radius: 8px; border-left: 4px solid #38a169; margin: 15px 0;'>";
                         $success .= "<strong><i class='fas fa-exclamation-circle'></i> Important:</strong> Save this Master Code! You will need it after entering your username and password during login.";
                         $success .= "</div>";
@@ -278,7 +278,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             
             .left-section {
                 flex: 1;
-                background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 50%, #1d4ed8 100%);
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
                 display: flex;
                 flex-direction: column;
                 justify-content: center;
@@ -327,22 +327,22 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             }
             
             .logo-circle {
-                width: 300px;
-                height: 300px;
-                background: transparent;
+                width: 100px;
+                height: 100px;
+                background: rgba(255, 255, 255, 0.15);
+                backdrop-filter: blur(10px);
+                border-radius: 50%;
                 display: flex;
                 align-items: center;
                 justify-content: center;
                 margin: 0 auto 30px;
-                border: none;
+                border: 2px solid rgba(255, 255, 255, 0.25);
             }
             
             .logo-circle img {
-                width: 300px;
-                height: 300px;
+                width: 60px;
+                height: 60px;
                 object-fit: contain;
-                filter: drop-shadow(0 0 20px white)
-                        drop-shadow(0 0 40px white);
             }
             
             .logo-container h1 {
@@ -430,8 +430,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             
             .mobile-header {
                 flex-shrink: 0;
-                background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 50%, #1d4ed8 100%);
-                padding: 50px 30px 100px;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                padding: 40px 30px 80px;
                 text-align: center;
                 color: white;
                 position: relative;
@@ -439,88 +439,107 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 z-index: 1;
             }
             
-            /* Wave container - matching register.php */
-            .wave-separator-index {
+            .mobile-header::after {
+                content: '';
                 position: absolute;
                 bottom: 0;
                 left: 0;
                 width: 100%;
-                height: 80px;
+                height: 120px;
+                background: white;
                 z-index: 2;
-                pointer-events: none;
+                mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 200'%3E%3Cpath fill='white' d='M0 0 C150 60 300 -40 450 20 C600 80 750 -20 900 40 C1050 100 1125 0 1200 60 L1200 200 L0 200 Z'/%3E%3C/svg%3E");
+                -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 200'%3E%3Cpath fill='white' d='M0 0 C150 60 300 -40 450 20 C600 80 750 -20 900 40 C1050 100 1125 0 1200 60 L1200 200 L0 200 Z'/%3E%3C/svg%3E");
+                mask-size: 100% 200px;
+                transform: translateY(80px);
             }
             
-            .wave-separator-index svg {
+            .mobile-header::before {
+                content: '';
                 position: absolute;
-                bottom: 0;
+                bottom: 10px;
                 left: 0;
                 width: 100%;
-                height: 80px;
-                display: block;
+                height: 140px;
+                background: rgba(255, 255, 255, 0.25);
+                z-index: 1;
+                mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 120' preserveAspectRatio='none'%3E%3Cpath fill='%23ffffff' d='M321.39,56.44c58-10.79,114.16-30.13,172-41.86,82.39-16.72,168.19-17.73,250.45-.39C823.78,31,906.67,72,985.66,92.83c70.05,18.48,146.53,26.09,214.34,3V0H0V27.35A600.21,600.21,0,0,0,321.39,56.44Z'/%3E%3C/svg%3E");
+                -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 120' preserveAspectRatio='none'%3E%3Cpath fill='%23ffffff' d='M321.39,56.44c58-10.79,114.16-30.13,172-41.86,82.39-16.72,168.19-17.73,250.45-.39C823.78,31,906.67,72,985.66,92.83c70.05,18.48,146.53,26.09,214.34,3V0H0V27.35A600.21,600.21,0,0,0,321.39,56.44Z'/%3E%3C/svg%3E");
+                mask-size: 1200px 140px;
+                -webkit-mask-size: 1200px 140px;
+                transform: translateY(70px);
             }
             
-            /* Updated: Larger logo without circle, with white shadow - matching register.php */
             .mobile-logo-circle {
+                width: 80px;
+                height: 80px;
+                background: rgba(255, 255, 255, 0.15);
+                backdrop-filter: blur(10px);
+                border-radius: 50%;
                 display: flex;
                 align-items: center;
                 justify-content: center;
                 margin: 0 auto 20px;
+                border: 2px solid rgba(255, 255, 255, 0.25);
                 position: relative;
                 z-index: 3;
-                background: transparent;
-                border: none;
-                border-radius: 0;
-                backdrop-filter: none;
-                width: 100%;
-                max-width: 300px;
-                height: auto;
-                aspect-ratio: 1;
             }
             
             .mobile-logo-circle img {
-                width: 150px;
-                height: 150px;
-                max-width: 100%;
+                width: 50px;
+                height: 50px;
                 object-fit: contain;
-                filter: drop-shadow(0 0 20px rgba(255, 255, 255, 0.8))
-                       drop-shadow(0 0 40px rgba(255, 255, 255, 0.6));
-            }
-            
-            .mobile-logo-circle img:hover {
-                filter: drop-shadow(0 0 35px rgba(255,255,255,1))
-                       drop-shadow(0 0 70px rgba(255,255,255,0.8))
-                       drop-shadow(0 0 120px rgba(255,255,255,0.6));
             }
             
             .mobile-header h1 {
-                font-size: 26px;
+                font-size: 24px;
                 font-weight: 700;
-                margin-bottom: 8px;
+                margin-bottom: 5px;
                 position: relative;
-                z-index: 4;
+                z-index: 3;
             }
             
             .mobile-header p {
-                font-size: 17px;
+                font-size: 16px;
                 opacity: 0.9;
                 position: relative;
-                z-index: 4;
+                z-index: 3;
                 margin-bottom: 20px;
             }
             
-            /* Adjust the form container */
+            .mobile-features {
+                display: flex;
+                justify-content: center;
+                gap: 15px;
+                flex-wrap: wrap;
+                margin-top: 20px;
+                position: relative;
+                z-index: 3;
+            }
+            
+            .mobile-feature {
+                display: flex;
+                align-items: center;
+                background: rgba(255, 255, 255, 0.1);
+                padding: 8px 12px;
+                border-radius: 20px;
+                font-size: 12px;
+                backdrop-filter: blur(10px);
+            }
+            
+            .mobile-feature i {
+                margin-right: 5px;
+                font-size: 10px;
+            }
+            
             .mobile-form-container {
                 flex: 1;
-                padding: 40px 30px;
+                padding: 40px 20px;
                 display: flex;
                 flex-direction: column;
-                background: white;
                 position: relative;
-                z-index: 1;
-                margin-top: 0;
-                padding-top: 20px;
-                border-radius: 30px 30px 0 0;
-                box-shadow: 0 -5px 20px rgba(0, 0, 0, 0.05);
+                z-index: 3;
+                background: white;
             }
             
             .mobile-form-header {
@@ -538,12 +557,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             .mobile-form-header p {
                 color: #718096;
                 font-size: 15px;
-            }
-            
-            /* Remove mobile-features styles */
-            .mobile-features,
-            .mobile-feature {
-                display: none;
             }
         }
         
@@ -597,8 +610,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         
         .form-input:focus, .form-select:focus, .form-textarea:focus {
             outline: none;
-            border-color: #1a4f8c;
-            box-shadow: 0 0 0 3px rgba(26, 79, 140, 0.1);
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
         }
         
         .form-grid {
@@ -631,8 +644,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         .btn-submit {
             width: 100%;
             padding: 16px;
+            background: linear-gradient(to right, #667eea, #764ba2);
             color: white;
-            background: linear-gradient(to right, #1e40af, #1d4ed8);
             border: none;
             border-radius: 12px;
             font-size: 16px;
@@ -644,7 +657,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         
         .btn-submit:hover {
             transform: translateY(-2px);
-            background: linear-gradient(to right, #1d4ed8, #1e3a8a);
+            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.3);
         }
         
         .btn-submit:disabled {
@@ -662,7 +675,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         }
         
         .login-link a {
-            color: #1a4f8c;
+            color: #667eea;
             text-decoration: none;
             font-weight: 600;
             margin-left: 5px;
@@ -738,74 +751,27 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         
         .back-home {
             position: absolute;
-            top: 30px;
-            left: 30px;
+            top: 20px;
+            left: 20px;
             color: white;
             text-decoration: none;
-            font-size: 24px;
+            font-size: 14px;
             display: flex;
             align-items: center;
             z-index: 10;
-            padding: 12px 16px;
-            background: rgba(255, 255, 255, 0.15);
-            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 8px 16px;
+            border-radius: 8px;
             backdrop-filter: blur(10px);
             border: 1px solid rgba(255, 255, 255, 0.2);
-            transition: all 0.3s ease;
-            width: auto;
-            min-width: 60px;
-            height: 50px;
         }
         
         .back-home:hover {
-            background: rgba(255, 255, 255, 0.25);
-            transform: translateX(-5px);
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+            background: rgba(255, 255, 255, 0.2);
         }
         
         .back-home i {
-            margin-right: 10px;
-            font-size: 22px;
-            width: 24px;
-        }
-        
-        /* Responsive adjustments */
-        @media (max-width: 480px) {
-            .mobile-header {
-                padding: 30px 20px 80px;
-            }
-            
-            .mobile-logo-circle {
-                width: 90px;
-                height: 90px;
-            }
-            
-            .mobile-logo-circle img {
-                width: 70px;
-                height: 70px;
-                filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.5))
-                       drop-shadow(0 0 15px rgba(255, 255, 255, 0.3));
-            }
-            
-            .mobile-header h1 {
-                font-size: 22px;
-            }
-            
-            .mobile-header p {
-                font-size: 15px;
-            }
-            
-            .mobile-form-container {
-                padding: 30px 20px;
-            }
-            
-            .mobile-form-header h2 {
-                font-size: 24px;
-            }
-            
-            .mobile-form-header p {
-                font-size: 14px;
-            }
+            margin-right: 8px;
         }
         
         .terms-checkbox {
@@ -830,7 +796,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         }
         
         .terms-checkbox a {
-            color: #1a4f8c;
+            color: #667eea;
             text-decoration: none;
             font-weight: 500;
         }
@@ -875,7 +841,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             width: 50px;
             height: 50px;
             border: 3px solid #e2e8f0;
-            border-top: 3px solid #1a4f8c;
+            border-top: 3px solid #667eea;
             border-radius: 50%;
             animation: spin 1s linear infinite;
             margin-bottom: 15px;
@@ -912,13 +878,44 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         }
         
         .role-option:hover {
-            border-color: #1a4f8c;
+            border-color: #667eea;
             background: #f7fafc;
         }
         
         .role-option.selected {
-            border-color: #1a4f8c;
+            border-color: #667eea;
             background: #edf2f7;
+        }
+        
+        /* UPDATED: Different border colors for each role when selected */
+        .role-option.tanod-role.selected {
+            border-color: #FFD700; /* Yellow */
+            box-shadow: 0 0 0 1px rgba(255, 215, 0, 0.2);
+        }
+        
+        .role-option.secretary-role.selected {
+            border-color: #FF8C00; /* Orange */
+            box-shadow: 0 0 0 1px rgba(255, 140, 0, 0.2);
+        }
+        
+        .role-option.admin-role.selected {
+            border-color: #32CD32; /* Green */
+            box-shadow: 0 0 0 1px rgba(50, 205, 50, 0.2);
+        }
+        
+        .role-option.captain-role.selected {
+            border-color: #4169E1; /* Blue */
+            box-shadow: 0 0 0 1px rgba(65, 105, 225, 0.2);
+        }
+        
+        .role-option.lupon-role.selected {
+            border-color: #EE82EE; /* Violet */
+            box-shadow: 0 0 0 1px rgba(238, 130, 238, 0.2);
+        }
+        
+        .role-option.super-admin-role.selected {
+            border-color: #000000; /* Black */
+            box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.2);
         }
         
         .role-icon {
@@ -945,13 +942,13 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             color: #718096;
         }
         
-        /* Role colors - updated to blue theme */
-        .tanod-role { background: linear-gradient(135deg, #1e40af, #1d4ed8); }
-        .secretary-role { background: linear-gradient(135deg, #1e3a8a, #1e40af); }
-        .admin-role { background: linear-gradient(135deg, #1e3a8a, #1d4ed8); }
-        .captain-role { background: linear-gradient(135deg, #1d4ed8, #1e3a8a); }
-        .lupon-role { background: linear-gradient(135deg, #1e40af, #1e3a8a); }
-        .super-admin-role { background: linear-gradient(135deg, #1e3a8a, #1e40af); }
+        /* Role colors - Updated to match border colors */
+        .tanod-role { background: linear-gradient(135deg, #FFD700, #FFA500); } /* Yellow to Orange */
+        .secretary-role { background: linear-gradient(135deg, #FF8C00, #FF6347); } /* Orange to Tomato */
+        .admin-role { background: linear-gradient(135deg, #32CD32, #228B22); } /* Green to Forest Green */
+        .captain-role { background: linear-gradient(135deg, #4169E1, #0000FF); } /* Blue to Blue */
+        .lupon-role { background: linear-gradient(135deg, #EE82EE, #DA70D6); } /* Violet to Orchid */
+        .super-admin-role { background: linear-gradient(135deg, #000000, #434343); } /* Black to Dark Gray */
         
         .role-grid {
             display: grid;
@@ -990,7 +987,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             background: white;
             padding: 15px 30px;
             border-radius: 10px;
-            border: 3px dashed #1d4ed8;
+            border: 3px dashed #667eea;
             margin: 20px auto;
             display: inline-block;
             letter-spacing: 5px;
@@ -999,7 +996,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         .login-button {
             display: inline-block;
             padding: 12px 30px;
-            background: linear-gradient(to right, #1e40af, #1d4ed8);
+            background: linear-gradient(to right, #667eea, #764ba2);
             color: white;
             border: none;
             border-radius: 10px;
@@ -1012,7 +1009,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         
         .login-button:hover {
             transform: translateY(-2px);
-            box-shadow: 0 10px 25px rgba(29, 78, 216, 0.3);
+            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.3);
         }
     </style>
 </head>
@@ -1026,13 +1023,34 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     <div class="register-container hidden md:flex">
         <div class="left-section">
             <a href="index.php" class="back-home">
-                <i class="fas fa-long-arrow-alt-left"></i>
+                <i class="fas fa-arrow-left"></i>Back to Home
             </a>
             
             <div class="logo-container">
                 <div class="logo-circle">
-                    <img src="images/10213.png" alt="LEIR Logo">
-                </div>   
+                    <img src="../dec/images/10213.png" alt="BLUEBACK Logo">
+                </div>
+                <h1>Personnel Registration</h1>
+                <p>Register as Barangay Personnel</p>
+                
+                <div class="features">
+                    <div class="feature-item">
+                        <i class="fas fa-shield-alt"></i>
+                        <span>Community Safety & Administration</span>
+                    </div>
+                    <div class="feature-item">
+                        <i class="fas fa-bolt"></i>
+                        <span>Quick Incident Management</span>
+                    </div>
+                    <div class="feature-item">
+                        <i class="fas fa-bell"></i>
+                        <span>Real-time Alerts & Notifications</span>
+                    </div>
+                    <div class="feature-item">
+                        <i class="fas fa-users"></i>
+                        <span>Community Service & Governance</span>
+                    </div>
+                </div>
             </div>
         </div>
         
@@ -1373,8 +1391,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 <div class="terms-checkbox">
                     <input type="checkbox" id="terms" name="terms" required>
                     <label for="terms">
-                        I agree to the <a href="#" style="color: #1a4f8c;">Terms of Service</a> and 
-                        <a href="#" style="color: #1a4f8c;">Privacy Policy</a> of LEIR Incident Reporting System.
+                        I agree to the <a href="#" style="color: #667eea;">Terms of Service</a> and 
+                        <a href="#" style="color: #667eea;">Privacy Policy</a> of BLUEBACK Incident Reporting System.
                         I understand that as barangay personnel, I have additional responsibilities and access privileges.
                     </label>
                 </div>
@@ -1392,7 +1410,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 <div class="login-link">
                     Already have an account? 
                     <a href="login.php">Sign in here</a> | 
-                    <a href="register.php" style="color: #38a169;">Citizen Registration</a>
+                    <a href="register.php" style="color: #4CAF50;">Citizen Registration</a>
                 </div>
             </form>
             
@@ -1400,22 +1418,27 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         </div>
     </div>
     
-    <!-- MOBILE VIEW - UPDATED TO MATCH register.php -->
     <div class="mobile-container md:hidden">
         <div class="mobile-header">
-            <!-- Updated logo container -->
             <div class="mobile-logo-circle">
-                <img src="images/10213.png" alt="LEIR Logo">
+                <img src="../dec/images/10213.png" alt="BLUEBACK Logo">
             </div>
-            
             <h1>Personnel Registration</h1>
             <p>Register as Barangay Personnel</p>
             
-            <!-- Add the wave separator from register.php -->
-            <div class="wave-separator-index">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 100" preserveAspectRatio="none">
-                    <path fill="white" fill-opacity="1" d="M0,80L48,75C96,70,192,60,288,55C384,50,480,50,576,55C672,60,768,70,864,75C960,80,1056,80,1152,75C1248,70,1344,60,1392,55L1440,50L1440,100L1392,100C1344,100,1248,100,1152,100C1056,100,960,100,864,100C768,100,672,100,576,100C480,100,384,100,288,100C192,100,96,100,48,100L0,100Z"></path>
-                </svg>
+            <div class="mobile-features">
+                <div class="mobile-feature">
+                    <i class="fas fa-shield-alt"></i>Security
+                </div>
+                <div class="mobile-feature">
+                    <i class="fas fa-bolt"></i>Management
+                </div>
+                <div class="mobile-feature">
+                    <i class="fas fa-bell"></i>Alerts
+                </div>
+                <div class="mobile-feature">
+                    <i class="fas fa-users"></i>Community
+                </div>
             </div>
         </div>
         
@@ -1746,9 +1769,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 <div class="terms-checkbox">
                     <input type="checkbox" id="mobile_terms" name="terms" required>
                     <label for="mobile_terms">
-                        I agree to the <a href="#" style="color: #1a4f8c;">Terms of Service</a> and 
-                        <a href="#" style="color: #1a4f8c;">Privacy Policy</a> of LEIR.
-                        I understand that as barangay personnel, I have additional responsibilities and access privileges.
+                        I agree to the <a href="#" style="color: #667eea;">Terms of Service</a> and 
+                        <a href="#" style="color: #667eea;">Privacy Policy</a> of BLUEBACK.
                     </label>
                 </div>
                 <div class="error-message" id="mobile_terms_error"></div>
@@ -1765,7 +1787,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 <div class="login-link">
                     Already have an account? 
                     <a href="login.php">Sign in here</a> | 
-                    <a href="register.php" style="color: #38a169;">Citizen Registration</a>
+                    <a href="register.php" style="color: #4CAF50;">Citizen Registration</a>
                 </div>
             </form>
             
