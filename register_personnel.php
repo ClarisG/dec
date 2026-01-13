@@ -1032,35 +1032,12 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             <div class="logo-container">
                 <div class="logo-circle">
                     <img src="images/10213.png" alt="LEIR Logo">
-                </div>                
-                <h1>Personnel Registration</h1>
-                <p>Register as Barangay Personnel</p>
-                
-                <div class="features">
-                    <div class="feature-item">
-                        <i class="fas fa-shield-alt"></i>
-                        <span>Community Safety & Administration</span>
-                    </div>
-                    <div class="feature-item">
-                        <i class="fas fa-bolt"></i>
-                        <span>Quick Incident Management</span>
-                    </div>
-                    <div class="feature-item">
-                        <i class="fas fa-bell"></i>
-                        <span>Real-time Alerts & Notifications</span>
-                    </div>
-                    <div class="feature-item">
-                        <i class="fas fa-users"></i>
-                        <span>Community Service & Governance</span>
-                    </div>
-                </div>
+                </div>   
             </div>
         </div>
         
         <div class="right-section">
             <div class="form-header">
-                <h2>Personnel Account Registration</h2>
-                <p>Fill in your details to register as barangay personnel</p>
             </div>
             
             <?php if ($error): ?>
