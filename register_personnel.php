@@ -1343,7 +1343,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     <input type="checkbox" id="terms" name="terms" required>
                     <label for="terms">
                         I agree to the <a href="#" style="color: #667eea;">Terms of Service</a> and 
-                        <a href="#" style="color: #667eea;">Privacy Policy</a> of BLUEBACK Incident Reporting System.
+                        <a href="#" style="color: #667eea;">Privacy Policy</a> of Law Enforcement and Incident Reporting System.
                         I understand that as barangay personnel, I have additional responsibilities and access privileges.
                     </label>
                 </div>
@@ -1715,15 +1715,11 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     <input type="checkbox" id="mobile_terms" name="terms" required>
                     <label for="mobile_terms">
                         I agree to the <a href="#" style="color: #667eea;">Terms of Service</a> and 
-                        <a href="#" style="color: #667eea;">Privacy Policy</a> of BLUEBACK.
+                        <a href="#" style="color: #667eea;">Privacy Policy</a> of LEIR.
                     </label>
                 </div>
                 <div class="error-message" id="mobile_terms_error"></div>
     
-                <div class="security-badge">
-                    <i class="fas fa-shield-alt"></i>
-                    <span>Your account will be verified by administrator</span>
-                </div>
                 
                 <button type="submit" class="btn-submit" id="mobileSubmitButton">
                     <i class="fas fa-user-plus mr-2"></i>Register as Personnel
