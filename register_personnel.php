@@ -1348,12 +1348,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     </label>
                 </div>
                 <div class="error-message" id="terms_error"></div>
-                
-                <div class="security-badge">
-                    <i class="fas fa-shield-alt"></i>
-                    <span>Your account will be verified by the system administrator</span>
-                </div>
-                
                 <button type="submit" class="btn-submit" id="submitButton">
                     <i class="fas fa-user-plus mr-2"></i>Register as Personnel
                 </button>
@@ -1725,7 +1719,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     </label>
                 </div>
                 <div class="error-message" id="mobile_terms_error"></div>
-                
+    
                 <div class="security-badge">
                     <i class="fas fa-shield-alt"></i>
                     <span>Your account will be verified by administrator</span>
