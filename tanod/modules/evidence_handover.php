@@ -1,5 +1,6 @@
 <?php
-session_start();
+// Fixed path: from modules folder to config folder
+require_once __DIR__ . '/../../config/database.php';
 
 // Check if user is logged in - adjust based on your actual session structure
 if (!isset($_SESSION['user_id'])) {

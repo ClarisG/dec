@@ -1,6 +1,6 @@
 <?php
-session_start();
-require_once '../../config/database.php';
+// Fixed path: from modules folder to config folder
+require_once __DIR__ . '/../../config/database.php';
 
 // Check if user is logged in and is a tanod
 if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'tanod') {
