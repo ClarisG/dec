@@ -1,5 +1,5 @@
 <?php
-// tanod/tanod_dashboard.php - TANOD DASHBOARD WITH LEIR LOGO
+// tanod/tanod_dashboard.php - REDESIGNED VERSION WITH SECRETARY DASHBOARD DESIGN
 session_start();
 
 // Check if user is logged in and is tanod
@@ -145,25 +145,25 @@ if ($module == 'dashboard') {
 // Function to get module title
 function getModuleTitle($module) {
     $titles = [
-        'dashboard' => 'Tanod Dashboard',
+        'dashboard' => 'Dashboard Overview',
         'duty_schedule' => 'Duty & Patrol Schedule',
         'evidence_handover' => 'Evidence Handover',
         'incident_logging' => 'Incident Logging',
         'report_vetting' => 'Report Vetting',
-        'profile' => 'Profile & Settings'
+        'profile' => 'Profile Account'
     ];
-    return $titles[$module] ?? 'Tanod Dashboard';
+    return $titles[$module] ?? 'Dashboard Overview';
 }
 
 // Function to get module subtitle
 function getModuleSubtitle($module) {
     $subtitles = [
-        'dashboard' => 'Overview of tanod activities and statistics',
-        'duty_schedule' => 'Manage duty shifts and patrol routes',
-        'evidence_handover' => 'Log and track evidence handovers',
-        'incident_logging' => 'Report and log field incidents',
-        'report_vetting' => 'Verify and vet citizen reports',
-        'profile' => 'Manage your account and settings'
+        'dashboard' => 'Overview of all tanod activities and quick actions',
+        'duty_schedule' => 'Manage duty shifts, patrol routes, and schedules',
+        'evidence_handover' => 'Log, track, and transfer evidence materials',
+        'incident_logging' => 'Report and log field incidents and observations',
+        'report_vetting' => 'Verify and validate citizen-submitted reports',
+        'profile' => 'Manage your account information and preferences'
     ];
     return $subtitles[$module] ?? '';
 }
@@ -182,21 +182,20 @@ function getModuleSubtitle($module) {
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="icon" type="image/png" href="../images/10213.png">
     <style>
-        /* ... (keep all existing CSS styles as they are) ... */
         * {
             font-family: 'Inter', sans-serif;
         }
         
         :root {
-            --primary-blue: #e8f4f8;
-            --secondary-blue: #c8e3ed;
-            --accent-blue: #3498db;
-            --dark-blue: #2c3e50;
-            --light-blue: #f9fcff;
+            --primary-blue: #e3f2fd;
+            --secondary-blue: #bbdefb;
+            --accent-blue: #2196f3;
+            --dark-blue: #0d47a1;
+            --light-blue: #f5fbff;
         }
         
         body {
-            background: linear-gradient(135deg, #f9fcff 0%, #e8f4f8 100%);
+            background: linear-gradient(135deg, #f5fbff 0%, #e3f2fd 100%);
             min-height: 100vh;
         }
         
@@ -213,11 +212,257 @@ function getModuleSubtitle($module) {
         
         .module-card:hover {
             transform: translateY(-5px);
-            box-shadow: 0 10px 25px rgba(52, 152, 219, 0.1);
+            box-shadow: 0 10px 25px rgba(33, 150, 243, 0.1);
             border-left-color: var(--dark-blue);
         }
         
-        /* ... (rest of the CSS remains the same) ... */
+        .stat-card {
+            background: linear-gradient(135deg, #ffffff 0%, #f0f9ff 100%);
+            border: 1px solid #e0f2fe;
+        }
+        
+        .urgent {
+            border-left: 4px solid #ef4444;
+            background: linear-gradient(135deg, #fef2f2 0%, #fecaca 100%);
+        }
+        
+        .warning {
+            border-left: 4px solid #f59e0b;
+            background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
+        }
+        
+        .success {
+            border-left: 4px solid #10b981;
+            background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
+        }
+        
+        .sidebar {
+            background: linear-gradient(180deg, #1e3a8a 0%, #0d47a1 100%);
+            box-shadow: 4px 0 15px rgba(0, 0, 0, 0.1);
+        }
+        
+        .sidebar-link {
+            transition: all 0.3s ease;
+            border-left: 3px solid transparent;
+        }
+        
+        .sidebar-link:hover {
+            background: rgba(255, 255, 255, 0.1);
+            border-left-color: #60a5fa;
+        }
+        
+        .sidebar-link.active {
+            background: rgba(255, 255, 255, 0.15);
+            border-left-color: #3b82f6;
+        }
+        
+        .badge {
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+        
+        .badge-pending {
+            background-color: #fef3c7;
+            color: #92400e;
+        }
+        
+        .badge-processing {
+            background-color: #dbeafe;
+            color: #1e40af;
+        }
+        
+        .badge-resolved {
+            background-color: #d1fae5;
+            color: #065f46;
+        }
+        
+        .badge-on-duty {
+            background-color: #c6f6d5;
+            color: #065f46;
+        }
+        
+        .badge-off-duty {
+            background-color: #e2e8f0;
+            color: #4a5568;
+        }
+        
+        .badge-emergency {
+            background-color: #fed7d7;
+            color: #9b2c2c;
+        }
+        
+        .animate-pulse {
+            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        /* Status badges */
+        .status-badge {
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .status-pending { background: #fed7d7; color: #9b2c2c; }
+        .status-investigating { background: #fef3c7; color: #92400e; }
+        .status-verified { background: #bee3f8; color: #2c5282; }
+        .status-resolved { background: #c6f6d5; color: #065f46; }
+        .status-escalated { background: #f3e8ff; color: #5b21b6; }
+        .status-closed { background: #e2e8f0; color: #4a5568; }
+        
+        /* Mobile Responsive */
+        @media (max-width: 768px) {
+            .sidebar {
+                transform: translateX(-100%);
+                position: fixed;
+                z-index: 50;
+            }
+            
+            .sidebar.active {
+                transform: translateX(0);
+            }
+            
+            .overlay {
+                display: none;
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: rgba(0, 0, 0, 0.5);
+                z-index: 40;
+            }
+            
+            .overlay.active {
+                display: block;
+            }
+            
+            .main-content {
+                margin-left: 0 !important;
+                padding: 1rem !important;
+            }
+            
+            .mobile-bottom-nav {
+                position: fixed;
+                bottom: 0;
+                left: 0;
+                right: 0;
+                background: white;
+                box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
+                z-index: 100;
+            }
+            
+            .mobile-nav-active {
+                color: #2196f3;
+                position: relative;
+            }
+            
+            .mobile-nav-active::after {
+                content: '';
+                position: absolute;
+                bottom: -5px;
+                left: 50%;
+                transform: translateX(-50%);
+                width: 6px;
+                height: 6px;
+                background: #2196f3;
+                border-radius: 50%;
+            }
+            
+            .mobile-nav-badge {
+                position: absolute;
+                top: -5px;
+                right: 5px;
+                background: #ef4444;
+                color: white;
+                border-radius: 50%;
+                width: 18px;
+                height: 18px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 10px;
+                font-weight: 600;
+            }
+        }
+        
+        /* Card animations */
+        .card {
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+        }
+        
+        /* Module icons */
+        .module-icon {
+            width: 50px;
+            height: 50px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            margin-bottom: 15px;
+        }
+        
+        .module-1 { background: linear-gradient(135deg, #667eea, #764ba2); color: white; }
+        .module-2 { background: linear-gradient(135deg, #4299e1, #3182ce); color: white; }
+        .module-3 { background: linear-gradient(135deg, #38a169, #2f855a); color: white; }
+        .module-4 { background: linear-gradient(135deg, #d69e2e, #b7791f); color: white; }
+        
+        /* Active status animation */
+        .active-status {
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.7; }
+            100% { opacity: 1; }
+        }
+        
+        /* Notification badge */
+        .notification-badge {
+            position: absolute;
+            top: -8px;
+            right: -8px;
+            background: #e53e3e;
+            color: white;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        
+        /* Progress bar */
+        .progress-bar {
+            height: 8px;
+            background: #e2e8f0;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            border-radius: 4px;
+            transition: width 0.5s ease;
+        }
     </style>
 </head>
 <body class="min-h-screen">
@@ -271,7 +516,7 @@ function getModuleSubtitle($module) {
             <nav class="space-y-2">
                 <a href="?module=dashboard" class="sidebar-link block p-3 text-white rounded-lg <?php echo $module == 'dashboard' ? 'active' : ''; ?>">
                     <i class="fas fa-tachometer-alt mr-3"></i>
-                    Tanod Dashboard
+                    Dashboard Overview
                 </a>
                 <a href="?module=duty_schedule" class="sidebar-link block p-3 text-white rounded-lg <?php echo $module == 'duty_schedule' ? 'active' : ''; ?>">
                     <i class="fas fa-calendar-alt mr-3"></i>
@@ -299,12 +544,12 @@ function getModuleSubtitle($module) {
             <!-- Status & Stats -->
             <div class="mt-8 pt-8 border-t border-blue-400/30">
                 <div class="mb-4">
-                    <div class="flex items-center p-3 rounded-lg bg-blue-500/20 text-blue-300">
+                    <div class="flex items-center p-3 rounded-lg <?php echo ($stats['on_duty'] ?? 0) > 0 ? 'bg-green-500/20 text-green-300' : 'bg-gray-500/20 text-gray-300'; ?>">
                         <i class="fas fa-shield-alt mr-3"></i>
                         <div class="flex-1">
                             <div class="text-xs">Duty Status</div>
                             <div class="font-bold text-lg">
-                                <?php echo isset($stats['on_duty']) && $stats['on_duty'] > 0 ? 'ON DUTY' : 'OFF DUTY'; ?>
+                                <?php echo ($stats['on_duty'] ?? 0) > 0 ? 'ON DUTY' : 'OFF DUTY'; ?>
                             </div>
                         </div>
                     </div>
@@ -328,7 +573,7 @@ function getModuleSubtitle($module) {
                 <div class="mt-6">
                     <a href="?module=profile" class="flex items-center p-3 text-blue-200 hover:text-white hover:bg-white/10 rounded-lg transition mb-2">
                         <i class="fas fa-user mr-3"></i>
-                        Profile & Settings
+                        Profile Account
                     </a>
                     <a href="../logout.php" class="flex items-center p-3 text-blue-200 hover:text-white hover:bg-white/10 rounded-lg transition">
                         <i class="fas fa-sign-out-alt mr-3"></i>
@@ -366,7 +611,9 @@ function getModuleSubtitle($module) {
                         <div class="relative">
                             <button onclick="showNotifications()" class="relative">
                                 <i class="fas fa-bell text-gray-600 text-xl cursor-pointer hover:text-blue-600"></i>
-                                <span class="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full animate-pulse"></span>
+                                <?php if (isset($stats['pending_reports']) && $stats['pending_reports'] > 0): ?>
+                                    <span class="notification-badge"><?php echo min($stats['pending_reports'], 9); ?></span>
+                                <?php endif; ?>
                             </button>
                         </div>
                         
@@ -416,7 +663,7 @@ function getModuleSubtitle($module) {
                                 <div class="p-2">
                                     <a href="?module=profile" class="flex items-center px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded">
                                         <i class="fas fa-user mr-2"></i>
-                                        Profile & Settings
+                                        Profile Account
                                     </a>
                                     <a href="../logout.php" class="flex items-center px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded">
                                         <i class="fas fa-sign-out-alt mr-2"></i>
@@ -480,11 +727,17 @@ function getModuleSubtitle($module) {
             <a href="?module=incident_logging" class="flex flex-col items-center text-gray-600 <?php echo $module == 'incident_logging' ? 'mobile-nav-active' : ''; ?>">
                 <i class="fas fa-exclamation-triangle text-xl"></i>
                 <span class="text-xs mt-1">Incident</span>
+                <?php if (isset($stats['today_incidents']) && $stats['today_incidents'] > 0): ?>
+                    <span class="mobile-nav-badge"><?php echo min($stats['today_incidents'], 9); ?></span>
+                <?php endif; ?>
             </a>
             
             <a href="?module=evidence_handover" class="flex flex-col items-center text-gray-600 <?php echo $module == 'evidence_handover' ? 'mobile-nav-active' : ''; ?>">
                 <i class="fas fa-box-open text-xl"></i>
                 <span class="text-xs mt-1">Evidence</span>
+                <?php if (isset($stats['pending_handovers']) && $stats['pending_handovers'] > 0): ?>
+                    <span class="mobile-nav-badge"><?php echo min($stats['pending_handovers'], 9); ?></span>
+                <?php endif; ?>
             </a>
             
             <a href="?module=profile" class="flex flex-col items-center text-gray-600 <?php echo $module == 'profile' ? 'mobile-nav-active' : ''; ?>">
