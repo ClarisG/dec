@@ -1,6 +1,9 @@
 <?php
-require_once '../../config/database.php';
-session_start();
+// Fixed path: from modules folder to config folder
+require_once __DIR__ . '/../config/database.php';
+
+// Don't call session_start() here - it's already started in the main file
+// session_start(); // Remove this line
 
 // Check if user is logged in and is a tanod
 if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'tanod') {
@@ -121,6 +124,9 @@ function addActivityLog($user_id, $action, $description) {
 }
 
 try {
+    // Get database connection
+    $pdo = getDbConnection();
+    
     // Get current duty status
     $stmt = $pdo->prepare("
         SELECT dl.*, ts.schedule_date, ts.shift_start, ts.shift_end, ts.patrol_route, 
@@ -316,7 +322,6 @@ try {
                                 <?php echo number_format($hours, 1); ?> hours
                             </span>
                         <?php endif; ?>
-                    </div>
                 </div>
                 
                 <div class="mt-4 md:mt-0">
@@ -691,7 +696,7 @@ try {
 
         // Clock In/Out functionality
         async function clockIn() {
-            const button = event.target;
+            const button = event.target.closest('button');
             const originalText = button.innerHTML;
             
             // Disable button and show loading
@@ -732,7 +737,7 @@ try {
                 return;
             }
             
-            const button = event.target;
+            const button = event.target.closest('button');
             const originalText = button.innerHTML;
             
             // Disable button and show loading
@@ -779,13 +784,6 @@ try {
 
         // Initialize page
         document.addEventListener('DOMContentLoaded', function() {
-            // Add tooltips to elements with data-tooltip attribute
-            const tooltipElements = document.querySelectorAll('[data-tooltip]');
-            tooltipElements.forEach(el => {
-                el.addEventListener('mouseenter', showTooltip);
-                el.addEventListener('mouseleave', hideTooltip);
-            });
-            
             // Show welcome message if there's a schedule today
             const todaySchedule = <?php echo json_encode($today_schedule); ?>;
             if (todaySchedule && todaySchedule.length > 0) {
@@ -801,31 +799,6 @@ try {
                 }
             }
         });
-
-        // Simple tooltip implementation
-        function showTooltip(e) {
-            const tooltipText = e.target.getAttribute('data-tooltip');
-            if (!tooltipText) return;
-            
-            const tooltip = document.createElement('div');
-            tooltip.className = 'fixed z-50 bg-gray-900 text-white text-sm px-3 py-2 rounded-lg shadow-lg';
-            tooltip.textContent = tooltipText;
-            tooltip.id = 'tooltip';
-            
-            document.body.appendChild(tooltip);
-            
-            const x = e.clientX;
-            const y = e.clientY;
-            tooltip.style.left = (x + 10) + 'px';
-            tooltip.style.top = (y + 10) + 'px';
-        }
-
-        function hideTooltip() {
-            const tooltip = document.getElementById('tooltip');
-            if (tooltip) {
-                tooltip.remove();
-            }
-        }
     </script>
 </body>
 </html>
