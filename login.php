@@ -535,7 +535,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     margin-top: 0;
     padding-top: 20px;
     border-radius: 30px 30px 0 0;
-    box-shadow: 0 -5px 20px rgba(0, 0, 0, 0.05);
     }
     
     .mobile-form-header {
