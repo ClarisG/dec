@@ -325,15 +325,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 color: white;
                 max-width: 350px;
             }
-            
-          .logo-circle {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin: 0 auto 30px;
-    width: 100%;
-    max-width: 300px;
-}
 
             .logo-circle img {
                 width: 300px;
