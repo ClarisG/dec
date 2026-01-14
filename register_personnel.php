@@ -278,7 +278,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             
             .left-section {
                 flex: 1;
-                background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 50%, #1d4ed8 100%);
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
                 display: flex;
                 flex-direction: column;
                 justify-content: center;
@@ -326,21 +326,23 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 max-width: 350px;
             }
             
-          .logo-circle {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin: 0 auto 30px;
-    width: 100%;
-    max-width: 300px;
-}
-
+            .logo-circle {
+                width: 100px;
+                height: 100px;
+                background: rgba(255, 255, 255, 0.15);
+                backdrop-filter: blur(10px);
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                margin: 0 auto 30px;
+                border: 2px solid rgba(255, 255, 255, 0.25);
+            }
+            
             .logo-circle img {
-                width: 300px;
-                height: 300px;
+                width: 60px;
+                height: 60px;
                 object-fit: contain;
-                filter: drop-shadow(0 0 20px white)
-                        drop-shadow(0 0 40px white);
             }
             
             .logo-container h1 {
@@ -429,7 +431,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             .mobile-header {
                 flex-shrink: 0;
                 background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                padding: 40px 30px 80px;
+                padding: 50px 30px 100px;
                 text-align: center;
                 color: white;
                 position: relative;
@@ -437,62 +439,53 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 z-index: 1;
             }
             
-            .mobile-header::after {
-                content: '';
+            /* Add wave separator from register.php */
+            .wave-separator-index {
                 position: absolute;
                 bottom: 0;
                 left: 0;
                 width: 100%;
-                height: 120px;
-                background: white;
+                height: 80px;
                 z-index: 2;
-                mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 200'%3E%3Cpath fill='white' d='M0 0 C150 60 300 -40 450 20 C600 80 750 -20 900 40 C1050 100 1125 0 1200 60 L1200 200 L0 200 Z'/%3E%3C/svg%3E");
-                -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 200'%3E%3Cpath fill='white' d='M0 0 C150 60 300 -40 450 20 C600 80 750 -20 900 40 C1050 100 1125 0 1200 60 L1200 200 L0 200 Z'/%3E%3C/svg%3E");
-                mask-size: 100% 200px;
-                transform: translateY(80px);
+                pointer-events: none;
             }
             
-            .mobile-header::before {
-                content: '';
+            .wave-separator-index svg {
                 position: absolute;
-                bottom: 10px;
+                bottom: 0;
                 left: 0;
                 width: 100%;
-                height: 140px;
-                background: rgba(255, 255, 255, 0.25);
-                z-index: 1;
-                mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 120' preserveAspectRatio='none'%3E%3Cpath fill='%23ffffff' d='M321.39,56.44c58-10.79,114.16-30.13,172-41.86,82.39-16.72,168.19-17.73,250.45-.39C823.78,31,906.67,72,985.66,92.83c70.05,18.48,146.53,26.09,214.34,3V0H0V27.35A600.21,600.21,0,0,0,321.39,56.44Z'/%3E%3C/svg%3E");
-                -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 120' preserveAspectRatio='none'%3E%3Cpath fill='%23ffffff' d='M321.39,56.44c58-10.79,114.16-30.13,172-41.86,82.39-16.72,168.19-17.73,250.45-.39C823.78,31,906.67,72,985.66,92.83c70.05,18.48,146.53,26.09,214.34,3V0H0V27.35A600.21,600.21,0,0,0,321.39,56.44Z'/%3E%3C/svg%3E");
-                mask-size: 1200px 140px;
-                -webkit-mask-size: 1200px 140px;
-                transform: translateY(70px);
+                height: 80px;
+                display: block;
             }
-                        
+            
+            /* Remove the old wave effects */
+            .mobile-header::after,
+            .mobile-header::before {
+                content: none;
+            }
+            
             .mobile-logo-circle {
+                width: 80px;
+                height: 80px;
+                background: rgba(255, 255, 255, 0.15);
+                backdrop-filter: blur(10px);
+                border-radius: 50%;
                 display: flex;
                 align-items: center;
                 justify-content: center;
                 margin: 0 auto 20px;
+                border: 2px solid rgba(255, 255, 255, 0.25);
                 position: relative;
                 z-index: 3;
-                background: transparent;
-                border: none;
-                border-radius: 0;
-                backdrop-filter: none;
-                width: 100%;
-                max-width: 200px;
-                height: auto;
-                aspect-ratio: 1;
             }
-
+            
             .mobile-logo-circle img {
-                width: 120px;
-                height: 120px;
-                max-width: 100%;
+                width: 50px;
+                height: 50px;
                 object-fit: contain;
-                filter: drop-shadow(0 0 20px rgba(255, 255, 255, 0.8))
-                    drop-shadow(0 0 40px rgba(255, 255, 255, 0.6));
             }
+            
             .mobile-header h1 {
                 font-size: 24px;
                 font-weight: 700;
@@ -646,7 +639,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         .btn-submit {
             width: 100%;
             padding: 16px;
-            background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 50%, #1d4ed8 100%);
+            background: linear-gradient(to right, #667eea, #764ba2);
             color: white;
             border: none;
             border-radius: 12px;
@@ -867,7 +860,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             margin-top: 5px;
         }
         
-        /* Role-specific styling - FIXED: Plain white background, only icon circles colored */
+        /* Role-specific styling */
         .role-option {
             display: flex;
             align-items: center;
@@ -877,17 +870,16 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             margin-bottom: 10px;
             cursor: pointer;
             transition: all 0.3s;
-            background: white !important; /* Force white background */
         }
         
         .role-option:hover {
             border-color: #667eea;
-            background: #f7fafc !important; /* Light gray on hover */
+            background: #f7fafc;
         }
         
         .role-option.selected {
             border-color: #667eea;
-            background: #edf2f7 !important; /* Slightly darker gray when selected */
+            background: #edf2f7;
         }
         
         .role-icon {
@@ -914,7 +906,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             color: #718096;
         }
         
-        /* Role colors for icons only */
+        /* Role colors */
         .tanod-role { background: linear-gradient(135deg, #4CAF50, #2E7D32); }
         .secretary-role { background: linear-gradient(135deg, #2196F3, #0D47A1); }
         .admin-role { background: linear-gradient(135deg, #9C27B0, #4A148C); }
@@ -968,7 +960,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         .login-button {
             display: inline-block;
             padding: 12px 30px;
-            background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 50%, #1d4ed8 100%);
+            background: linear-gradient(to right, #667eea, #764ba2);
             color: white;
             border: none;
             border-radius: 10px;
@@ -995,12 +987,33 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     <div class="register-container hidden md:flex">
         <div class="left-section">
             <a href="index.php" class="back-home">
-            <i class="fas fa-long-arrow-alt-left"></i>
+                <i class="fas fa-arrow-left"></i>Back to Home
             </a>
             
             <div class="logo-container">
                 <div class="logo-circle">
-             <img src="images/10213.png" alt="LEIR Logo">
+                    <img src="../dec/images/10213.png" alt="BLUEBACK Logo">
+                </div>
+                <h1>Personnel Registration</h1>
+                <p>Register as Barangay Personnel</p>
+                
+                <div class="features">
+                    <div class="feature-item">
+                        <i class="fas fa-shield-alt"></i>
+                        <span>Community Safety & Administration</span>
+                    </div>
+                    <div class="feature-item">
+                        <i class="fas fa-bolt"></i>
+                        <span>Quick Incident Management</span>
+                    </div>
+                    <div class="feature-item">
+                        <i class="fas fa-bell"></i>
+                        <span>Real-time Alerts & Notifications</span>
+                    </div>
+                    <div class="feature-item">
+                        <i class="fas fa-users"></i>
+                        <span>Community Service & Governance</span>
+                    </div>
                 </div>
             </div>
         </div>
@@ -1075,7 +1088,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 </h3>
                 
                 <div class="role-grid">
-                    <div class="role-option" data-role="tanod">
+                    <div class="role-option tanod-role" data-role="tanod">
                         <div class="role-icon tanod-role">
                             <i class="fas fa-shield-alt"></i>
                         </div>
@@ -1085,7 +1098,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                         </div>
                     </div>
                     
-                    <div class="role-option" data-role="secretary">
+                    <div class="role-option secretary-role" data-role="secretary">
                         <div class="role-icon secretary-role">
                             <i class="fas fa-file-alt"></i>
                         </div>
@@ -1095,7 +1108,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                         </div>
                     </div>
                     
-                    <div class="role-option" data-role="admin">
+                    <div class="role-option admin-role" data-role="admin">
                         <div class="role-icon admin-role">
                             <i class="fas fa-cogs"></i>
                         </div>
@@ -1105,7 +1118,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                         </div>
                     </div>
                     
-                    <div class="role-option" data-role="captain">
+                    <div class="role-option captain-role" data-role="captain">
                         <div class="role-icon captain-role">
                             <i class="fas fa-crown"></i>
                         </div>
@@ -1115,7 +1128,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                         </div>
                     </div>
                     
-                    <div class="role-option" data-role="lupon">
+                    <div class="role-option lupon-role" data-role="lupon">
                         <div class="role-icon lupon-role">
                             <i class="fas fa-balance-scale"></i>
                         </div>
@@ -1125,7 +1138,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                         </div>
                     </div>
                     
-                    <div class="role-option" data-role="super_admin">
+                    <div class="role-option super-admin-role" data-role="super_admin">
                         <div class="role-icon super-admin-role">
                             <i class="fas fa-user-shield"></i>
                         </div>
@@ -1343,18 +1356,25 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     <input type="checkbox" id="terms" name="terms" required>
                     <label for="terms">
                         I agree to the <a href="#" style="color: #667eea;">Terms of Service</a> and 
-                        <a href="#" style="color: #667eea;">Privacy Policy</a> of Law Enforcement and Incident Reporting System.
+                        <a href="#" style="color: #667eea;">Privacy Policy</a> of BLUEBACK Incident Reporting System.
                         I understand that as barangay personnel, I have additional responsibilities and access privileges.
                     </label>
                 </div>
                 <div class="error-message" id="terms_error"></div>
+                
+                <div class="security-badge">
+                    <i class="fas fa-shield-alt"></i>
+                    <span>Your account will be verified by the system administrator</span>
+                </div>
+                
                 <button type="submit" class="btn-submit" id="submitButton">
                     <i class="fas fa-user-plus mr-2"></i>Register as Personnel
                 </button>
                 
                 <div class="login-link">
                     Already have an account? 
-                    <a href="login.php">Sign in here</a> 
+                    <a href="login.php">Sign in here</a> | 
+                    <a href="register.php" style="color: #4CAF50;">Citizen Registration</a>
                 </div>
             </form>
             
@@ -1365,11 +1385,17 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     <div class="mobile-container md:hidden">
         <div class="mobile-header">
             <div class="mobile-logo-circle">
-            <img src="images/10213.png" alt="LEIR Logo">
+                <img src="../dec/images/10213.png" alt="BLUEBACK Logo">
             </div>
             <h1>Personnel Registration</h1>
             <p>Register as Barangay Personnel</p>
             
+            <!-- Add the wave separator from register.php -->
+            <div class="wave-separator-index">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 100" preserveAspectRatio="none">
+                    <path fill="white" fill-opacity="1" d="M0,80L48,75C96,70,192,60,288,55C384,50,480,50,576,55C672,60,768,70,864,75C960,80,1056,80,1152,75C1248,70,1344,60,1392,55L1440,50L1440,100L1392,100C1344,100,1248,100,1152,100C1056,100,960,100,864,100C768,100,672,100,576,100C480,100,384,100,288,100C192,100,96,100,48,100L0,100Z"></path>
+                </svg>
+            </div>
         </div>
         
         <div class="mobile-form-container">
@@ -1440,7 +1466,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 </h3>
                 
                 <div class="role-grid">
-                    <div class="role-option" data-role="tanod">
+                    <div class="role-option tanod-role" data-role="tanod">
                         <div class="role-icon tanod-role">
                             <i class="fas fa-shield-alt"></i>
                         </div>
@@ -1450,7 +1476,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                         </div>
                     </div>
                     
-                    <div class="role-option" data-role="secretary">
+                    <div class="role-option secretary-role" data-role="secretary">
                         <div class="role-icon secretary-role">
                             <i class="fas fa-file-alt"></i>
                         </div>
@@ -1460,7 +1486,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                         </div>
                     </div>
                     
-                    <div class="role-option" data-role="admin">
+                    <div class="role-option admin-role" data-role="admin">
                         <div class="role-icon admin-role">
                             <i class="fas fa-cogs"></i>
                         </div>
@@ -1470,7 +1496,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                         </div>
                     </div>
                     
-                    <div class="role-option" data-role="captain">
+                    <div class="role-option captain-role" data-role="captain">
                         <div class="role-icon captain-role">
                             <i class="fas fa-crown"></i>
                         </div>
@@ -1480,7 +1506,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                         </div>
                     </div>
                     
-                    <div class="role-option" data-role="lupon">
+                    <div class="role-option lupon-role" data-role="lupon">
                         <div class="role-icon lupon-role">
                             <i class="fas fa-balance-scale"></i>
                         </div>
@@ -1490,7 +1516,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                         </div>
                     </div>
                     
-                    <div class="role-option" data-role="super_admin">
+                    <div class="role-option super-admin-role" data-role="super_admin">
                         <div class="role-icon super-admin-role">
                             <i class="fas fa-user-shield"></i>
                         </div>
@@ -1700,12 +1726,15 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     <input type="checkbox" id="mobile_terms" name="terms" required>
                     <label for="mobile_terms">
                         I agree to the <a href="#" style="color: #667eea;">Terms of Service</a> and 
-                        <a href="#" style="color: #667eea;">Privacy Policy</a> of  Law Enforcement and Incident Reporting System. 
-                        I understand that as barangay personnel, I have additional responsibilities and access privileges.
+                        <a href="#" style="color: #667eea;">Privacy Policy</a> of BLUEBACK.
                     </label>
                 </div>
                 <div class="error-message" id="mobile_terms_error"></div>
-    
+                
+                <div class="security-badge">
+                    <i class="fas fa-shield-alt"></i>
+                    <span>Your account will be verified by administrator</span>
+                </div>
                 
                 <button type="submit" class="btn-submit" id="mobileSubmitButton">
                     <i class="fas fa-user-plus mr-2"></i>Register as Personnel
@@ -1713,7 +1742,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 
                 <div class="login-link">
                     Already have an account? 
-                    <a href="login.php">Sign in here</a>  
+                    <a href="login.php">Sign in here</a> | 
+                    <a href="register.php" style="color: #4CAF50;">Citizen Registration</a>
                 </div>
             </form>
             
