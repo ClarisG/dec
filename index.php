@@ -29,7 +29,7 @@ if (isset($_SESSION['user_id'])) {
     <title>LEIR</title>
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="icon" type="image/png" href="../dec/images/10213.png">
+    <link rel="icon" type="image/png" href="images/10213.png">
     <style>
         :root {
             --primary-blue: #1a4f8c;
