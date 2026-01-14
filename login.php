@@ -14,6 +14,8 @@ function redirectUser($role) {
         case 'secretary': header("Location: sec/secretary_dashboard.php"); exit;
         case 'captain': header("Location: captain/captain_dashboard.php"); exit;
         case 'admin': header("Location: admin/admin_dashboard.php"); exit;
+        case 'lupon': header("Location: lupon/lupon_dashboard.php"); exit;
+        case 'super_admin': header("Location: super_admin/super_admin_dashboard.php"); exit;
         default: header("Location: index.php"); exit;
     }
 }
@@ -160,7 +162,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                             // Allow both 'active' and 'pending' status for personnel
                             if ($user['is_active'] && ($user['status'] == 'active' || $user['status'] == 'pending')) {
                                 // Check if user is personnel (requires master code)
-                                $personnel_roles = ['tanod', 'secretary', 'admin', 'captain'];
+                                $personnel_roles = ['tanod', 'secretary', 'admin', 'captain', 'lupon', 'super_admin'];
                                 
                                 if (in_array($user['role'], $personnel_roles)) {
                                     error_log("User is personnel with role: " . $user['role']);
