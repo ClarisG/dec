@@ -1714,7 +1714,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     <input type="checkbox" id="mobile_terms" name="terms" required>
                     <label for="mobile_terms">
                         I agree to the <a href="#" style="color: #667eea;">Terms of Service</a> and 
-                        <a href="#" style="color: #667eea;">Privacy Policy</a> of LEIR.
+                        <a href="#" style="color: #667eea;">Privacy Policy</a> of  Law Enforcement and Incident Reporting System. 
+                        I understand that as barangay personnel, I have additional responsibilities and access privileges.
                     </label>
                 </div>
                 <div class="error-message" id="mobile_terms_error"></div>
