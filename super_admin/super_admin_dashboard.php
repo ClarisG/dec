@@ -34,6 +34,29 @@ if (!in_array($module, $valid_modules)) {
     $module = 'dashboard';
 }
 
+// Handle form submissions based on module
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    switch($module) {
+        case 'global_config':
+            if (isset($_POST['save_config'])) {
+                handleGlobalConfig($conn, $_POST);
+            }
+            break;
+        case 'user_management':
+            if (isset($_POST['update_user'])) {
+                handleUserUpdate($conn, $_POST);
+            } elseif (isset($_POST['create_user'])) {
+                handleUserCreate($conn, $_POST);
+            }
+            break;
+        case 'super_notifications':
+            if (isset($_POST['send_notification'])) {
+                handleSendNotification($conn, $_POST);
+            }
+            break;
+    }
+}
+
 // Get user data including profile picture
 $user_query = "SELECT u.*, 
                       IFNULL(u.barangay, 'System-wide') as barangay_display,
@@ -60,17 +83,41 @@ if ($user_data) {
     $active_cases = 0;
 }
 
-// Get system health
+// Get system health statistics
 $health_query = "SELECT 
     (SELECT COUNT(*) FROM users WHERE is_active = 1) as active_users,
     (SELECT COUNT(*) FROM reports WHERE created_at > DATE_SUB(NOW(), INTERVAL 7 DAY)) as weekly_reports,
     (SELECT COUNT(*) FROM api_integrations WHERE status = 'active') as active_apis,
     (SELECT COUNT(*) FROM file_encryption_logs WHERE last_decrypted IS NOT NULL) as decrypted_files,
     (SELECT COUNT(*) FROM activity_logs WHERE created_at > DATE_SUB(NOW(), INTERVAL 1 HOUR)) as hourly_activity,
-    (SELECT MAX(created_at) FROM activity_logs) as last_activity";
+    (SELECT MAX(created_at) FROM activity_logs) as last_activity,
+    (SELECT COUNT(*) FROM reports WHERE status = 'pending') as pending_reports,
+    (SELECT COUNT(*) FROM patrol_logs WHERE DATE(start_time) = CURDATE()) as today_patrols";
 $health_stmt = $conn->prepare($health_query);
 $health_stmt->execute();
 $health_data = $health_stmt->fetch(PDO::FETCH_ASSOC);
+
+// Get recent system activities
+$activities_query = "SELECT al.*, u.first_name, u.last_name 
+                     FROM activity_logs al 
+                     LEFT JOIN users u ON al.user_id = u.id 
+                     ORDER BY al.created_at DESC 
+                     LIMIT 10";
+$activities_stmt = $conn->prepare($activities_query);
+$activities_stmt->execute();
+$recent_activities = $activities_stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Get all roles for user management
+$roles_query = "SELECT DISTINCT role FROM users WHERE role IS NOT NULL";
+$roles_stmt = $conn->prepare($roles_query);
+$roles_stmt->execute();
+$all_roles = $roles_stmt->fetchAll(PDO::FETCH_COLUMN);
+
+// Get all barangays for filtering
+$barangays_query = "SELECT DISTINCT barangay FROM users WHERE barangay IS NOT NULL AND barangay != ''";
+$barangays_stmt = $conn->prepare($barangays_query);
+$barangays_stmt->execute();
+$all_barangays = $barangays_stmt->fetchAll(PDO::FETCH_COLUMN);
 
 // Function to get module title
 function getModuleTitle($module) {
@@ -119,106 +166,216 @@ function getModuleSubtitle($module) {
     ];
     return $subtitles[$module] ?? '';
 }
+
+// Handler functions
+function handleGlobalConfig($conn, $data) {
+    try {
+        // Update configuration settings
+        foreach($data as $key => $value) {
+            if (strpos($key, 'config_') === 0) {
+                $config_key = substr($key, 7);
+                $stmt = $conn->prepare("INSERT INTO system_config (config_key, config_value, updated_by, updated_at) 
+                                       VALUES (:key, :value, :user_id, NOW()) 
+                                       ON DUPLICATE KEY UPDATE config_value = :value, updated_by = :user_id, updated_at = NOW()");
+                $stmt->execute([
+                    ':key' => $config_key,
+                    ':value' => $value,
+                    ':user_id' => $_SESSION['user_id']
+                ]);
+            }
+        }
+        $_SESSION['success'] = "Configuration updated successfully!";
+    } catch(PDOException $e) {
+        $_SESSION['error'] = "Failed to update configuration: " . $e->getMessage();
+    }
+}
+
+function handleUserUpdate($conn, $data) {
+    try {
+        $user_id = $data['user_id'];
+        $role = $data['role'];
+        $status = $data['status'];
+        
+        $stmt = $conn->prepare("UPDATE users SET role = :role, is_active = :status WHERE id = :id");
+        $stmt->execute([
+            ':role' => $role,
+            ':status' => $status,
+            ':id' => $user_id
+        ]);
+        
+        // Log the action
+        logActivity($conn, $_SESSION['user_id'], "Updated user #$user_id (Role: $role, Status: $status)");
+        
+        $_SESSION['success'] = "User updated successfully!";
+    } catch(PDOException $e) {
+        $_SESSION['error'] = "Failed to update user: " . $e->getMessage();
+    }
+}
+
+function handleUserCreate($conn, $data) {
+    try {
+        $first_name = $data['first_name'] ?? '';
+        $last_name = $data['last_name'] ?? '';
+        $email = $data['email'] ?? '';
+        $role = $data['role'] ?? 'citizen';
+        $barangay = $data['barangay'] ?? '';
+        
+        // Check if email already exists
+        $check_email = $conn->prepare("SELECT id FROM users WHERE email = :email");
+        $check_email->execute([':email' => $email]);
+        if ($check_email->fetch()) {
+            $_SESSION['error'] = "Email already exists!";
+            return;
+        }
+        
+        // Generate a temporary password
+        $temp_password = bin2hex(random_bytes(8));
+        $hashed_password = password_hash($temp_password, PASSWORD_DEFAULT);
+        
+        // Insert new user
+        $stmt = $conn->prepare("INSERT INTO users (first_name, last_name, email, role, barangay, password, is_active, created_at) 
+                               VALUES (:first_name, :last_name, :email, :role, :barangay, :password, 1, NOW())");
+        $stmt->execute([
+            ':first_name' => $first_name,
+            ':last_name' => $last_name,
+            ':email' => $email,
+            ':role' => $role,
+            ':barangay' => $barangay,
+            ':password' => $hashed_password
+        ]);
+        
+        $new_user_id = $conn->lastInsertId();
+        
+        // Log the action
+        logActivity($conn, $_SESSION['user_id'], "Created user #$new_user_id ($first_name $last_name) with role $role");
+        
+        $_SESSION['success'] = "User created successfully! Temporary password: $temp_password";
+    } catch(PDOException $e) {
+        $_SESSION['error'] = "Failed to create user: " . $e->getMessage();
+    }
+}
+
+function handleSendNotification($conn, $data) {
+    try {
+        $title = $data['title'];
+        $message = $data['message'];
+        $target_role = $data['target_role'];
+        $priority = $data['priority'];
+        
+        $stmt = $conn->prepare("INSERT INTO notifications (title, message, target_role, priority, created_by, created_at) 
+                               VALUES (:title, :message, :target_role, :priority, :user_id, NOW())");
+        $stmt->execute([
+            ':title' => $title,
+            ':message' => $message,
+            ':target_role' => $target_role,
+            ':priority' => $priority,
+            ':user_id' => $_SESSION['user_id']
+        ]);
+        
+        // Log the action
+        logActivity($conn, $_SESSION['user_id'], "Sent notification to $target_role: $title");
+        
+        $_SESSION['success'] = "Notification sent successfully!";
+    } catch(PDOException $e) {
+        $_SESSION['error'] = "Failed to send notification: " . $e->getMessage();
+    }
+}
+
+function logActivity($conn, $user_id, $action) {
+    $stmt = $conn->prepare("INSERT INTO activity_logs (user_id, action, ip_address, user_agent, created_at) 
+                           VALUES (:user_id, :action, :ip, :agent, NOW())");
+    $stmt->execute([
+        ':user_id' => $user_id,
+        ':action' => $action,
+        ':ip' => $_SERVER['REMOTE_ADDR'],
+        ':agent' => $_SERVER['HTTP_USER_AGENT']
+    ]);
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Super Admin - <?php echo getModuleTitle($module); ?> LEIR | Super Admin</title>
+    <title>Super Admin - <?php echo getModuleTitle($module); ?> | LEIR</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="icon" type="image/png" href="../images/10213.png">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         * {
             font-family: 'Inter', sans-serif;
         }
         
         :root {
-            --primary-purple: #7e22ce;
-            --secondary-purple: #9333ea;
-            --accent-purple: #a855f7;
-            --dark-purple: #581c87;
-            --light-purple: #faf5ff;
+            --primary-blue: #e3f2fd;
+            --secondary-blue: #bbdefb;
+            --accent-blue: #2196f3;
+            --dark-blue: #0d47a1;
+            --light-blue: #f5fbff;
         }
         
         body {
-            background: linear-gradient(135deg, #faf5ff 0%, #f3e8ff 100%);
+            background: linear-gradient(135deg, #f5fbff 0%, #e3f2fd 100%);
             min-height: 100vh;
         }
         
         .glass-card {
-            background: rgba(255, 255, 255, 0.95);
+            background: rgba(255, 255, 255, 0.9);
             backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.2);
         }
         
         .module-card {
             transition: all 0.3s ease;
-            border-left: 4px solid var(--accent-purple);
+            border-left: 4px solid var(--accent-blue);
         }
         
         .module-card:hover {
             transform: translateY(-5px);
-            box-shadow: 0 15px 30px rgba(126, 34, 206, 0.15);
+            box-shadow: 0 10px 25px rgba(33, 150, 243, 0.1);
+            border-left-color: var(--dark-blue);
         }
         
-        .super-stat-card {
-            background: linear-gradient(135deg, #ffffff 0%, #f8f0ff 100%);
-            border: 1px solid #e9d5ff;
-            position: relative;
-            overflow: hidden;
+        .stat-card {
+            background: linear-gradient(135deg, #ffffff 0%, #f0f9ff 100%);
+            border: 1px solid #e0f2fe;
         }
         
-        .super-stat-card::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 4px;
-            background: linear-gradient(90deg, #7e22ce, #9333ea);
+        .urgent {
+            border-left: 4px solid #ef4444;
+            background: linear-gradient(135deg, #fef2f2 0%, #fecaca 100%);
+        }
+        
+        .warning {
+            border-left: 4px solid #f59e0b;
+            background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
+        }
+        
+        .success {
+            border-left: 4px solid #10b981;
+            background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
         }
         
         .sidebar {
-            background: linear-gradient(180deg, #1e1b4b 0%, #3730a3 100%);
-            box-shadow: 4px 0 20px rgba(0, 0, 0, 0.15);
+            background: linear-gradient(180deg, #1e3a8a 0%, #0d47a1 100%);
+            box-shadow: 4px 0 15px rgba(0, 0, 0, 0.1);
         }
         
         .sidebar-link {
             transition: all 0.3s ease;
             border-left: 3px solid transparent;
-            position: relative;
         }
         
         .sidebar-link:hover {
             background: rgba(255, 255, 255, 0.1);
-            border-left-color: #a855f7;
+            border-left-color: #60a5fa;
         }
         
         .sidebar-link.active {
             background: rgba(255, 255, 255, 0.15);
-            border-left-color: #8b5cf6;
-            font-weight: 600;
-        }
-        
-        .sidebar-link.active::after {
-            content: '';
-            position: absolute;
-            right: 15px;
-            top: 50%;
-            transform: translateY(-50%);
-            width: 8px;
-            height: 8px;
-            background: #8b5cf6;
-            border-radius: 50%;
-            animation: pulse 2s infinite;
-        }
-        
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
+            border-left-color: #3b82f6;
         }
         
         .badge {
@@ -229,7 +386,7 @@ function getModuleSubtitle($module) {
         }
         
         .badge-super {
-            background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+            background: linear-gradient(135deg, #3b82f6, #2563eb);
             color: white;
         }
         
@@ -345,7 +502,7 @@ function getModuleSubtitle($module) {
             }
             
             .mobile-nav-item.active {
-                color: #7e22ce;
+                color: #2196f3;
             }
             
             .mobile-nav-item.active::after {
@@ -356,7 +513,7 @@ function getModuleSubtitle($module) {
                 transform: translateX(-50%);
                 width: 6px;
                 height: 6px;
-                background: #7e22ce;
+                background: #2196f3;
                 border-radius: 50%;
             }
             
@@ -388,18 +545,14 @@ function getModuleSubtitle($module) {
         }
         
         ::-webkit-scrollbar-thumb {
-            background: linear-gradient(180deg, #7e22ce, #9333ea);
+            background: linear-gradient(180deg, #2196f3, #0d47a1);
             border-radius: 4px;
-        }
-        
-        ::-webkit-scrollbar-thumb:hover {
-            background: linear-gradient(180deg, #6b21a8, #7c3aed);
         }
         
         /* Loading Animation */
         .loading-spinner {
             border: 3px solid #f3f3f3;
-            border-top: 3px solid #7e22ce;
+            border-top: 3px solid #2196f3;
             border-radius: 50%;
             width: 40px;
             height: 40px;
@@ -409,6 +562,13 @@ function getModuleSubtitle($module) {
         @keyframes spin {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
+        }
+        
+        /* Chart container */
+        .chart-container {
+            position: relative;
+            height: 300px;
+            width: 100%;
         }
     </style>
 </head>
@@ -420,13 +580,13 @@ function getModuleSubtitle($module) {
     <div class="sidebar w-64 min-h-screen fixed left-0 top-0 z-40 hidden md:block">
         <div class="p-6">
             <!-- LEIR Logo -->
-            <div class="flex items-center space-x-3 mb-8 pb-4 border-b border-purple-400/30">
+            <div class="flex items-center space-x-3 mb-8 pb-4 border-b border-blue-400/30">
                 <div class="w-10 h-10 flex items-center justify-center">
                     <img src="../images/10213.png" alt="LEIR Logo" class="w-19 h-22 object-contain">
                 </div>
                 <div>
                     <h1 class="text-xl font-bold text-white">LEIR</h1>
-                    <p class="text-purple-200 text-sm">Super Admin System</p>
+                    <p class="text-blue-200 text-sm">Super Admin System</p>
                 </div>
             </div>
             
@@ -441,7 +601,7 @@ function getModuleSubtitle($module) {
                             <img src="<?php echo $profile_pic_path; ?>" 
                                  alt="Profile" class="w-10 h-10 rounded-full object-cover border-2 border-white shadow-lg">
                         <?php else: ?>
-                            <div class="w-10 h-10 rounded-full bg-gradient-to-r from-purple-600 to-pink-600 flex items-center justify-center text-white font-bold text-lg">
+                            <div class="w-10 h-10 rounded-full bg-gradient-to-r from-blue-600 to-blue-500 flex items-center justify-center text-white font-bold text-lg">
                                 SA
                             </div>
                         <?php endif; ?>
@@ -449,11 +609,11 @@ function getModuleSubtitle($module) {
                     </div>
                     <div>
                         <p class="text-white font-medium truncate"><?php echo htmlspecialchars($user_name); ?></p>
-                        <p class="text-purple-200 text-sm">Super Administrator</p>
+                        <p class="text-blue-200 text-sm">Super Administrator</p>
                     </div>
                 </div>
                 <div class="mt-3 ml-3">
-                    <p class="text-sm text-purple-200 flex items-center">
+                    <p class="text-sm text-blue-200 flex items-center">
                         <i class="fas fa-globe mr-2 text-xs"></i>
                         <span class="truncate">System-wide Access</span>
                     </p>
@@ -462,7 +622,7 @@ function getModuleSubtitle($module) {
             
             <!-- Navigation -->
             <nav class="space-y-1">
-                <h3 class="text-xs uppercase tracking-wider text-purple-300 mb-2">System Modules</h3>
+                <h3 class="text-xs uppercase tracking-wider text-blue-300 mb-2">System Modules</h3>
                 <a href="?module=dashboard" class="sidebar-link block p-3 text-white rounded-lg <?php echo $module == 'dashboard' ? 'active' : ''; ?>">
                     <i class="fas fa-tachometer-alt mr-3"></i>
                     Dashboard Overview
@@ -488,7 +648,7 @@ function getModuleSubtitle($module) {
                     Evidence Master Log
                 </a>
                 
-                <h3 class="text-xs uppercase tracking-wider text-purple-300 mt-4 mb-2">Control Modules</h3>
+                <h3 class="text-xs uppercase tracking-wider text-blue-300 mt-4 mb-2">Control Modules</h3>
                 <a href="?module=patrol_override" class="sidebar-link block p-3 text-white rounded-lg <?php echo $module == 'patrol_override' ? 'active' : ''; ?>">
                     <i class="fas fa-walking mr-3"></i>
                     Patrol Control
@@ -506,18 +666,18 @@ function getModuleSubtitle($module) {
                     Mediation Oversight
                 </a>
                 
-                <h3 class="text-xs uppercase tracking-wider text-purple-300 mt-4 mb-2">Data Access</h3>
+                <h3 class="text-xs uppercase tracking-wider text-blue-300 mt-4 mb-2">Data Access</h3>
                 <a href="?module=reports_all" class="sidebar-link block p-3 text-white rounded-lg <?php echo $module == 'reports_all' ? 'active' : ''; ?>">
                     <i class="fas fa-file-alt mr-3"></i>
                     All Reports
-                    <span class="float-right bg-purple-500 text-white text-xs rounded-full w-6 h-6 flex items-center justify-center">
+                    <span class="float-right bg-blue-500 text-white text-xs rounded-full w-6 h-6 flex items-center justify-center">
                         <?php echo $active_cases; ?>
                     </span>
                 </a>
                 <a href="?module=users_all" class="sidebar-link block p-3 text-white rounded-lg <?php echo $module == 'users_all' ? 'active' : ''; ?>">
                     <i class="fas fa-user-friends mr-3"></i>
                     All Users
-                    <span class="float-right bg-purple-500 text-white text-xs rounded-full w-6 h-6 flex items-center justify-center">
+                    <span class="float-right bg-blue-500 text-white text-xs rounded-full w-6 h-6 flex items-center justify-center">
                         <?php echo $total_users; ?>
                     </span>
                 </a>
@@ -532,7 +692,7 @@ function getModuleSubtitle($module) {
             </nav>
             
             <!-- Status & Logout -->
-            <div class="mt-8 pt-8 border-t border-purple-400/30">
+            <div class="mt-8 pt-8 border-t border-blue-400/30">
                 <div class="flex items-center justify-between p-3 bg-white/10 rounded-lg mb-4">
                     <div class="flex items-center">
                         <i class="fas fa-server text-green-400 mr-2"></i>
@@ -541,7 +701,7 @@ function getModuleSubtitle($module) {
                     <span class="px-2 py-1 bg-green-500/30 text-green-300 text-xs rounded-full">Operational</span>
                 </div>
                 
-                <a href="../logout.php" class="flex items-center p-3 text-purple-200 hover:text-white hover:bg-white/10 rounded-lg transition">
+                <a href="../logout.php" class="flex items-center p-3 text-blue-200 hover:text-white hover:bg-white/10 rounded-lg transition">
                     <i class="fas fa-sign-out-alt mr-3"></i>
                     Logout
                 </a>
@@ -557,7 +717,7 @@ function getModuleSubtitle($module) {
                 <div class="flex justify-between items-center">
                     <!-- Left: Mobile Menu Button and Title -->
                     <div class="flex items-center space-x-4">
-                        <button id="mobileMenuButton" class="md:hidden text-gray-600 hover:text-purple-600 focus:outline-none">
+                        <button id="mobileMenuButton" class="md:hidden text-gray-600 hover:text-blue-600 focus:outline-none">
                             <i class="fas fa-bars text-2xl"></i>
                         </button>
                         <div>
@@ -576,7 +736,7 @@ function getModuleSubtitle($module) {
                         <div class="hidden md:flex items-center space-x-4">
                             <div class="text-right">
                                 <p class="text-sm text-gray-500">Active Users</p>
-                                <p class="font-semibold text-purple-600"><?php echo $health_data['active_users'] ?? 0; ?></p>
+                                <p class="font-semibold text-blue-600"><?php echo $health_data['active_users'] ?? 0; ?></p>
                             </div>
                             <div class="text-right">
                                 <p class="text-sm text-gray-500">Weekly Reports</p>
@@ -598,9 +758,9 @@ function getModuleSubtitle($module) {
                             <button id="userMenuButton" class="flex items-center space-x-2 focus:outline-none">
                                 <?php if (!empty($profile_picture) && file_exists($profile_pic_path)): ?>
                                     <img src="<?php echo $profile_pic_path; ?>" 
-                                         alt="Profile" class="w-10 h-10 rounded-full object-cover border-2 border-purple-300 shadow-sm">
+                                         alt="Profile" class="w-10 h-10 rounded-full object-cover border-2 border-blue-300 shadow-sm">
                                 <?php else: ?>
-                                    <div class="w-10 h-10 rounded-full bg-gradient-to-r from-purple-600 to-pink-600 flex items-center justify-center text-white font-semibold">
+                                    <div class="w-10 h-10 rounded-full bg-gradient-to-r from-blue-600 to-blue-500 flex items-center justify-center text-white font-semibold">
                                         SA
                                     </div>
                                 <?php endif; ?>
@@ -619,7 +779,7 @@ function getModuleSubtitle($module) {
                                             <img src="<?php echo $profile_pic_path; ?>" 
                                                  alt="Profile" class="w-10 h-10 rounded-full object-cover">
                                         <?php else: ?>
-                                            <div class="w-10 h-10 rounded-full bg-gradient-to-r from-purple-600 to-pink-600 flex items-center justify-center text-white font-bold">
+                                            <div class="w-10 h-10 rounded-full bg-gradient-to-r from-blue-600 to-blue-500 flex items-center justify-center text-white font-bold">
                                                 SA
                                             </div>
                                         <?php endif; ?>
@@ -655,14 +815,81 @@ function getModuleSubtitle($module) {
             </div>
         </header>
 
+        <!-- Alerts -->
+        <?php if (isset($_SESSION['success'])): ?>
+        <div class="mb-6 p-4 bg-green-50 border-l-4 border-green-500 rounded-lg">
+            <div class="flex items-center">
+                <i class="fas fa-check-circle text-green-500 mr-3"></i>
+                <p class="text-green-700"><?php echo htmlspecialchars($_SESSION['success']); ?></p>
+            </div>
+        </div>
+        <?php unset($_SESSION['success']); ?>
+        <?php endif; ?>
+        
+        <?php if (isset($_SESSION['error'])): ?>
+        <div class="mb-6 p-4 bg-red-50 border-l-4 border-red-500 rounded-lg">
+            <div class="flex items-center">
+                <i class="fas fa-exclamation-circle text-red-500 mr-3"></i>
+                <p class="text-red-700"><?php echo htmlspecialchars($_SESSION['error']); ?></p>
+            </div>
+        </div>
+        <?php unset($_SESSION['error']); ?>
+        <?php endif; ?>
+
         <!-- Module Content -->
         <?php
-        $module_file = "super_admin/modules/{$module}.php";
-        if (file_exists($module_file)) {
-            include $module_file;
-        } else {
-            // Fallback to dashboard if module file doesn't exist
-            include "super_admin/modules/dashboard.php";
+        // Load module content based on selected module
+        switch($module) {
+            case 'dashboard':
+                include 'modules/dashboard.php';
+                break;
+            case 'global_config':
+                include 'modules/global_config.php';
+                break;
+            case 'user_management':
+                include 'modules/user_management.php';
+                break;
+            case 'audit_dashboard':
+                include 'modules/audit_dashboard.php';
+                break;
+            case 'incident_override':
+                include 'modules/incident_override.php';
+                break;
+            case 'evidence_log':
+                include 'modules/evidence_log.php';
+                break;
+            case 'patrol_override':
+                include 'modules/patrol_override.php';
+                break;
+            case 'kpi_superview':
+                include 'modules/kpi_superview.php';
+                break;
+            case 'api_control':
+                include 'modules/api_control.php';
+                break;
+            case 'mediation_oversight':
+                include 'modules/mediation_oversight.php';
+                break;
+            case 'super_notifications':
+                include 'modules/super_notifications.php';
+                break;
+            case 'system_health':
+                include 'modules/system_health.php';
+                break;
+            case 'reports_all':
+                include 'modules/reports_all.php';
+                break;
+            case 'users_all':
+                include 'modules/users_all.php';
+                break;
+            case 'activity_logs':
+                include 'modules/activity_logs.php';
+                break;
+            case 'profile':
+                include 'modules/profile.php';
+                break;
+            default:
+                include 'modules/dashboard.php';
         }
         ?>
     </div>
@@ -703,6 +930,21 @@ function getModuleSubtitle($module) {
         </div>
     </div>
 
+    <!-- Quick Action Modal -->
+    <div id="quickActionModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-2xl max-w-md w-full p-6">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-xl font-bold text-gray-800">Quick Action</h3>
+                <button onclick="closeModal('quickActionModal')" class="text-gray-400 hover:text-gray-600">
+                    <i class="fas fa-times text-xl"></i>
+                </button>
+            </div>
+            <div id="modalContent">
+                <!-- Dynamic content will be loaded here -->
+            </div>
+        </div>
+    </div>
+
     <script>
         // Mobile menu toggle
         document.getElementById('mobileMenuButton').addEventListener('click', function() {
@@ -735,10 +977,121 @@ function getModuleSubtitle($module) {
             if (userDropdown) userDropdown.classList.add('hidden');
         });
 
+        // Modal functions
+        function openModal(modalId, content = '') {
+            const modal = document.getElementById(modalId);
+            if (content) {
+                document.getElementById('modalContent').innerHTML = content;
+            }
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            document.body.style.overflow = 'hidden';
+        }
+        
+        function closeModal(modalId) {
+            const modal = document.getElementById(modalId);
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+            document.body.style.overflow = 'auto';
+        }
+        
+        // Quick action functions
+        function quickCreateUser() {
+            const content = `
+                <form method="POST" action="">
+                    <input type="hidden" name="create_user" value="1">
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">First Name</label>
+                            <input type="text" name="first_name" required class="w-full p-3 border border-gray-300 rounded-lg">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Last Name</label>
+                            <input type="text" name="last_name" required class="w-full p-3 border border-gray-300 rounded-lg">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                            <input type="email" name="email" required class="w-full p-3 border border-gray-300 rounded-lg">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Role</label>
+                            <select name="role" required class="w-full p-3 border border-gray-300 rounded-lg">
+                                <option value="">Select Role</option>
+                                <option value="citizen">Citizen</option>
+                                <option value="tanod">Tanod</option>
+                                <option value="secretary">Secretary</option>
+                                <option value="captain">Captain</option>
+                                <option value="lupon">Lupon</option>
+                                <option value="admin">Admin</option>
+                                <option value="super_admin">Super Admin</option>
+                            </select>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Barangay (Optional)</label>
+                            <input type="text" name="barangay" class="w-full p-3 border border-gray-300 rounded-lg" placeholder="Leave empty for system-wide access">
+                        </div>
+                        
+                        <div class="flex justify-end space-x-3">
+                            <button type="button" onclick="closeModal('quickActionModal')" class="px-4 py-2 text-gray-600 hover:text-gray-800">
+                                Cancel
+                            </button>
+                            <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                                Create User
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            `;
+            openModal('quickActionModal', content);
+        }
+        
+        function quickSendNotification() {
+            const content = `
+                <form method="POST" action="">
+                    <input type="hidden" name="send_notification" value="1">
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Title</label>
+                            <input type="text" name="title" required class="w-full p-3 border border-gray-300 rounded-lg">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Message</label>
+                            <textarea name="message" required rows="3" class="w-full p-3 border border-gray-300 rounded-lg"></textarea>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Target Role</label>
+                            <select name="target_role" class="w-full p-3 border border-gray-300 rounded-lg">
+                                <option value="all">All Users</option>
+                                <option value="citizen">Citizens</option>
+                                <option value="tanod">Tanods</option>
+                                <option value="secretary">Secretaries</option>
+                                <option value="captain">Captains</option>
+                                <option value="lupon">Lupon Members</option>
+                                <option value="admin">Admins</option>
+                            </select>
+                        </div>
+                        <div class="flex justify-end space-x-3">
+                            <button type="button" onclick="closeModal('quickActionModal')" class="px-4 py-2 text-gray-600 hover:text-gray-800">
+                                Cancel
+                            </button>
+                            <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                                Send Notification
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            `;
+            openModal('quickActionModal', content);
+        }
+
         // Auto-refresh system stats every 30 seconds
         if (window.location.search.includes('module=dashboard') || window.location.search.includes('module=system_health')) {
             setInterval(() => {
-                // You can implement AJAX refresh here
+                // In a real implementation, you would fetch updated data via AJAX
                 console.log('Refreshing system stats...');
             }, 30000);
         }
@@ -748,10 +1101,32 @@ function getModuleSubtitle($module) {
             window.history.replaceState(null, null, window.location.href);
         }
 
-        // Initialize tooltips (if using any tooltip library)
+        // Initialize charts for dashboard
         document.addEventListener('DOMContentLoaded', function() {
             // Initialize any JavaScript plugins here
         });
+
+        // Close modal when clicking outside
+        window.onclick = function(event) {
+            const modal = document.getElementById('quickActionModal');
+            if (event.target == modal) {
+                closeModal('quickActionModal');
+            }
+        }
+        
+        // Auto-hide success/error messages after 5 seconds
+        setTimeout(function() {
+            const alerts = document.querySelectorAll('.bg-green-50, .bg-red-50');
+            alerts.forEach(alert => {
+                alert.style.transition = 'opacity 0.5s';
+                alert.style.opacity = '0';
+                setTimeout(() => {
+                    if (alert.parentNode) {
+                        alert.remove();
+                    }
+                }, 500);
+            });
+        }, 5000);
     </script>
 </body>
 </html>

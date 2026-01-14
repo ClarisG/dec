@@ -2,408 +2,464 @@
 // super_admin/modules/evidence_log.php
 
 // Get evidence logs
-$evidence_query = "
-    SELECT fel.*, r.report_number, r.title as report_title,
-           u_decrypt.first_name as decrypt_first, u_decrypt.last_name as decrypt_last,
-           u_report.first_name as report_first, u_report.last_name as report_last
-    FROM file_encryption_logs fel
-    LEFT JOIN reports r ON fel.report_id = r.id
-    LEFT JOIN users u_decrypt ON fel.last_decrypted_by = u_decrypt.id
-    LEFT JOIN users u_report ON r.user_id = u_report.id
-    ORDER BY fel.created_at DESC
-    LIMIT 20
-";
+$evidence_query = "SELECT fel.*, 
+                          r.report_number,
+                          r.title as report_title,
+                          u.first_name as decrypted_by_first,
+                          u.last_name as decrypted_by_last
+                   FROM file_encryption_logs fel
+                   JOIN reports r ON fel.report_id = r.id
+                   LEFT JOIN users u ON fel.last_decrypted_by = u.id
+                   ORDER BY fel.created_at DESC 
+                   LIMIT 50";
 $evidence_stmt = $conn->prepare($evidence_query);
 $evidence_stmt->execute();
 $evidence_logs = $evidence_stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Get encryption statistics
-$encryption_stats_query = "
-    SELECT 
-        COUNT(*) as total_files,
-        SUM(file_size) as total_size,
-        AVG(file_size) as avg_size,
-        MAX(decryption_count) as max_decrypts,
-        COUNT(CASE WHEN last_decrypted IS NOT NULL THEN 1 END) as accessed_files
-    FROM file_encryption_logs
-";
-$encryption_stats_stmt = $conn->prepare($encryption_stats_query);
-$encryption_stats_stmt->execute();
-$encryption_stats = $encryption_stats_stmt->fetch(PDO::FETCH_ASSOC);
-
-// Format file size
-function formatSize($bytes) {
-    if ($bytes == 0) return '0 Bytes';
-    $k = 1024;
-    $sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    $i = floor(log($bytes) / log($k));
-    return round($bytes / pow($k, $i), 2) . ' ' . $sizes[$i];
-}
+// Get evidence statistics
+$evidence_stats_query = "SELECT 
+    COUNT(*) as total_files,
+    SUM(decryption_count) as total_decryptions,
+    COUNT(CASE WHEN last_decrypted IS NULL THEN 1 END) as never_decrypted,
+    COUNT(CASE WHEN decryption_count > 0 THEN 1 END) as accessed_files,
+    MAX(last_decrypted) as last_access
+    FROM file_encryption_logs";
+$evidence_stats_stmt = $conn->prepare($evidence_stats_query);
+$evidence_stats_stmt->execute();
+$evidence_stats = $evidence_stats_stmt->fetch(PDO::FETCH_ASSOC);
 ?>
 <div class="space-y-6">
-    <!-- Evidence Log Header -->
-    <div class="flex justify-between items-center">
-        <div>
-            <h3 class="text-lg font-semibold text-gray-800">Evidence & Encryption Master Log</h3>
-            <p class="text-sm text-gray-600">Access all encrypted files without restriction</p>
+    <!-- Header -->
+    <div class="glass-card rounded-xl p-6">
+        <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
+            <div>
+                <h2 class="text-2xl font-bold text-gray-800">Evidence & Encryption Master Log</h2>
+                <p class="text-gray-600 mt-2">Access all encrypted files and manage evidence lifecycle</p>
+            </div>
+            <div class="mt-4 md:mt-0">
+                <button onclick="showEncryptionKey()"
+                        class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition">
+                    <i class="fas fa-key mr-2"></i> Master Encryption Keys
+                </button>
+            </div>
         </div>
-        <div class="flex space-x-3">
-            <button class="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50">
-                <i class="fas fa-key mr-2"></i>Master Key Access
-            </button>
-            <button class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700">
-                <i class="fas fa-shield-alt mr-2"></i>Security Audit
-            </button>
-        </div>
-    </div>
 
-    <!-- Encryption Statistics -->
-    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div class="super-stat-card rounded-xl p-4">
-            <div class="flex items-center justify-between">
-                <div>
-                    <p class="text-sm text-gray-500">Encrypted Files</p>
-                    <p class="text-2xl font-bold text-gray-800"><?php echo $encryption_stats['total_files']; ?></p>
-                </div>
-                <div class="p-3 bg-purple-100 rounded-lg">
-                    <i class="fas fa-lock text-purple-600 text-xl"></i>
-                </div>
+        <!-- Evidence Statistics -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+            <div class="bg-purple-50 p-4 rounded-xl">
+                <div class="text-2xl font-bold text-purple-700"><?php echo $evidence_stats['total_files'] ?? 0; ?></div>
+                <div class="text-sm text-gray-600">Encrypted Files</div>
             </div>
-            <div class="mt-2 text-xs text-gray-500">
-                Total size: <?php echo formatSize($encryption_stats['total_size']); ?>
+            <div class="bg-blue-50 p-4 rounded-xl">
+                <div class="text-2xl font-bold text-blue-700"><?php echo $evidence_stats['total_decryptions'] ?? 0; ?></div>
+                <div class="text-sm text-gray-600">Total Decryptions</div>
             </div>
-        </div>
-        
-        <div class="super-stat-card rounded-xl p-4">
-            <div class="flex items-center justify-between">
-                <div>
-                    <p class="text-sm text-gray-500">Accessed Files</p>
-                    <p class="text-2xl font-bold text-gray-800"><?php echo $encryption_stats['accessed_files']; ?></p>
-                </div>
-                <div class="p-3 bg-green-100 rounded-lg">
-                    <i class="fas fa-unlock text-green-600 text-xl"></i>
-                </div>
+            <div class="bg-green-50 p-4 rounded-xl">
+                <div class="text-2xl font-bold text-green-700"><?php echo $evidence_stats['accessed_files'] ?? 0; ?></div>
+                <div class="text-sm text-gray-600">Accessed Files</div>
             </div>
-            <div class="mt-2 text-xs text-gray-500">
-                <?php echo round(($encryption_stats['accessed_files'] / max(1, $encryption_stats['total_files'])) * 100, 1); ?>% accessed
-            </div>
-        </div>
-        
-        <div class="super-stat-card rounded-xl p-4">
-            <div class="flex items-center justify-between">
-                <div>
-                    <p class="text-sm text-gray-500">Avg File Size</p>
-                    <p class="text-2xl font-bold text-gray-800"><?php echo formatSize($encryption_stats['avg_size']); ?></p>
-                </div>
-                <div class="p-3 bg-blue-100 rounded-lg">
-                    <i class="fas fa-file text-blue-600 text-xl"></i>
-                </div>
-            </div>
-            <div class="mt-2 text-xs text-gray-500">
-                Average size per file
-            </div>
-        </div>
-        
-        <div class="super-stat-card rounded-xl p-4">
-            <div class="flex items-center justify-between">
-                <div>
-                    <p class="text-sm text-gray-500">Max Accesses</p>
-                    <p class="text-2xl font-bold text-gray-800"><?php echo $encryption_stats['max_decrypts']; ?></p>
-                </div>
-                <div class="p-3 bg-red-100 rounded-lg">
-                    <i class="fas fa-history text-red-600 text-xl"></i>
-                </div>
-            </div>
-            <div class="mt-2 text-xs text-gray-500">
-                Most accessed file
+            <div class="bg-red-50 p-4 rounded-xl">
+                <div class="text-2xl font-bold text-red-700"><?php echo $evidence_stats['never_decrypted'] ?? 0; ?></div>
+                <div class="text-sm text-gray-600">Never Accessed</div>
             </div>
         </div>
     </div>
 
-    <!-- Evidence Logs Table -->
-    <div class="bg-white rounded-xl shadow-sm border border-gray-200">
-        <div class="p-6">
-            <div class="flex justify-between items-center mb-4">
-                <h4 class="text-md font-medium text-gray-800">Encrypted File Logs</h4>
+    <!-- Evidence Log Table -->
+    <div class="glass-card rounded-xl overflow-hidden">
+        <div class="p-6 border-b">
+            <div class="flex justify-between items-center">
+                <h3 class="text-lg font-bold text-gray-800">Evidence Access Log</h3>
                 <div class="flex space-x-2">
-                    <input type="text" placeholder="Search files..." 
-                           class="p-2 border border-gray-300 rounded-lg text-sm w-64">
-                    <select class="p-2 border border-gray-300 rounded-lg text-sm">
-                        <option>All Status</option>
-                        <option>Never Accessed</option>
-                        <option>Recently Accessed</option>
-                        <option>Multiple Accesses</option>
-                    </select>
+                    <input type="text" placeholder="Search evidence..." 
+                           class="p-2 border border-gray-300 rounded-lg w-64"
+                           onkeyup="filterEvidenceTable(this.value)">
                 </div>
             </div>
-            
-            <div class="overflow-x-auto">
-                <table class="w-full">
-                    <thead class="bg-gray-50">
-                        <tr>
-                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">File</th>
-                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Report</th>
-                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Encryption Info</th>
-                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Access History</th>
-                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Size</th>
-                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-gray-200">
-                        <?php foreach ($evidence_logs as $log): 
-                            $access_class = $log['decryption_count'] == 0 ? 
-                                          'bg-gray-100 text-gray-800' : 
-                                          ($log['decryption_count'] > 5 ? 
-                                           'bg-yellow-100 text-yellow-800' : 
-                                           'bg-green-100 text-green-800');
-                        ?>
-                        <tr class="hover:bg-gray-50">
-                            <td class="px-4 py-3">
+        </div>
+        
+        <div class="overflow-x-auto">
+            <table class="w-full" id="evidenceTable">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="py-3 px-4 text-left text-sm font-medium text-gray-700">File</th>
+                        <th class="py-3 px-4 text-left text-sm font-medium text-gray-700">Report</th>
+                        <th class="py-3 px-4 text-left text-sm font-medium text-gray-700">Encryption Status</th>
+                        <th class="py-3 px-4 text-left text-sm font-medium text-gray-700">Access History</th>
+                        <th class="py-3 px-4 text-left text-sm font-medium text-gray-700">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200">
+                    <?php foreach ($evidence_logs as $evidence): ?>
+                    <tr class="table-row hover:bg-gray-50">
+                        <td class="py-4 px-4">
+                            <div class="flex items-center">
+                                <div class="w-10 h-10 mr-3">
+                                    <?php
+                                    $ext = pathinfo($evidence['original_name'], PATHINFO_EXTENSION);
+                                    $icon = 'fa-file';
+                                    $color = 'text-gray-600';
+                                    
+                                    if (in_array($ext, ['jpg', 'jpeg', 'png', 'gif'])) {
+                                        $icon = 'fa-image';
+                                        $color = 'text-green-600';
+                                    } elseif (in_array($ext, ['pdf'])) {
+                                        $icon = 'fa-file-pdf';
+                                        $color = 'text-red-600';
+                                    } elseif (in_array($ext, ['doc', 'docx'])) {
+                                        $icon = 'fa-file-word';
+                                        $color = 'text-blue-600';
+                                    }
+                                    ?>
+                                    <div class="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center">
+                                        <i class="fas <?php echo $icon; ?> <?php echo $color; ?> text-lg"></i>
+                                    </div>
+                                </div>
+                                <div>
+                                    <p class="font-medium text-gray-800 text-sm truncate max-w-xs">
+                                        <?php echo htmlspecialchars($evidence['original_name']); ?>
+                                    </p>
+                                    <p class="text-xs text-gray-500">
+                                        <?php echo round(filesize('../' . $evidence['file_path']) / 1024, 1); ?> KB
+                                    </p>
+                                </div>
+                            </div>
+                        </td>
+                        <td class="py-4 px-4">
+                            <div>
+                                <p class="font-medium text-gray-800 text-sm">
+                                    <?php echo htmlspecialchars($evidence['report_number']); ?>
+                                </p>
+                                <p class="text-xs text-gray-500 truncate max-w-xs">
+                                    <?php echo htmlspecialchars($evidence['report_title']); ?>
+                                </p>
+                            </div>
+                        </td>
+                        <td class="py-4 px-4">
+                            <div class="space-y-1">
                                 <div class="flex items-center">
-                                    <div class="p-2 bg-purple-100 rounded-lg mr-3">
-                                        <?php
-                                        $extension = pathinfo($log['original_name'], PATHINFO_EXTENSION);
-                                        $icon = 'file';
-                                        if (in_array($extension, ['jpg', 'jpeg', 'png', 'gif'])) $icon = 'file-image';
-                                        elseif (in_array($extension, ['pdf'])) $icon = 'file-pdf';
-                                        elseif (in_array($extension, ['doc', 'docx'])) $icon = 'file-word';
-                                        ?>
-                                        <i class="fas fa-<?php echo $icon; ?> text-purple-600"></i>
-                                    </div>
-                                    <div>
-                                        <div class="text-sm font-medium text-gray-900 truncate" style="max-width: 200px;">
-                                            <?php echo htmlspecialchars($log['original_name']); ?>
-                                        </div>
-                                        <div class="text-xs text-gray-500">
-                                            <?php echo pathinfo($log['original_name'], PATHINFO_EXTENSION); ?> • 
-                                            <?php echo date('M d, Y', strtotime($log['created_at'])); ?>
-                                        </div>
-                                    </div>
+                                    <div class="status-indicator status-active"></div>
+                                    <span class="text-xs text-green-600 ml-1">Encrypted</span>
                                 </div>
-                            </td>
-                            <td class="px-4 py-3">
-                                <div class="text-sm font-medium text-gray-900">
-                                    <?php echo htmlspecialchars($log['report_number']); ?>
-                                </div>
-                                <div class="text-xs text-gray-500 truncate" style="max-width: 150px;">
-                                    <?php echo htmlspecialchars($log['report_title']); ?>
-                                </div>
-                                <div class="text-xs text-gray-400">
-                                    By: <?php echo htmlspecialchars($log['report_first'] . ' ' . $log['report_last']); ?>
-                                </div>
-                            </td>
-                            <td class="px-4 py-3">
-                                <div class="text-xs">
-                                    <div class="mb-1">
-                                        <span class="font-medium">Key Hash:</span>
-                                        <span class="text-gray-600 font-mono text-xs truncate block" style="max-width: 120px;">
-                                            <?php echo substr($log['encryption_key'], 0, 20) . '...'; ?>
-                                        </span>
-                                    </div>
-                                    <div>
-                                        <span class="font-medium">IV:</span>
-                                        <span class="text-gray-600 font-mono text-xs">
-                                            <?php echo substr($log['iv'] ?? 'N/A', 0, 10) . '...'; ?>
-                                        </span>
-                                    </div>
-                                </div>
-                            </td>
-                            <td class="px-4 py-3">
-                                <div class="flex items-center">
-                                    <span class="px-2 py-1 text-xs rounded-full <?php echo $access_class; ?> mr-2">
-                                        <?php echo $log['decryption_count']; ?> accesses
-                                    </span>
-                                    <?php if ($log['last_decrypted']): ?>
-                                    <div class="text-xs text-gray-500">
-                                        Last: <?php echo date('M d', strtotime($log['last_decrypted'])); ?>
-                                        <br>
-                                        By: <?php echo htmlspecialchars($log['decrypt_first'] . ' ' . $log['decrypt_last']); ?>
-                                    </div>
-                                    <?php else: ?>
-                                    <span class="text-xs text-gray-400">Never accessed</span>
-                                    <?php endif; ?>
-                                </div>
-                            </td>
-                            <td class="px-4 py-3 text-sm text-gray-900">
-                                <?php echo formatSize($log['file_size']); ?>
-                            </td>
-                            <td class="px-4 py-3">
-                                <div class="flex space-x-2">
-                                    <button onclick="decryptFile(<?php echo $log['id']; ?>)" 
-                                            class="px-3 py-1 bg-purple-600 text-white text-xs rounded hover:bg-purple-700">
-                                        <i class="fas fa-unlock-alt mr-1"></i>Decrypt
-                                    </button>
-                                    <button onclick="viewFileDetails(<?php echo $log['id']; ?>)" 
-                                            class="px-3 py-1 border border-gray-300 text-gray-700 text-xs rounded hover:bg-gray-50">
-                                        <i class="fas fa-info-circle mr-1"></i>Details
-                                    </button>
-                                    <button onclick="showEncryptionKey(<?php echo $log['id']; ?>)" 
-                                            class="px-3 py-1 border border-gray-300 text-gray-700 text-xs rounded hover:bg-gray-50">
-                                        <i class="fas fa-key mr-1"></i>Key
-                                    </button>
-                                </div>
-                            </td>
-                        </tr>
-                        <?php endforeach; ?>
-                    </tbody>
-                </table>
-            </div>
+                                <p class="text-xs text-gray-500">
+                                    Key: <?php echo substr($evidence['encryption_key'], 0, 8) . '...'; ?>
+                                </p>
+                            </div>
+                        </td>
+                        <td class="py-4 px-4">
+                            <div class="space-y-1">
+                                <p class="text-sm">
+                                    <span class="font-medium"><?php echo $evidence['decryption_count'] ?? 0; ?></span> accesses
+                                </p>
+                                <?php if ($evidence['last_decrypted']): ?>
+                                <p class="text-xs text-gray-500">
+                                    Last: <?php echo date('M d, H:i', strtotime($evidence['last_decrypted'])); ?>
+                                </p>
+                                <p class="text-xs text-gray-500">
+                                    By: <?php echo htmlspecialchars($evidence['decrypted_by_first'] . ' ' . $evidence['decrypted_by_last']); ?>
+                                </p>
+                                <?php else: ?>
+                                <p class="text-xs text-gray-500">Never accessed</p>
+                                <?php endif; ?>
+                            </div>
+                        </td>
+                        <td class="py-4 px-4">
+                            <div class="flex space-x-2">
+                                <button onclick="decryptFile(<?php echo $evidence['id']; ?>)"
+                                        class="px-3 py-1 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 text-sm">
+                                    <i class="fas fa-unlock mr-1"></i> Decrypt
+                                </button>
+                                <button onclick="viewFileDetails(<?php echo $evidence['id']; ?>)"
+                                        class="px-3 py-1 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 text-sm">
+                                    <i class="fas fa-eye mr-1"></i> Details
+                                </button>
+                                <?php if ($evidence['decryption_count'] > 0): ?>
+                                <button onclick="viewAccessLog(<?php echo $evidence['id']; ?>)"
+                                        class="px-3 py-1 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm">
+                                    <i class="fas fa-history mr-1"></i> Log
+                                </button>
+                                <?php endif; ?>
+                            </div>
+                        </td>
+                    </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
         </div>
     </div>
 
     <!-- Chain of Custody -->
-    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-        <div class="flex justify-between items-center mb-4">
-            <h4 class="text-md font-medium text-gray-800">Chain of Custody Logs</h4>
-            <button class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">
-                <i class="fas fa-plus mr-2"></i>Add Custody Record
+    <div class="glass-card rounded-xl p-6">
+        <div class="flex justify-between items-center mb-6">
+            <h3 class="text-lg font-bold text-gray-800">Chain of Custody Management</h3>
+            <button onclick="showCustodyTransfer()"
+                    class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-sm">
+                <i class="fas fa-exchange-alt mr-2"></i> Transfer Custody
             </button>
         </div>
         
+        <?php
+        $custody_query = "SELECT eh.*,
+                                 u1.first_name as from_first, u1.last_name as from_last,
+                                 u2.first_name as to_first, u2.last_name as to_last
+                          FROM evidence_handovers eh
+                          JOIN users u1 ON eh.tanod_id = u1.id
+                          JOIN users u2 ON eh.handover_to = u2.id
+                          ORDER BY eh.handover_date DESC 
+                          LIMIT 10";
+        $custody_stmt = $conn->prepare($custody_query);
+        $custody_stmt->execute();
+        $custody_logs = $custody_stmt->fetchAll(PDO::FETCH_ASSOC);
+        ?>
+        
         <div class="space-y-4">
-            <?php for ($i = 1; $i <= 3; $i++): ?>
-            <div class="border border-gray-200 rounded-lg p-4">
+            <?php foreach ($custody_logs as $log): ?>
+            <div class="p-4 bg-gray-50 rounded-lg">
                 <div class="flex items-center justify-between mb-3">
-                    <div class="flex items-center">
-                        <div class="w-8 h-8 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 flex items-center justify-center text-white font-bold text-sm mr-3">
-                            E<?php echo $i; ?>
-                        </div>
-                        <div>
-                            <h5 class="font-medium text-gray-800">Evidence Item #E<?php echo $i; ?></h5>
-                            <p class="text-sm text-gray-500">Case: RPT-20260110-ABC123</p>
-                        </div>
+                    <div>
+                        <p class="font-medium text-gray-800"><?php echo htmlspecialchars($log['item_description']); ?></p>
+                        <p class="text-sm text-gray-500"><?php echo htmlspecialchars($log['item_type']); ?></p>
                     </div>
-                    <span class="px-3 py-1 bg-green-100 text-green-800 text-xs rounded-full">
-                        <i class="fas fa-check-circle mr-1"></i>In Custody
+                    <span class="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-medium">
+                        <?php echo $log['recipient_acknowledged'] ? 'Acknowledged' : 'Pending'; ?>
                     </span>
                 </div>
                 
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-                    <div>
-                        <span class="text-gray-500">Current Holder:</span>
-                        <span class="font-medium text-gray-700 ml-2">Barangay Secretary</span>
-                    </div>
-                    <div>
-                        <span class="text-gray-500">Location:</span>
-                        <span class="font-medium text-gray-700 ml-2">Evidence Room, Cabinet A</span>
-                    </div>
-                    <div>
-                        <span class="text-gray-500">Last Updated:</span>
-                        <span class="font-medium text-gray-700 ml-2">Today, 10:30 AM</span>
-                    </div>
-                </div>
-                
-                <div class="mt-3 flex space-x-2">
-                    <button class="text-xs text-blue-600 hover:text-blue-800">
-                        <i class="fas fa-history mr-1"></i>View Full History
-                    </button>
-                    <button class="text-xs text-green-600 hover:text-green-800">
-                        <i class="fas fa-exchange-alt mr-1"></i>Transfer
-                    </button>
-                    <button class="text-xs text-red-600 hover:text-red-800">
-                        <i class="fas fa-trash-alt mr-1"></i>Dispose
-                    </button>
-                </div>
-            </div>
-            <?php endfor; ?>
-        </div>
-    </div>
-</div>
-
-<!-- Encryption Key Modal -->
-<div id="encryptionKeyModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50 p-4">
-    <div class="bg-white rounded-2xl max-w-2xl w-full">
-        <div class="p-6">
-            <div class="flex justify-between items-center mb-6">
-                <h3 class="text-xl font-bold text-gray-800">Encryption Key Details</h3>
-                <button onclick="closeEncryptionKeyModal()" class="text-gray-400 hover:text-gray-600">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-            
-            <div class="space-y-4">
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">File Information</label>
-                    <div class="bg-gray-50 p-4 rounded-lg">
-                        <p class="text-sm font-medium text-gray-900" id="modalFileName"></p>
-                        <p class="text-xs text-gray-500" id="modalFileReport"></p>
-                    </div>
-                </div>
-                
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">Encryption Key Hash</label>
-                    <div class="bg-gray-900 text-green-400 p-4 rounded-lg font-mono text-sm overflow-x-auto">
-                        <code id="modalKeyHash">Loading...</code>
-                    </div>
-                </div>
-                
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">Initialization Vector (IV)</label>
-                    <div class="bg-gray-900 text-green-400 p-4 rounded-lg font-mono text-sm overflow-x-auto">
-                        <code id="modalIV">Loading...</code>
-                    </div>
-                </div>
-                
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">Access Warnings</label>
-                    <div class="bg-yellow-50 border border-yellow-200 p-4 rounded-lg">
-                        <div class="flex items-center">
-                            <i class="fas fa-exclamation-triangle text-yellow-500 mr-2"></i>
-                            <p class="text-sm text-yellow-700">
-                                This key provides direct access to encrypted evidence. All access is logged.
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-4">
+                        <div class="text-center">
+                            <div class="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center mx-auto">
+                                <i class="fas fa-user text-red-600 text-xs"></i>
+                            </div>
+                            <p class="text-xs text-gray-600 mt-1 truncate max-w-xs">
+                                <?php echo htmlspecialchars($log['from_first'] . ' ' . $log['from_last']); ?>
+                            </p>
+                        </div>
+                        
+                        <div class="text-gray-400">
+                            <i class="fas fa-arrow-right"></i>
+                        </div>
+                        
+                        <div class="text-center">
+                            <div class="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center mx-auto">
+                                <i class="fas fa-user-check text-green-600 text-xs"></i>
+                            </div>
+                            <p class="text-xs text-gray-600 mt-1 truncate max-w-xs">
+                                <?php echo htmlspecialchars($log['to_first'] . ' ' . $log['to_last']); ?>
                             </p>
                         </div>
                     </div>
-                </div>
-                
-                <div class="flex justify-end space-x-3">
-                    <button onclick="closeEncryptionKeyModal()" 
-                            class="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50">
-                        Close
-                    </button>
-                    <button onclick="copyEncryptionKey()" 
-                            class="px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700">
-                        <i class="fas fa-copy mr-2"></i>Copy Key
-                    </button>
+                    
+                    <div class="text-right">
+                        <p class="text-xs text-gray-500">
+                            <?php echo date('M d, H:i', strtotime($log['handover_date'])); ?>
+                        </p>
+                    </div>
                 </div>
             </div>
+            <?php endforeach; ?>
+            
+            <?php if (empty($custody_logs)): ?>
+            <div class="text-center py-8">
+                <i class="fas fa-exchange-alt text-gray-300 text-3xl mb-3"></i>
+                <p class="text-gray-500">No custody transfers found</p>
+            </div>
+            <?php endif; ?>
         </div>
     </div>
 </div>
 
 <script>
+function showEncryptionKey() {
+    const content = `
+        <div class="space-y-4">
+            <div class="p-4 bg-red-50 border border-red-200 rounded-lg">
+                <div class="flex items-center">
+                    <i class="fas fa-exclamation-triangle text-red-500 text-xl mr-3"></i>
+                    <div>
+                        <p class="font-medium text-red-800">Master Encryption Key</p>
+                        <p class="text-sm text-red-600">This key provides unrestricted access to all encrypted files</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="p-4 bg-gray-50 rounded-lg">
+                <p class="text-sm text-gray-500 mb-2">Super Admin Master Key</p>
+                <div class="flex items-center">
+                    <code class="flex-1 bg-white p-3 rounded border font-mono text-sm">
+                        SUPER_MASTER_KEY_<?php echo strtoupper(md5($_SESSION['user_id'] . date('Ymd'))); ?>
+                    </code>
+                    <button onclick="copyToClipboard(this)" 
+                            class="ml-3 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700">
+                        <i class="fas fa-copy"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <div class="text-xs text-gray-500">
+                <p>This master key:</p>
+                <ul class="list-disc list-inside mt-1">
+                    <li>Decrypts all evidence files</li>
+                    <li>Overrides all permission checks</li>
+                    <li>Logs all access with Super Admin ID</li>
+                    <li>Should be used with extreme caution</li>
+                </ul>
+            </div>
+        </div>
+    `;
+    openModal('quickActionModal', content);
+}
+
 function decryptFile(fileId) {
-    if (confirm('Decrypt this file? This action will be logged.')) {
-        // Implement decryption functionality
-        window.open('../ajax/decrypt_file.php?id=' + fileId, '_blank');
+    if (confirm('Decrypting this file will be logged in the audit trail. Continue?')) {
+        fetch('../ajax/decrypt_file.php', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                file_id: fileId,
+                master_key: true
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                window.open(data.download_url, '_blank');
+                setTimeout(() => window.location.reload(), 1000);
+            } else {
+                alert(data.message || 'Failed to decrypt file');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Failed to decrypt file');
+        });
     }
 }
 
 function viewFileDetails(fileId) {
-    // Implement file details view
-    alert('Viewing file details for ID: ' + fileId);
+    fetch(`../ajax/get_file_details.php?id=${fileId}`)
+        .then(response => response.json())
+        .then(data => {
+            const content = `
+                <div class="space-y-4">
+                    <div class="flex items-center space-x-4">
+                        <div class="w-16 h-16 bg-gray-100 rounded-lg flex items-center justify-center">
+                            <i class="fas fa-file text-gray-600 text-2xl"></i>
+                        </div>
+                        <div>
+                            <h3 class="font-bold text-gray-800">${data.original_name}</h3>
+                            <p class="text-sm text-gray-500">${data.file_size} bytes</p>
+                        </div>
+                    </div>
+                    
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <p class="text-sm text-gray-500">Report</p>
+                            <p class="font-medium">${data.report_number}</p>
+                        </div>
+                        <div>
+                            <p class="text-sm text-gray-500">Encrypted</p>
+                            <p class="font-medium">${new Date(data.created_at).toLocaleDateString()}</p>
+                        </div>
+                        <div>
+                            <p class="text-sm text-gray-500">Access Count</p>
+                            <p class="font-medium">${data.decryption_count}</p>
+                        </div>
+                        <div>
+                            <p class="text-sm text-gray-500">Last Accessed</p>
+                            <p class="font-medium">${data.last_decrypted ? new Date(data.last_decrypted).toLocaleDateString() : 'Never'}</p>
+                        </div>
+                    </div>
+                    
+                    <div class="border-t pt-4">
+                        <p class="text-sm text-gray-500 mb-2">Encryption Key Hash</p>
+                        <code class="block bg-gray-50 p-3 rounded text-xs font-mono break-all">
+                            ${data.encryption_key_hash}
+                        </code>
+                    </div>
+                </div>
+            `;
+            openModal('quickActionModal', content);
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Failed to load file details');
+        });
 }
 
-function showEncryptionKey(fileId) {
-    // In real implementation, fetch encryption key via AJAX
-    document.getElementById('modalFileName').textContent = 'evidence_photo.jpg';
-    document.getElementById('modalFileReport').textContent = 'Report #RPT-20260115-ABC123';
-    document.getElementById('modalKeyHash').textContent = 'dd5aaf0ba30faee45db2b88214916c4e5b5717d5c5872e6df695c63fffa7ca16';
-    document.getElementById('modalIV').textContent = 'f23c1baeacf99860d3d27a176ccb9acc';
+function filterEvidenceTable(searchTerm) {
+    const table = document.getElementById('evidenceTable');
+    const rows = table.getElementsByTagName('tbody')[0].getElementsByTagName('tr');
     
-    document.getElementById('encryptionKeyModal').classList.remove('hidden');
-    document.getElementById('encryptionKeyModal').classList.add('flex');
+    for (let row of rows) {
+        const text = row.textContent.toLowerCase();
+        row.style.display = text.includes(searchTerm.toLowerCase()) ? '' : 'none';
+    }
 }
 
-function closeEncryptionKeyModal() {
-    document.getElementById('encryptionKeyModal').classList.add('hidden');
-    document.getElementById('encryptionKeyModal').classList.remove('flex');
-}
-
-function copyEncryptionKey() {
-    const key = document.getElementById('modalKeyHash').textContent;
-    navigator.clipboard.writeText(key).then(() => {
-        alert('Encryption key copied to clipboard!');
-    });
+function showCustodyTransfer() {
+    const content = `
+        <form method="POST" action="../handlers/transfer_custody.php">
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Item Description</label>
+                    <input type="text" name="item_description" required class="w-full p-3 border border-gray-300 rounded-lg">
+                </div>
+                
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">From (Tanod)</label>
+                        <select name="from_user" required class="w-full p-3 border border-gray-300 rounded-lg">
+                            <option value="">Select Tanod...</option>
+                            <?php
+                            $tanods_query = "SELECT id, first_name, last_name FROM users WHERE role = 'tanod'";
+                            $tanods_stmt = $conn->prepare($tanods_query);
+                            $tanods_stmt->execute();
+                            $tanods = $tanods_stmt->fetchAll(PDO::FETCH_ASSOC);
+                            foreach ($tanods as $tanod): ?>
+                            <option value="<?php echo $tanod['id']; ?>">
+                                <?php echo htmlspecialchars($tanod['first_name'] . ' ' . $tanod['last_name']); ?>
+                            </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">To (Recipient)</label>
+                        <select name="to_user" required class="w-full p-3 border border-gray-300 rounded-lg">
+                            <option value="">Select Recipient...</option>
+                            <?php
+                            $users_query = "SELECT id, first_name, last_name, role FROM users WHERE role IN ('captain', 'secretary', 'admin')";
+                            $users_stmt = $conn->prepare($users_query);
+                            $users_stmt->execute();
+                            $recipients = $users_stmt->fetchAll(PDO::FETCH_ASSOC);
+                            foreach ($recipients as $user): ?>
+                            <option value="<?php echo $user['id']; ?>">
+                                <?php echo htmlspecialchars($user['first_name'] . ' ' . $user['last_name'] . ' (' . ucfirst($user['role']) . ')'); ?>
+                            </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Chain of Custody Notes</label>
+                    <textarea name="custody_notes" rows="3" class="w-full p-3 border border-gray-300 rounded-lg"></textarea>
+                </div>
+                
+                <div class="flex justify-end space-x-3">
+                    <button type="button" onclick="closeModal('quickActionModal')" class="px-4 py-2 text-gray-600 hover:text-gray-800">
+                        Cancel
+                    </button>
+                    <button type="submit" class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700">
+                        Transfer Custody
+                    </button>
+                </div>
+            </div>
+        </form>
+    `;
+    openModal('quickActionModal', content);
 }
 </script>

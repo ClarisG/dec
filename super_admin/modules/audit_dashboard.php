@@ -1,252 +1,281 @@
 <?php
 // super_admin/modules/audit_dashboard.php
 
+// Get audit filters
+$type_filter = $_GET['type'] ?? '';
+$date_from = $_GET['date_from'] ?? date('Y-m-d', strtotime('-7 days'));
+$date_to = $_GET['date_to'] ?? date('Y-m-d');
+
+// Get audit logs
+$audit_query = "SELECT al.*, u.first_name, u.last_name, u.role
+                FROM activity_logs al
+                LEFT JOIN users u ON al.user_id = u.id
+                WHERE DATE(al.created_at) BETWEEN :date_from AND :date_to";
+                
+$audit_params = [':date_from' => $date_from, ':date_to' => $date_to];
+
+if ($type_filter) {
+    $audit_query .= " AND al.action_type = :type";
+    $audit_params[':type'] = $type_filter;
+}
+
+$audit_query .= " ORDER BY al.created_at DESC LIMIT 100";
+
+$audit_stmt = $conn->prepare($audit_query);
+$audit_stmt->execute($audit_params);
+$audit_logs = $audit_stmt->fetchAll(PDO::FETCH_ASSOC);
+
 // Get audit statistics
-$audit_stats_query = "
-    SELECT 
-        (SELECT COUNT(*) FROM activity_logs) as total_logs,
-        (SELECT COUNT(*) FROM activity_logs WHERE created_at >= CURDATE()) as today_logs,
-        (SELECT COUNT(DISTINCT user_id) FROM activity_logs) as active_users,
-        (SELECT COUNT(*) FROM file_encryption_logs) as encrypted_files,
-        (SELECT COUNT(*) FROM login_history WHERE success = 0 AND login_time >= DATE_SUB(NOW(), INTERVAL 7 DAY)) as failed_logins
-    FROM DUAL
-";
-$audit_stats_stmt = $conn->prepare($audit_stats_query);
-$audit_stats_stmt->execute();
-$audit_stats = $audit_stats_stmt->fetch(PDO::FETCH_ASSOC);
+$stats_query = "SELECT 
+    COUNT(*) as total_logs,
+    COUNT(DISTINCT user_id) as unique_users,
+    COUNT(CASE WHEN DATE(created_at) = CURDATE() THEN 1 END) as today_logs,
+    COUNT(CASE WHEN action LIKE '%login%' THEN 1 END) as login_events,
+    COUNT(CASE WHEN action LIKE '%delete%' OR action LIKE '%remove%' THEN 1 END) as delete_events
+    FROM activity_logs 
+    WHERE DATE(created_at) BETWEEN :date_from AND :date_to";
+    
+$stats_stmt = $conn->prepare($stats_query);
+$stats_stmt->execute([':date_from' => $date_from, ':date_to' => $date_to]);
+$audit_stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
 ?>
 <div class="space-y-6">
-    <!-- Audit Dashboard Header -->
-    <div class="flex justify-between items-center">
-        <div>
-            <h3 class="text-lg font-semibold text-gray-800">Master Audit & Compliance Dashboard</h3>
-            <p class="text-sm text-gray-600">View all cases, evidence logs, user actions, and system events</p>
-        </div>
-        <div class="flex space-x-3">
-            <button class="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50">
-                <i class="fas fa-download mr-2"></i>Export All
-            </button>
-            <button class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700">
-                <i class="fas fa-filter mr-2"></i>Advanced Filters
-            </button>
-        </div>
-    </div>
-
-    <!-- Audit Statistics -->
-    <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
-        <div class="super-stat-card rounded-xl p-4">
-            <div class="flex items-center justify-between">
-                <div>
-                    <p class="text-sm text-gray-500">Total Audit Logs</p>
-                    <p class="text-2xl font-bold text-gray-800"><?php echo number_format($audit_stats['total_logs']); ?></p>
-                </div>
-                <div class="p-3 bg-blue-100 rounded-lg">
-                    <i class="fas fa-history text-blue-600 text-xl"></i>
-                </div>
+    <!-- Header -->
+    <div class="glass-card rounded-xl p-6">
+        <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
+            <div>
+                <h2 class="text-2xl font-bold text-gray-800">Master Audit & Compliance Dashboard</h2>
+                <p class="text-gray-600 mt-2">View all cases, evidence logs, and system events with full filtering and export capabilities</p>
             </div>
-            <div class="mt-2 text-xs text-gray-500">
-                <i class="fas fa-arrow-up text-green-500 mr-1"></i>
-                Today: <?php echo $audit_stats['today_logs']; ?> logs
-            </div>
-        </div>
-        
-        <div class="super-stat-card rounded-xl p-4">
-            <div class="flex items-center justify-between">
-                <div>
-                    <p class="text-sm text-gray-500">Active Audited Users</p>
-                    <p class="text-2xl font-bold text-gray-800"><?php echo $audit_stats['active_users']; ?></p>
-                </div>
-                <div class="p-3 bg-green-100 rounded-lg">
-                    <i class="fas fa-user-check text-green-600 text-xl"></i>
-                </div>
-            </div>
-        </div>
-        
-        <div class="super-stat-card rounded-xl p-4">
-            <div class="flex items-center justify-between">
-                <div>
-                    <p class="text-sm text-gray-500">Encrypted Files</p>
-                    <p class="text-2xl font-bold text-gray-800"><?php echo $audit_stats['encrypted_files']; ?></p>
-                </div>
-                <div class="p-3 bg-purple-100 rounded-lg">
-                    <i class="fas fa-key text-purple-600 text-xl"></i>
-                </div>
-            </div>
-        </div>
-        
-        <div class="super-stat-card rounded-xl p-4">
-            <div class="flex items-center justify-between">
-                <div>
-                    <p class="text-sm text-gray-500">Failed Logins (7d)</p>
-                    <p class="text-2xl font-bold text-gray-800"><?php echo $audit_stats['failed_logins']; ?></p>
-                </div>
-                <div class="p-3 bg-red-100 rounded-lg">
-                    <i class="fas fa-exclamation-triangle text-red-600 text-xl"></i>
-                </div>
-            </div>
-        </div>
-        
-        <div class="super-stat-card rounded-xl p-4">
-            <div class="flex items-center justify-between">
-                <div>
-                    <p class="text-sm text-gray-500">Data Retention</p>
-                    <p class="text-2xl font-bold text-gray-800">90 days</p>
-                </div>
-                <div class="p-3 bg-yellow-100 rounded-lg">
-                    <i class="fas fa-database text-yellow-600 text-xl"></i>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Audit Logs Tabs -->
-    <div class="bg-white rounded-xl shadow-sm border border-gray-200">
-        <div class="border-b">
-            <nav class="flex space-x-8 px-6" aria-label="Audit Tabs">
-                <button class="py-4 px-1 border-b-2 border-purple-600 text-sm font-medium text-purple-600">
-                    Activity Logs
+            <div class="flex space-x-3 mt-4 md:mt-0">
+                <button onclick="exportAuditLogs()"
+                        class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition">
+                    <i class="fas fa-download mr-2"></i> Export Audit Log
                 </button>
-                <button class="py-4 px-1 border-b-2 border-transparent text-sm font-medium text-gray-500 hover:text-gray-700">
-                    Evidence Access
-                </button>
-                <button class="py-4 px-1 border-b-2 border-transparent text-sm font-medium text-gray-500 hover:text-gray-700">
-                    Login History
-                </button>
-                <button class="py-4 px-1 border-b-2 border-transparent text-sm font-medium text-gray-500 hover:text-gray-700">
-                    System Changes
-                </button>
-            </nav>
+            </div>
         </div>
 
-        <!-- Activity Logs Table -->
-        <div class="p-6">
-            <div class="mb-4 flex justify-between items-center">
-                <h4 class="text-md font-medium text-gray-800">Recent Activity Logs</h4>
+        <!-- Audit Statistics -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+            <div class="bg-purple-50 p-4 rounded-xl">
+                <div class="text-2xl font-bold text-purple-700"><?php echo $audit_stats['total_logs'] ?? 0; ?></div>
+                <div class="text-sm text-gray-600">Total Audit Logs</div>
+            </div>
+            <div class="bg-blue-50 p-4 rounded-xl">
+                <div class="text-2xl font-bold text-blue-700"><?php echo $audit_stats['unique_users'] ?? 0; ?></div>
+                <div class="text-sm text-gray-600">Unique Users</div>
+            </div>
+            <div class="bg-green-50 p-4 rounded-xl">
+                <div class="text-2xl font-bold text-green-700"><?php echo $audit_stats['today_logs'] ?? 0; ?></div>
+                <div class="text-sm text-gray-600">Today's Events</div>
+            </div>
+            <div class="bg-red-50 p-4 rounded-xl">
+                <div class="text-2xl font-bold text-red-700"><?php echo $audit_stats['delete_events'] ?? 0; ?></div>
+                <div class="text-sm text-gray-600">Delete Events</div>
+            </div>
+        </div>
+
+        <!-- Filters -->
+        <div class="bg-gray-50 p-4 rounded-xl mb-6">
+            <form method="GET" action="" class="space-y-4 md:space-y-0 md:flex md:space-x-4 md:items-end">
+                <input type="hidden" name="module" value="audit_dashboard">
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Date From</label>
+                    <input type="date" name="date_from" value="<?php echo htmlspecialchars($date_from); ?>"
+                           class="w-full p-3 border border-gray-300 rounded-lg">
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Date To</label>
+                    <input type="date" name="date_to" value="<?php echo htmlspecialchars($date_to); ?>"
+                           class="w-full p-3 border border-gray-300 rounded-lg">
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Action Type</label>
+                    <select name="type" class="w-full p-3 border border-gray-300 rounded-lg">
+                        <option value="">All Actions</option>
+                        <option value="login" <?php echo $type_filter === 'login' ? 'selected' : ''; ?>>Login Events</option>
+                        <option value="create" <?php echo $type_filter === 'create' ? 'selected' : ''; ?>>Create Events</option>
+                        <option value="update" <?php echo $type_filter === 'update' ? 'selected' : ''; ?>>Update Events</option>
+                        <option value="delete" <?php echo $type_filter === 'delete' ? 'selected' : ''; ?>>Delete Events</option>
+                    </select>
+                </div>
+                
                 <div class="flex space-x-2">
-                    <input type="date" class="p-2 border border-gray-300 rounded-lg text-sm">
-                    <input type="text" placeholder="Search actions..." class="p-2 border border-gray-300 rounded-lg text-sm w-64">
+                    <button type="submit" class="px-4 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700">
+                        <i class="fas fa-filter mr-2"></i> Filter
+                    </button>
+                    <a href="?module=audit_dashboard" class="px-4 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">
+                        <i class="fas fa-redo"></i>
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Audit Timeline -->
+    <div class="glass-card rounded-xl p-6">
+        <h3 class="text-lg font-bold text-gray-800 mb-6">Audit Timeline</h3>
+        
+        <div class="space-y-4">
+            <?php foreach ($audit_logs as $log): ?>
+            <div class="flex items-start p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition">
+                <div class="flex-shrink-0 w-10 h-10 mr-4">
+                    <div class="w-10 h-10 rounded-full 
+                        <?php echo $log['role'] === 'super_admin' ? 'bg-purple-100' : 
+                                 ($log['role'] === 'admin' ? 'bg-red-100' :
+                                 ($log['role'] === 'captain' ? 'bg-blue-100' :
+                                 'bg-gray-100')); ?> 
+                        flex items-center justify-center">
+                        <i class="fas 
+                            <?php echo strpos($log['action'], 'login') !== false ? 'fa-sign-in-alt text-green-600' :
+                                   (strpos($log['action'], 'create') !== false ? 'fa-plus-circle text-blue-600' :
+                                   (strpos($log['action'], 'update') !== false ? 'fa-edit text-yellow-600' :
+                                   (strpos($log['action'], 'delete') !== false ? 'fa-trash text-red-600' :
+                                   'fa-history text-gray-600'))); ?>"></i>
+                    </div>
+                </div>
+                
+                <div class="flex-1">
+                    <p class="text-sm font-medium text-gray-800"><?php echo htmlspecialchars($log['action']); ?></p>
+                    
+                    <div class="flex items-center mt-2 space-x-4">
+                        <p class="text-xs text-gray-500">
+                            <i class="fas fa-user mr-1"></i>
+                            <?php 
+                            $user_name = $log['first_name'] && $log['last_name'] 
+                                ? htmlspecialchars($log['first_name'] . ' ' . $log['last_name'])
+                                : 'System';
+                            echo $user_name . ' (' . ($log['role'] ? ucfirst($log['role']) : 'System') . ')';
+                            ?>
+                        </p>
+                        <p class="text-xs text-gray-500">
+                            <i class="fas fa-clock mr-1"></i>
+                            <?php echo date('M d, H:i:s', strtotime($log['created_at'])); ?>
+                        </p>
+                        <?php if ($log['ip_address']): ?>
+                        <p class="text-xs text-gray-500">
+                            <i class="fas fa-network-wired mr-1"></i>
+                            <?php echo htmlspecialchars($log['ip_address']); ?>
+                        </p>
+                        <?php endif; ?>
+                    </div>
                 </div>
             </div>
+            <?php endforeach; ?>
             
-            <div class="overflow-x-auto">
-                <table class="w-full">
-                    <thead class="bg-gray-50">
-                        <tr>
-                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Timestamp</th>
-                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
-                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
-                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Details</th>
-                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">IP Address</th>
-                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Affected</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-gray-200">
-                        <?php
-                        // Get recent activity logs
-                        $activity_query = "SELECT al.*, u.first_name, u.last_name, u.username 
-                                          FROM activity_logs al 
-                                          LEFT JOIN users u ON al.user_id = u.id 
-                                          ORDER BY al.created_at DESC 
-                                          LIMIT 20";
-                        $activity_stmt = $conn->prepare($activity_query);
-                        $activity_stmt->execute();
-                        $activities = $activity_stmt->fetchAll(PDO::FETCH_ASSOC);
-                        
-                        foreach ($activities as $log):
-                            $action_class = [
-                                'create' => 'bg-green-100 text-green-800',
-                                'update' => 'bg-blue-100 text-blue-800',
-                                'delete' => 'bg-red-100 text-red-800',
-                                'login' => 'bg-purple-100 text-purple-800',
-                                'access' => 'bg-yellow-100 text-yellow-800'
-                            ][strtolower($log['action'])] ?? 'bg-gray-100 text-gray-800';
-                        ?>
-                        <tr class="hover:bg-gray-50">
-                            <td class="px-4 py-3 text-sm text-gray-900">
-                                <?php echo date('Y-m-d H:i:s', strtotime($log['created_at'])); ?>
-                            </td>
-                            <td class="px-4 py-3">
-                                <div class="text-sm font-medium text-gray-900">
-                                    <?php echo htmlspecialchars($log['first_name'] . ' ' . $log['last_name']); ?>
-                                </div>
-                                <div class="text-xs text-gray-500">
-                                    @<?php echo htmlspecialchars($log['username']); ?>
-                                </div>
-                            </td>
-                            <td class="px-4 py-3">
-                                <span class="px-2 py-1 text-xs rounded-full <?php echo $action_class; ?>">
-                                    <?php echo htmlspecialchars($log['action']); ?>
-                                </span>
-                            </td>
-                            <td class="px-4 py-3 text-sm text-gray-700">
-                                <?php echo htmlspecialchars(substr($log['description'], 0, 100)); ?>...
-                            </td>
-                            <td class="px-4 py-3 text-sm text-gray-900">
-                                <?php echo htmlspecialchars($log['ip_address']); ?>
-                            </td>
-                            <td class="px-4 py-3 text-sm text-gray-900">
-                                <?php if ($log['affected_id']): ?>
-                                <span class="text-xs bg-gray-100 px-2 py-1 rounded">
-                                    ID: <?php echo $log['affected_id']; ?>
-                                </span>
-                                <?php endif; ?>
-                            </td>
-                        </tr>
-                        <?php endforeach; ?>
-                    </tbody>
-                </table>
+            <?php if (empty($audit_logs)): ?>
+            <div class="text-center py-12">
+                <i class="fas fa-history text-gray-300 text-4xl mb-4"></i>
+                <p class="text-gray-500">No audit logs found for selected period</p>
             </div>
+            <?php endif; ?>
         </div>
     </div>
 
     <!-- Compliance Reports -->
-    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-        <h4 class="text-md font-medium text-gray-800 mb-4">Compliance Reports</h4>
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div class="border border-gray-200 rounded-lg p-4">
-                <div class="flex items-center mb-3">
-                    <div class="p-2 bg-blue-100 rounded-lg mr-3">
-                        <i class="fas fa-file-pdf text-blue-600"></i>
-                    </div>
-                    <div>
-                        <h5 class="font-medium text-gray-800">Monthly Activity Report</h5>
-                        <p class="text-sm text-gray-500">Last generated: Jan 15, 2026</p>
-                    </div>
-                </div>
-                <button class="w-full mt-2 px-3 py-2 bg-blue-600 text-white text-sm rounded hover:bg-blue-700">
-                    Generate New Report
-                </button>
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Security Compliance -->
+        <div class="glass-card rounded-xl p-6">
+            <div class="flex items-center justify-between mb-6">
+                <h3 class="text-lg font-bold text-gray-800">Security Compliance</h3>
+                <span class="px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm font-medium">
+                    <i class="fas fa-check-circle mr-1"></i> Compliant
+                </span>
             </div>
             
-            <div class="border border-gray-200 rounded-lg p-4">
-                <div class="flex items-center mb-3">
-                    <div class="p-2 bg-green-100 rounded-lg mr-3">
-                        <i class="fas fa-shield-alt text-green-600"></i>
+            <div class="space-y-4">
+                <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    <div class="flex items-center">
+                        <i class="fas fa-user-shield text-green-500 mr-3"></i>
+                        <div>
+                            <p class="font-medium">Access Control</p>
+                            <p class="text-sm text-gray-500">Role-based permissions</p>
+                        </div>
                     </div>
-                    <div>
-                        <h5 class="font-medium text-gray-800">Security Audit Report</h5>
-                        <p class="text-sm text-gray-500">Last audit: Jan 10, 2026</p>
+                    <div class="text-green-600">
+                        <i class="fas fa-check"></i>
                     </div>
                 </div>
-                <button class="w-full mt-2 px-3 py-2 bg-green-600 text-white text-sm rounded hover:bg-green-700">
-                    Run Security Audit
-                </button>
+                
+                <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    <div class="flex items-center">
+                        <i class="fas fa-file-contract text-blue-500 mr-3"></i>
+                        <div>
+                            <p class="font-medium">Audit Trail</p>
+                            <p class="text-sm text-gray-500">Complete activity logging</p>
+                        </div>
+                    </div>
+                    <div class="text-green-600">
+                        <i class="fas fa-check"></i>
+                    </div>
+                </div>
+                
+                <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    <div class="flex items-center">
+                        <i class="fas fa-lock text-purple-500 mr-3"></i>
+                        <div>
+                            <p class="font-medium">Data Encryption</p>
+                            <p class="text-sm text-gray-500">Evidence file protection</p>
+                        </div>
+                    </div>
+                    <div class="text-green-600">
+                        <i class="fas fa-check"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Data Retention -->
+        <div class="glass-card rounded-xl p-6">
+            <div class="flex items-center justify-between mb-6">
+                <h3 class="text-lg font-bold text-gray-800">Data Retention</h3>
+                <span class="px-3 py-1 bg-yellow-100 text-yellow-800 rounded-full text-sm font-medium">
+                    <i class="fas fa-clock mr-1"></i> 90 Days
+                </span>
             </div>
             
-            <div class="border border-gray-200 rounded-lg p-4">
-                <div class="flex items-center mb-3">
-                    <div class="p-2 bg-purple-100 rounded-lg mr-3">
-                        <i class="fas fa-user-shield text-purple-600"></i>
+            <div class="space-y-4">
+                <div class="p-3 bg-blue-50 rounded-lg">
+                    <div class="flex items-center justify-between mb-2">
+                        <p class="font-medium">Audit Logs</p>
+                        <span class="text-sm text-blue-600"><?php echo $audit_stats['total_logs'] ?? 0; ?> records</span>
                     </div>
-                    <div>
-                        <h5 class="font-medium text-gray-800">User Access Review</h5>
-                        <p class="text-sm text-gray-500">Due: Feb 1, 2026</p>
+                    <div class="health-bar">
+                        <div class="health-fill health-good" style="width: 65%"></div>
                     </div>
                 </div>
-                <button class="w-full mt-2 px-3 py-2 bg-purple-600 text-white text-sm rounded hover:bg-purple-700">
-                    Start Review
-                </button>
+                
+                <div class="p-3 bg-green-50 rounded-lg">
+                    <div class="flex items-center justify-between mb-2">
+                        <p class="font-medium">User Activities</p>
+                        <span class="text-sm text-green-600"><?php echo $audit_stats['unique_users'] ?? 0; ?> users</span>
+                    </div>
+                    <div class="health-bar">
+                        <div class="health-fill health-excellent" style="width: 85%"></div>
+                    </div>
+                </div>
+                
+                <div class="p-3 bg-purple-50 rounded-lg">
+                    <div class="flex items-center justify-between mb-2">
+                        <p class="font-medium">System Events</p>
+                        <span class="text-sm text-purple-600"><?php echo $audit_stats['today_logs'] ?? 0; ?> today</span>
+                    </div>
+                    <div class="health-bar">
+                        <div class="health-fill health-warning" style="width: 45%"></div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 </div>
+
+<script>
+function exportAuditLogs() {
+    const params = new URLSearchParams(window.location.search);
+    params.set('export', 'csv');
+    window.location.href = '?' + params.toString();
+}
+</script>
