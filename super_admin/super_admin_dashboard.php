@@ -405,6 +405,12 @@ function logActivity($conn, $user_id, $action) {
         .sidebar {
             background: linear-gradient(180deg, #1e3a8a 0%, #0d47a1 100%);
             box-shadow: 4px 0 15px rgba(0, 0, 0, 0.1);
+            height: 100vh;
+            overflow-y: auto;
+        }
+        
+        .sidebar-content {
+            padding-bottom: 2rem;
         }
         
         .sidebar-link {
@@ -493,6 +499,25 @@ function logActivity($conn, $user_id, $action) {
             background-color: #f8fafc;
         }
         
+        /* Custom Scrollbar for Sidebar */
+        .sidebar::-webkit-scrollbar {
+            width: 6px;
+        }
+        
+        .sidebar::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 3px;
+        }
+        
+        .sidebar::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 3px;
+        }
+        
+        .sidebar::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.4);
+        }
+        
         /* Mobile Responsive */
         @media (max-width: 768px) {
             .sidebar {
@@ -578,7 +603,7 @@ function logActivity($conn, $user_id, $action) {
             }
         }
         
-        /* Custom Scrollbar */
+        /* General Scrollbar */
         ::-webkit-scrollbar {
             width: 8px;
         }
@@ -621,8 +646,8 @@ function logActivity($conn, $user_id, $action) {
     <div class="overlay md:hidden" id="mobileOverlay"></div>
     
     <!-- Desktop Sidebar -->
-    <div class="sidebar w-64 min-h-screen fixed left-0 top-0 z-40 hidden md:block">
-        <div class="p-6">
+    <div class="sidebar w-64 fixed left-0 top-0 z-40 hidden md:block">
+        <div class="sidebar-content p-6">
             <!-- LEIR Logo -->
             <div class="flex items-center space-x-3 mb-8 pb-4 border-b border-blue-400/30">
                 <div class="w-10 h-10 flex items-center justify-center">
@@ -710,6 +735,16 @@ function logActivity($conn, $user_id, $action) {
                     Mediation Oversight
                 </a>
                 
+                <h3 class="text-xs uppercase tracking-wider text-blue-300 mt-4 mb-2">Communication</h3>
+                <a href="?module=super_notifications" class="sidebar-link block p-3 text-white rounded-lg <?php echo $module == 'super_notifications' ? 'active' : ''; ?>">
+                    <i class="fas fa-bell mr-3"></i>
+                    Super Notifications
+                </a>
+                <a href="?module=announcements_all" class="sidebar-link block p-3 text-white rounded-lg <?php echo $module == 'announcements_all' ? 'active' : ''; ?>">
+                    <i class="fas fa-bullhorn mr-3"></i>
+                    All Announcements
+                </a>
+                
                 <h3 class="text-xs uppercase tracking-wider text-blue-300 mt-4 mb-2">Data Access</h3>
                 <a href="?module=reports_all" class="sidebar-link block p-3 text-white rounded-lg <?php echo $module == 'reports_all' ? 'active' : ''; ?>">
                     <i class="fas fa-file-alt mr-3"></i>
@@ -729,9 +764,15 @@ function logActivity($conn, $user_id, $action) {
                     <i class="fas fa-history mr-3"></i>
                     Activity Logs
                 </a>
+                
+                <h3 class="text-xs uppercase tracking-wider text-blue-300 mt-4 mb-2">System</h3>
                 <a href="?module=system_health" class="sidebar-link block p-3 text-white rounded-lg <?php echo $module == 'system_health' ? 'active' : ''; ?>">
                     <i class="fas fa-heartbeat mr-3"></i>
                     System Health
+                </a>
+                <a href="?module=profile" class="sidebar-link block p-3 text-white rounded-lg <?php echo $module == 'profile' ? 'active' : ''; ?>">
+                    <i class="fas fa-user-cog mr-3"></i>
+                    Profile Account
                 </a>
             </nav>
             
@@ -749,6 +790,15 @@ function logActivity($conn, $user_id, $action) {
                     <i class="fas fa-sign-out-alt mr-3"></i>
                     Logout
                 </a>
+            </div>
+            
+            <!-- Scroll indicator for long sidebars -->
+            <div class="text-center mt-4 pt-4 border-t border-blue-400/20">
+                <p class="text-xs text-blue-300/70">
+                    <i class="fas fa-arrow-up mr-1"></i>
+                    Scroll to see all modules
+                    <i class="fas fa-arrow-up ml-1"></i>
+                </p>
             </div>
         </div>
     </div>
