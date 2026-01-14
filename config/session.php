@@ -1,8 +1,10 @@
 <?php
 // config/session.php
-session_cache_limiter('private');
-session_cache_expire(30);
-session_start();
+if (session_status() === PHP_SESSION_NONE) {
+    session_cache_limiter('private');
+    session_cache_expire(30);
+    session_start();
+}
 
 // Regenerate session ID periodically for security
 if (!isset($_SESSION['created'])) {

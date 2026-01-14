@@ -32,22 +32,10 @@ if ($_SESSION['role'] !== 'tanod') {
     }
 }
 
-// Create mysqli connection from PDO config if $conn doesn't exist
-if (!isset($conn)) {
-    $host = 'localhost';
-    $dbname = 'leir_db';
-    $username = 'root';
-    $password = '';
-    $port = '3307';
-    
-    $conn = new mysqli($host, $username, $password, $dbname, $port);
-    if ($conn->connect_error) {
-        die("Database connection failed: " . $conn->connect_error);
-    }
-    $conn->set_charset("utf8mb4");
-}
+// Get PDO connection from database.php
+$pdo = getDbConnection();
 
-// Now we can safely use $conn
+// Now we can safely use $pdo
 $tanod_id = $_SESSION['user_id'];
 $tanod_name = $_SESSION['first_name'] . ' ' . $_SESSION['last_name'] ?? 'Tanod';
 $current_date = date('Y-m-d H:i:s');
@@ -61,21 +49,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $report_id = intval($_POST['report_id']);
         
         $sql = "UPDATE reports SET assigned_tanod = ?, status = 'assigned', needs_verification = 0 WHERE id = ?";
-        $stmt = $conn->prepare($sql);
+        $stmt = $pdo->prepare($sql);
         
         if ($stmt) {
-            $stmt->bind_param("ii", $tanod_id, $report_id);
-            if ($stmt->execute()) {
+            if ($stmt->execute([$tanod_id, $report_id])) {
                 // Log the assignment
-                logActivity($tanod_id, 'assigned_report', "Assigned report #$report_id for vetting", $conn);
+                logActivity($tanod_id, 'assigned_report', "Assigned report #$report_id for vetting", $pdo);
                 
                 $_SESSION['success'] = "Report assigned successfully for vetting.";
             } else {
-                $_SESSION['error'] = "Error assigning report: " . $stmt->error;
+                $errorInfo = $stmt->errorInfo();
+                $_SESSION['error'] = "Error assigning report: " . $errorInfo[2];
             }
-            $stmt->close();
         } else {
-            $_SESSION['error'] = "Database error: " . $conn->error;
+            $_SESSION['error'] = "Database error: Failed to prepare statement";
         }
     }
     
@@ -94,15 +81,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         
         // Check if vetting already exists
         $check_sql = "SELECT vetting_id FROM report_vetting WHERE report_id = ?";
-        $check_stmt = $conn->prepare($check_sql);
+        $check_stmt = $pdo->prepare($check_sql);
         
         if ($check_stmt) {
-            $check_stmt->bind_param("i", $report_id);
-            $check_stmt->execute();
-            $check_result = $check_stmt->get_result();
-            $check_stmt->close();
+            $check_stmt->execute([$report_id]);
+            $check_result = $check_stmt->fetchAll(PDO::FETCH_ASSOC);
             
-            if ($check_result->num_rows > 0) {
+            if (count($check_result) > 0) {
                 // Update existing vetting
                 $sql = "UPDATE report_vetting SET 
                         location_verified = ?, 
@@ -119,18 +104,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         VALUES (?, ?, ?, ?, ?, ?, 'Completed')";
             }
             
-            $stmt = $conn->prepare($sql);
+            $stmt = $pdo->prepare($sql);
             
             if ($stmt) {
-                if ($check_result->num_rows > 0) {
+                if (count($check_result) > 0) {
                     // Update
-                    $stmt->bind_param("sssssi", $location_verified, $facts_verified, $verification_notes, $recommendation, $current_date, $report_id);
+                    $stmt->execute([$location_verified, $facts_verified, $verification_notes, $recommendation, $current_date, $report_id]);
                 } else {
                     // Insert
-                    $stmt->bind_param("iissss", $report_id, $tanod_id, $location_verified, $facts_verified, $verification_notes, $recommendation);
+                    $stmt->execute([$report_id, $tanod_id, $location_verified, $facts_verified, $verification_notes, $recommendation]);
                 }
                 
-                if ($stmt->execute()) {
+                if ($stmt->rowCount() > 0) {
                     // Update report status based on recommendation
                     $report_status = 'assigned';
                     if ($recommendation == 'Approved') {
@@ -140,16 +125,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     }
                     
                     $update_sql = "UPDATE reports SET status = ?, verification_notes = ?, verification_date = NOW(), verified_by = ? WHERE id = ?";
-                    $update_stmt = $conn->prepare($update_sql);
+                    $update_stmt = $pdo->prepare($update_sql);
                     
                     if ($update_stmt) {
-                        $update_stmt->bind_param("ssii", $report_status, $verification_notes, $tanod_id, $report_id);
-                        $update_stmt->execute();
-                        $update_stmt->close();
+                        $update_stmt->execute([$report_status, $verification_notes, $tanod_id, $report_id]);
                     }
                     
                     // Log activity
-                    logActivity($tanod_id, 'submitted_vetting', "Submitted vetting for report #$report_id with recommendation: $recommendation", $conn);
+                    logActivity($tanod_id, 'submitted_vetting', "Submitted vetting for report #$report_id with recommendation: $recommendation", $pdo);
                     
                     $_SESSION['success'] = "Vetting report submitted successfully.";
                     
@@ -157,9 +140,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     header("Location: " . $_SERVER['PHP_SELF'] . "?success=1");
                     exit();
                 } else {
-                    $_SESSION['error'] = "Error submitting vetting report: " . $stmt->error;
+                    $errorInfo = $stmt->errorInfo();
+                    $_SESSION['error'] = "Error submitting vetting report: " . $errorInfo[2];
                 }
-                $stmt->close();
             }
         }
     }
@@ -179,16 +162,10 @@ $assigned_sql = "
     ORDER BY r.created_at DESC
 ";
 
-$assigned_stmt = $conn->prepare($assigned_sql);
+$assigned_stmt = $pdo->prepare($assigned_sql);
 if ($assigned_stmt) {
-    $assigned_stmt->bind_param("ii", $tanod_id, $tanod_id);
-    $assigned_stmt->execute();
-    $assigned_result = $assigned_stmt->get_result();
-    
-    while ($row = $assigned_result->fetch_assoc()) {
-        $assigned_reports[] = $row;
-    }
-    $assigned_stmt->close();
+    $assigned_stmt->execute([$tanod_id, $tanod_id]);
+    $assigned_reports = $assigned_stmt->fetchAll(PDO::FETCH_ASSOC);
 }
 
 // Get pending reports available for assignment (reports needing verification, not assigned yet)
@@ -205,15 +182,10 @@ $pending_sql = "
     LIMIT 10
 ";
 
-$pending_stmt = $conn->prepare($pending_sql);
+$pending_stmt = $pdo->prepare($pending_sql);
 if ($pending_stmt) {
     $pending_stmt->execute();
-    $pending_result = $pending_stmt->get_result();
-    
-    while ($row = $pending_result->fetch_assoc()) {
-        $pending_reports[] = $row;
-    }
-    $pending_stmt->close();
+    $pending_reports = $pending_stmt->fetchAll(PDO::FETCH_ASSOC);
 }
 
 // Get completed vettings
@@ -230,16 +202,10 @@ $completed_sql = "
     LIMIT 10
 ";
 
-$completed_stmt = $conn->prepare($completed_sql);
+$completed_stmt = $pdo->prepare($completed_sql);
 if ($completed_stmt) {
-    $completed_stmt->bind_param("i", $tanod_id);
-    $completed_stmt->execute();
-    $completed_result = $completed_stmt->get_result();
-    
-    while ($row = $completed_result->fetch_assoc()) {
-        $completed_vettings[] = $row;
-    }
-    $completed_stmt->close();
+    $completed_stmt->execute([$tanod_id]);
+    $completed_vettings = $completed_stmt->fetchAll(PDO::FETCH_ASSOC);
 }
 
 // Get specific report details if requested
@@ -257,16 +223,12 @@ if (isset($_GET['view_report'])) {
         WHERE r.id = ?
     ";
     
-    $report_stmt = $conn->prepare($report_sql);
+    $report_stmt = $pdo->prepare($report_sql);
     if ($report_stmt) {
-        $report_stmt->bind_param("i", $report_id);
-        $report_stmt->execute();
-        $report_result = $report_stmt->get_result();
-        
-        if ($report_result->num_rows > 0) {
-            $report_details = $report_result->fetch_assoc();
+        $report_stmt->execute([$report_id]);
+        if ($report_stmt->rowCount() > 0) {
+            $report_details = $report_stmt->fetch(PDO::FETCH_ASSOC);
         }
-        $report_stmt->close();
     }
 }
 ?>
@@ -296,7 +258,7 @@ if (isset($_GET['view_report'])) {
         .status-completed { @apply bg-green-100 text-green-800; }
         .status-approved { @apply bg-emerald-100 text-emerald-800; }
         .status-rejected { @apply bg-red-100 text-red-800; }
-        .status-needs-info { @apply bg-orange-100 text-orange-800; }
+        .status-needs_info { @apply bg-orange-100 text-orange-800; }
         
         /* Responsive adjustments */
         @media (max-width: 768px) {
@@ -307,10 +269,10 @@ if (isset($_GET['view_report'])) {
             .grid-cols-1 {
                 grid-template-columns: 1fr;
             }
-            .lg\\:col-span-2 {
+            .lg\:col-span-2 {
                 grid-column: span 1;
             }
-            .lg\\:col-span-1 {
+            .lg\:col-span-1 {
                 grid-column: span 1;
             }
         }
@@ -457,7 +419,7 @@ if (isset($_GET['view_report'])) {
                                                 <?php if (!empty($report['vetting_recommendation'])): ?>
                                                     <?php 
                                                     $rec = $report['vetting_recommendation'];
-                                                    $rec_class = 'status-' . strtolower(str_replace(' ', '-', $rec));
+                                                    $rec_class = 'status-' . strtolower(str_replace(' ', '_', $rec));
                                                     ?>
                                                     <span class="badge <?php echo $rec_class; ?>">
                                                         <?php echo $rec; ?>
@@ -720,7 +682,7 @@ if (isset($_GET['view_report'])) {
                                                 </div>
                                                 <?php 
                                                 $rec = $vetting['recommendation'] ?? 'Needs More Info';
-                                                $rec_class = 'status-' . strtolower(str_replace(' ', '-', $rec));
+                                                $rec_class = 'status-' . strtolower(str_replace(' ', '_', $rec));
                                                 ?>
                                                 <span class="badge <?php echo $rec_class; ?> text-xs">
                                                     <?php echo $rec; ?>
@@ -856,7 +818,7 @@ if (isset($_GET['view_report'])) {
 </html>
 <?php
 // Close database connection
-if (isset($conn)) {
-    $conn->close();
+if (isset($pdo)) {
+    $pdo = null;
 }
 ?>
