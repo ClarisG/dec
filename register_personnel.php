@@ -539,24 +539,10 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             }
             
             /* Remove mobile-features styles */
-            .mobile-features{
-                display: flex;
-                align-items: center;
-                background: rgba(255, 255, 255, 0.1);
-                padding: 8px 12px;
-                border-radius: 20px;
-                font-size: 12px;
-                backdrop-filter: blur(10px);
-            }
+            /* Remove mobile-features styles */
+            .mobile-features,
             .mobile-feature {
-                display: none; 
-                display: flex;
-                justify-content: center;
-                gap: 15px;
-                flex-wrap: wrap;
-                margin-top: 20px;
-                position: relative;
-                z-index: 4;
+                display: none;
             }
         }
         
@@ -1367,7 +1353,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             </div>
             <h1>Personnel Registration</h1>
             <p>Register as Barangay Personnel</p>
-            
+
             <!-- Add the wave separator from login.php -->
             <div class="wave-separator-index">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 100" preserveAspectRatio="none">

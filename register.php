@@ -11,6 +11,8 @@ if (isset($_SESSION['user_id'])) {
         case 'secretary': header("Location: secretary_dashboard.php"); exit;
         case 'captain': header("Location: captain_dashboard.php"); exit;
         case 'admin': header("Location: admin_dashboard.php"); exit;
+        case 'lupon': header("Location: lupon/lupon_dashboard.php"); exit;
+        case 'super_admin': header("Location: super_admin/super_admin_dashboard.php"); exit;
     }
 }
 
@@ -544,7 +546,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             .mobile-header {
                 flex-shrink: 0;
                 background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 50%, #1d4ed8 100%);
-                padding: 50px 30px 100px;
+                padding: 50px 30px 80px;
                 text-align: center;
                 color: white;
                 position: relative;
