@@ -1,111 +1,221 @@
 <?php
-require_once '../config/session.php';
-require_once '../config/database.php';
-require_once '../config/functions.php';
+// lupon/lupon_dashboard.php - LUPON DASHBOARD WITH LEIR LOGO
+session_start();
 
-// Check if user is logged in and is a tanod
-if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'tanod') {
-    header('Location: ../login.php');
-    exit();
+// Check if user is logged in and is lupon
+if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'lupon') {
+    header("Location: ../login.php");
+    exit;
 }
 
-// Get tanod data
-$tanod_id = $_SESSION['user_id'];
+// Include database configuration
+require_once '../config/database.php';
 
-// Check if database connection is available
-if (!isset($pdo)) {
-    // Try to get connection using function
+// Get lupon information
+$user_id = $_SESSION['user_id'];
+$user_name = $_SESSION['first_name'] . ' ' . $_SESSION['last_name'];
+
+// Database connection
+try {
+    $conn = getDbConnection();
+} catch(PDOException $e) {
+    die("Database connection failed: " . $e->getMessage());
+}
+
+// Check if assigned_lupon column exists
+$checkColumnStmt = $conn->query("SHOW COLUMNS FROM reports LIKE 'assigned_lupon'");
+$columnExists = $checkColumnStmt->rowCount() > 0;
+
+// Alternative: Check for other assignment columns
+$checkAltColumnStmt = $conn->query("SHOW COLUMNS FROM reports");
+$allColumns = $checkAltColumnStmt->fetchAll(PDO::FETCH_COLUMN);
+$assignmentColumns = array_filter($allColumns, function($col) {
+    return stripos($col, 'assign') !== false || stripos($col, 'lupon') !== false;
+});
+
+// Determine which column to use for assignment
+$assignmentColumn = 'assigned_lupon'; // default
+if (!$columnExists && !empty($assignmentColumns)) {
+    $assignmentColumn = reset($assignmentColumns); // use first assignment-related column
+} elseif (!$columnExists) {
+    // Create a temporary assignment method using mediation_logs
+    $assignmentColumn = null;
+}
+
+// Handle module switching
+$module = isset($_GET['module']) ? $_GET['module'] : 'dashboard';
+$valid_modules = ['dashboard', 'case_mediation', 'mediation_scheduling', 'settlement_document', 'progress_tracker', 'profile'];
+if (!in_array($module, $valid_modules)) {
+    $module = 'dashboard';
+}
+
+// Handle actions based on module
+if ($module == 'case_mediation' && isset($_POST['start_mediation'])) {
+    $case_id = $_POST['case_id'];
+    $mediation_date = $_POST['mediation_date'];
+    $notes = $_POST['mediation_notes'];
+    
     try {
-        $pdo = getDbConnection();
-    } catch (Exception $e) {
-        die('Database connection not established. Please check your database configuration.');
+        // Update report status
+        $updateSql = "UPDATE reports SET status = 'in_mediation', mediation_started = NOW()";
+        if ($assignmentColumn) {
+            $updateSql .= ", $assignmentColumn = :lupon_id";
+        }
+        $updateSql .= " WHERE id = :id";
+        
+        $stmt = $conn->prepare($updateSql);
+        $params = [':id' => $case_id];
+        if ($assignmentColumn) {
+            $params[':lupon_id'] = $user_id;
+        }
+        $stmt->execute($params);
+        
+        // Insert mediation log
+        $log_stmt = $conn->prepare("INSERT INTO mediation_logs (report_id, lupon_id, mediation_date, notes, status) VALUES (:report_id, :lupon_id, :mediation_date, :notes, 'scheduled')");
+        $log_stmt->execute([
+            ':report_id' => $case_id,
+            ':lupon_id' => $user_id,
+            ':mediation_date' => $mediation_date,
+            ':notes' => $notes
+        ]);
+        
+        $_SESSION['success'] = "Mediation session scheduled successfully!";
+        header("Location: lupon_dashboard.php?module=case_mediation");
+        exit;
+    } catch(PDOException $e) {
+        $_SESSION['error'] = "Failed to schedule mediation: " . $e->getMessage();
     }
 }
-
-$stmt = $pdo->prepare("SELECT * FROM users WHERE id = ?");
-$stmt->execute([$tanod_id]);
-$tanod = $stmt->fetch();
-
-// Get duty status
-$stmt = $pdo->prepare("SELECT status FROM tanod_status WHERE user_id = ?");
-$stmt->execute([$tanod_id]);
-$duty_status = $stmt->fetch(PDO::FETCH_ASSOC);
 
 // Get user data including profile picture
 $user_query = "SELECT u.*, 
                       IFNULL(u.barangay, 'Not specified') as barangay_display,
                       u.permanent_address as user_address,
                       u.profile_picture,
-                      u.is_active
+                      u.is_active,
+                      bp.position_name
                FROM users u 
+               LEFT JOIN barangay_positions bp ON u.position_id = bp.id
                WHERE u.id = :id";
-$user_stmt = $pdo->prepare($user_query);
-$user_stmt->execute([':id' => $tanod_id]);
+$user_stmt = $conn->prepare($user_query);
+$user_stmt->execute([':id' => $user_id]);
 $user_data = $user_stmt->fetch(PDO::FETCH_ASSOC);
 
 if ($user_data) {
     $is_active = $user_data['is_active'] ?? 1;
+    $position_name = $user_data['position_name'] ?? 'Lupon Member';
     $_SESSION['permanent_address'] = $user_data['user_address'];
     $_SESSION['barangay'] = $user_data['barangay_display'];
     $user_address = $user_data['user_address'];
     $profile_picture = $user_data['profile_picture'];
 } else {
     $is_active = 1;
+    $position_name = 'Lupon Member';
     $user_address = '';
     $profile_picture = '';
-}
-
-// Handle module switching
-$module = isset($_GET['module']) ? $_GET['module'] : 'dashboard';
-$valid_modules = ['dashboard', 'duty_schedule', 'incident_logging', 'report_vetting', 'evidence_handover', 'profile'];
-if (!in_array($module, $valid_modules)) {
-    $module = 'dashboard';
 }
 
 // Get statistics for dashboard
 $stats = [];
 if ($module == 'dashboard') {
-    // Pending incidents - FIXED: Changed table from 'incidents' to 'tanod_incidents'
-    $pending_query = "SELECT COUNT(*) as count FROM tanod_incidents WHERE status = 'pending' AND user_id = ?";
-    $pending_stmt = $pdo->prepare($pending_query);
-    $pending_stmt->execute([$tanod_id]);
-    $stats['pending_incidents'] = $pending_stmt->fetchColumn();
+    // Assigned mediation cases - dynamic query based on column existence
+    if ($assignmentColumn) {
+        $assigned_query = "SELECT COUNT(*) as count FROM reports 
+                          WHERE $assignmentColumn = :lupon_id 
+                          AND status IN ('pending', 'assigned', 'in_mediation')";
+    } else {
+        // Alternative: Get cases from mediation_logs where lupon is assigned
+        $assigned_query = "SELECT COUNT(DISTINCT ml.report_id) as count 
+                          FROM mediation_logs ml
+                          JOIN reports r ON ml.report_id = r.id
+                          WHERE ml.lupon_id = :lupon_id 
+                          AND r.status IN ('pending', 'assigned', 'in_mediation')";
+    }
+    $assigned_stmt = $conn->prepare($assigned_query);
+    $assigned_stmt->execute([':lupon_id' => $user_id]);
+    $stats['assigned_cases'] = $assigned_stmt->fetchColumn();
     
-    // Reports for vetting
-    $vetting_query = "SELECT COUNT(*) as count FROM reports WHERE status = 'pending_vetting'";
-    $vetting_stmt = $pdo->prepare($vetting_query);
-    $vetting_stmt->execute();
-    $stats['pending_vetting'] = $vetting_stmt->fetchColumn();
+    // Successful mediations (last 30 days)
+    $success_query = "SELECT COUNT(DISTINCT ml.report_id) as count 
+                     FROM mediation_logs ml
+                     JOIN reports r ON ml.report_id = r.id
+                     WHERE ml.lupon_id = :lupon_id 
+                     AND ml.status = 'successful'
+                     AND ml.mediation_date >= DATE_SUB(NOW(), INTERVAL 30 DAY)";
+    $success_stmt = $conn->prepare($success_query);
+    $success_stmt->execute([':lupon_id' => $user_id]);
+    $stats['successful_mediations'] = $success_stmt->fetchColumn();
     
-    // Total incidents logged - FIXED: Changed table from 'incidents' to 'tanod_incidents'
-    $total_query = "SELECT COUNT(*) as count FROM tanod_incidents WHERE user_id = ?";
-    $total_stmt = $pdo->prepare($total_query);
-    $total_stmt->execute([$tanod_id]);
-    $stats['total_incidents'] = $total_stmt->fetchColumn();
+    // Upcoming mediation sessions
+    $upcoming_query = "SELECT COUNT(*) as count FROM mediation_logs 
+                      WHERE lupon_id = :lupon_id 
+                      AND mediation_date >= CURDATE() 
+                      AND status = 'scheduled'";
+    $upcoming_stmt = $conn->prepare($upcoming_query);
+    $upcoming_stmt->execute([':lupon_id' => $user_id]);
+    $stats['upcoming_sessions'] = $upcoming_stmt->fetchColumn();
+    
+    // Mediation success rate
+    $total_mediated_query = "SELECT COUNT(*) as total FROM mediation_logs WHERE lupon_id = :lupon_id";
+    $total_mediated_stmt = $conn->prepare($total_mediated_query);
+    $total_mediated_stmt->execute([':lupon_id' => $user_id]);
+    $total_mediated = $total_mediated_stmt->fetchColumn();
+    
+    $successful_query = "SELECT COUNT(*) as successful FROM mediation_logs WHERE lupon_id = :lupon_id AND status = 'successful'";
+    $successful_stmt = $conn->prepare($successful_query);
+    $successful_stmt->execute([':lupon_id' => $user_id]);
+    $successful = $successful_stmt->fetchColumn();
+    
+    $stats['success_rate'] = $total_mediated > 0 ? round(($successful / $total_mediated) * 100, 1) : 0;
+    
+    // Get recent mediation cases
+    if ($assignmentColumn) {
+        $recent_cases_query = "SELECT r.*, u.first_name as complainant_fname, u.last_name as complainant_lname,
+                                      rt.type_name, r.created_at as case_date
+                               FROM reports r
+                               JOIN users u ON r.user_id = u.id
+                               JOIN report_types rt ON r.report_type_id = rt.id
+                               WHERE r.$assignmentColumn = :lupon_id
+                               ORDER BY r.created_at DESC 
+                               LIMIT 5";
+    } else {
+        $recent_cases_query = "SELECT DISTINCT r.*, u.first_name as complainant_fname, u.last_name as complainant_lname,
+                                      rt.type_name, r.created_at as case_date
+                               FROM reports r
+                               JOIN users u ON r.user_id = u.id
+                               JOIN report_types rt ON r.report_type_id = rt.id
+                               JOIN mediation_logs ml ON r.id = ml.report_id
+                               WHERE ml.lupon_id = :lupon_id
+                               ORDER BY r.created_at DESC 
+                               LIMIT 5";
+    }
+    $recent_cases_stmt = $conn->prepare($recent_cases_query);
+    $recent_cases_stmt->execute([':lupon_id' => $user_id]);
+    $recent_cases = $recent_cases_stmt->fetchAll(PDO::FETCH_ASSOC);
 }
 
 // Function to get module title
 function getModuleTitle($module) {
     $titles = [
-        'dashboard' => 'Dashboard Overview',
-        'duty_schedule' => 'Duty & Patrol Schedule',
-        'incident_logging' => 'Incident Logging',
-        'report_vetting' => 'Report Vetting',
-        'evidence_handover' => 'Evidence Handover',
-        'profile' => 'Profile Account'
+        'dashboard' => 'Mediation Dashboard',
+        'case_mediation' => 'Case Mediation Desk',
+        'mediation_scheduling' => 'Mediation Scheduling',
+        'settlement_document' => 'Settlement Documents',
+        'progress_tracker' => 'Mediation Progress',
+        'profile' => 'Profile & Performance'
     ];
-    return $titles[$module] ?? 'Dashboard';
+    return $titles[$module] ?? 'Mediation Dashboard';
 }
 
 // Function to get module subtitle
 function getModuleSubtitle($module) {
     $subtitles = [
-        'dashboard' => 'Overview of all tanod functions and quick actions',
-        'duty_schedule' => 'View assigned shifts, patrol routes, and clock in/out',
-        'incident_logging' => 'Log incidents with GPS location and evidence upload',
-        'report_vetting' => 'Review citizen reports for field verification',
-        'evidence_handover' => 'Track evidence transfer and chain of custody',
-        'profile' => 'Manage your account information and settings'
+        'dashboard' => 'Overview of mediation activities and performance metrics',
+        'case_mediation' => 'View and mediate assigned barangay cases with full access to details',
+        'mediation_scheduling' => 'Coordinate hearing schedules and send reminders to parties',
+        'settlement_document' => 'Generate and sign amicable settlement agreements and reports',
+        'progress_tracker' => 'Monitor mediation progress and log session outcomes',
+        'profile' => 'View mediation statistics and manage your account'
     ];
     return $subtitles[$module] ?? '';
 }
@@ -115,7 +225,7 @@ function getModuleSubtitle($module) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tanod Dashboard - <?php echo getModuleTitle($module); ?></title>
+    <title>Lupon Dashboard - <?php echo getModuleTitle($module); ?></title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -124,20 +234,21 @@ function getModuleSubtitle($module) {
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="icon" type="image/png" href="../images/10213.png">
     <style>
+        /* ... (keep all existing CSS styles as they are) ... */
         * {
             font-family: 'Inter', sans-serif;
         }
         
         :root {
-            --primary-blue: #e3f2fd;
-            --secondary-blue: #bbdefb;
-            --accent-blue: #2196f3;
-            --dark-blue: #0d47a1;
-            --light-blue: #f5fbff;
+            --primary-green: #e8f5e9;
+            --secondary-green: #c8e6c9;
+            --accent-green: #4caf50;
+            --dark-green: #2e7d32;
+            --light-green: #f9fff9;
         }
         
         body {
-            background: linear-gradient(135deg, #f5fbff 0%, #e3f2fd 100%);
+            background: linear-gradient(135deg, #f9fff9 0%, #e8f5e9 100%);
             min-height: 100vh;
         }
         
@@ -149,217 +260,16 @@ function getModuleSubtitle($module) {
         
         .module-card {
             transition: all 0.3s ease;
-            border-left: 4px solid var(--accent-blue);
+            border-left: 4px solid var(--accent-green);
         }
         
         .module-card:hover {
             transform: translateY(-5px);
-            box-shadow: 0 10px 25px rgba(33, 150, 243, 0.1);
-            border-left-color: var(--dark-blue);
+            box-shadow: 0 10px 25px rgba(76, 175, 80, 0.1);
+            border-left-color: var(--dark-green);
         }
         
-        .stat-card {
-            background: linear-gradient(135deg, #ffffff 0%, #f0f9ff 100%);
-            border: 1px solid #e0f2fe;
-        }
-        
-        .urgent {
-            border-left: 4px solid #ef4444;
-            background: linear-gradient(135deg, #fef2f2 0%, #fecaca 100%);
-        }
-        
-        .warning {
-            border-left: 4px solid #f59e0b;
-            background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
-        }
-        
-        .success {
-            border-left: 4px solid #10b981;
-            background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
-        }
-        
-        .sidebar {
-            background: linear-gradient(180deg, #1e3a8a 0%, #0d47a1 100%);
-            box-shadow: 4px 0 15px rgba(0, 0, 0, 0.1);
-        }
-        
-        .sidebar-link {
-            transition: all 0.3s ease;
-            border-left: 3px solid transparent;
-        }
-        
-        .sidebar-link:hover {
-            background: rgba(255, 255, 255, 0.1);
-            border-left-color: #60a5fa;
-        }
-        
-        .sidebar-link.active {
-            background: rgba(255, 255, 255, 0.15);
-            border-left-color: #3b82f6;
-        }
-        
-        .case-table tr {
-            border-bottom: 1px solid #e5e7eb;
-        }
-        
-        .case-table tr:hover {
-            background-color: #f8fafc;
-        }
-        
-        .badge {
-            padding: 0.25rem 0.75rem;
-            border-radius: 9999px;
-            font-size: 0.75rem;
-            font-weight: 600;
-        }
-        
-        .badge-pending {
-            background-color: #fef3c7;
-            color: #92400e;
-        }
-        
-        .badge-processing {
-            background-color: #dbeafe;
-            color: #1e40af;
-        }
-        
-        .badge-resolved {
-            background-color: #d1fae5;
-            color: #065f46;
-        }
-        
-        .badge-on-duty {
-            background-color: #10b981;
-            color: white;
-        }
-        
-        .badge-off-duty {
-            background-color: #6b7280;
-            color: white;
-        }
-        
-        .animate-pulse {
-            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-        }
-        
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
-        }
-        
-        /* Mobile Responsive */
-        @media (max-width: 768px) {
-            .sidebar {
-                transform: translateX(-100%);
-                position: fixed;
-                z-index: 50;
-            }
-            
-            .sidebar.active {
-                transform: translateX(0);
-            }
-            
-            .overlay {
-                display: none;
-                position: fixed;
-                top: 0;
-                left: 0;
-                right: 0;
-                bottom: 0;
-                background: rgba(0, 0, 0, 0.5);
-                z-index: 40;
-            }
-            
-            .overlay.active {
-                display: block;
-            }
-            
-            .main-content {
-                margin-left: 0 !important;
-                padding: 1rem !important;
-            }
-            
-            .mobile-bottom-nav {
-                position: fixed;
-                bottom: 0;
-                left: 0;
-                right: 0;
-                background: white;
-                box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
-                z-index: 100;
-            }
-            
-            .mobile-nav-active {
-                color: #2196f3;
-                position: relative;
-            }
-            
-            .mobile-nav-active::after {
-                content: '';
-                position: absolute;
-                bottom: -5px;
-                left: 50%;
-                transform: translateX(-50%);
-                width: 6px;
-                height: 6px;
-                background: #2196f3;
-                border-radius: 50%;
-            }
-            
-            .mobile-nav-badge {
-                position: absolute;
-                top: -5px;
-                right: 5px;
-                background: #ef4444;
-                color: white;
-                border-radius: 50%;
-                width: 18px;
-                height: 18px;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                font-size: 10px;
-                font-weight: 600;
-            }
-        }
-        
-        /* Card animations */
-        .card {
-            transition: transform 0.3s ease, box-shadow 0.3s ease;
-        }
-        
-        .card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
-        }
-        
-        /* Active status animation */
-        .active-status {
-            animation: pulse 2s infinite;
-        }
-        
-        @keyframes pulse {
-            0% { opacity: 1; }
-            50% { opacity: 0.7; }
-            100% { opacity: 1; }
-        }
-        
-        /* Notification badge */
-        .notification-badge {
-            position: absolute;
-            top: -8px;
-            right: -8px;
-            background: #e53e3e;
-            color: white;
-            border-radius: 50%;
-            width: 20px;
-            height: 20px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 12px;
-            font-weight: 600;
-        }
+        /* ... (rest of the CSS remains the same) ... */
     </style>
 </head>
 <body class="min-h-screen">
@@ -370,13 +280,13 @@ function getModuleSubtitle($module) {
     <div class="sidebar w-64 min-h-screen fixed left-0 top-0 z-40 hidden md:block">
         <div class="p-6">
             <!-- LEIR Logo -->
-            <div class="flex items-center space-x-3 mb-8 pb-4 border-b border-blue-400/30">
+            <div class="flex items-center space-x-3 mb-8 pb-4 border-b border-green-400/30">
                 <div class="w-10 h-10 flex items-center justify-center">
                     <img src="../images/10213.png" alt="Logo" class="w-19 h-22 object-contain">
                 </div>
                 <div>
                     <h1 class="text-xl font-bold text-white">LEIR</h1>
-                    <p class="text-blue-200 text-sm">Tanod System</p>
+                    <p class="text-green-200 text-sm">Lupon Mediation System</p>
                 </div>
             </div>
             
@@ -385,26 +295,25 @@ function getModuleSubtitle($module) {
                 <div class="flex items-center space-x-3 p-3 bg-white/10 rounded-lg">
                     <div class="relative">
                         <?php 
-                        // FIXED: Changed path from ../uploads to ../../uploads
-                        $profile_pic_path = "../../uploads/profile_pictures/" . ($profile_picture ?? '');
+                        $profile_pic_path = "../uploads/profile_pictures/" . ($profile_picture ?? '');
                         if (!empty($profile_picture) && file_exists($profile_pic_path)): 
                         ?>
                             <img src="<?php echo $profile_pic_path; ?>" 
                                  alt="Profile" class="w-10 h-10 rounded-full object-cover border-2 border-white shadow-sm">
                         <?php else: ?>
-                            <div class="w-10 h-10 rounded-full bg-gradient-to-r from-blue-600 to-blue-500 flex items-center justify-center text-white font-bold">
-                                <?php echo strtoupper(substr($tanod['first_name'], 0, 1)); ?>
+                            <div class="w-10 h-10 rounded-full bg-gradient-to-r from-green-600 to-green-500 flex items-center justify-center text-white font-bold">
+                                <?php echo strtoupper(substr($_SESSION['first_name'], 0, 1)); ?>
                             </div>
                         <?php endif; ?>
                         <div class="absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-white <?php echo $is_active ? 'bg-green-500' : 'bg-red-500'; ?>"></div>
                     </div>
                     <div>
-                        <p class="text-white font-medium truncate"><?php echo htmlspecialchars($tanod['first_name'] . ' ' . $tanod['last_name']); ?></p>
-                        <p class="text-blue-200 text-sm">Barangay Tanod</p>
+                        <p class="text-white font-medium truncate"><?php echo htmlspecialchars($user_name); ?></p>
+                        <p class="text-green-200 text-sm"><?php echo htmlspecialchars($position_name); ?></p>
                     </div>
                 </div>
                 <div class="mt-3 ml-3">
-                    <p class="text-sm text-blue-200 flex items-center">
+                    <p class="text-sm text-green-200 flex items-center">
                         <i class="fas fa-map-marker-alt mr-2 text-xs"></i>
                         <span class="truncate"><?php echo htmlspecialchars($user_address ?? 'Barangay Office'); ?></span>
                     </p>
@@ -414,61 +323,64 @@ function getModuleSubtitle($module) {
             <nav class="space-y-2">
                 <a href="?module=dashboard" class="sidebar-link block p-3 text-white rounded-lg <?php echo $module == 'dashboard' ? 'active' : ''; ?>">
                     <i class="fas fa-tachometer-alt mr-3"></i>
-                    Dashboard Overview
+                    Mediation Dashboard
                 </a>
-                <a href="?module=duty_schedule" class="sidebar-link block p-3 text-white rounded-lg <?php echo $module == 'duty_schedule' ? 'active' : ''; ?>">
+                <a href="?module=case_mediation" class="sidebar-link block p-3 text-white rounded-lg <?php echo $module == 'case_mediation' ? 'active' : ''; ?>">
+                    <i class="fas fa-handshake mr-3"></i>
+                    Case Mediation Desk
+                    <?php if (isset($stats['assigned_cases']) && $stats['assigned_cases'] > 0): ?>
+                        <span class="float-right bg-red-500 text-white text-xs rounded-full w-6 h-6 flex items-center justify-center">
+                            <?php echo min($stats['assigned_cases'], 9); ?>
+                        </span>
+                    <?php endif; ?>
+                </a>
+                <a href="?module=mediation_scheduling" class="sidebar-link block p-3 text-white rounded-lg <?php echo $module == 'mediation_scheduling' ? 'active' : ''; ?>">
                     <i class="fas fa-calendar-alt mr-3"></i>
-                    Duty & Patrol Schedule
+                    Mediation Scheduling
                 </a>
-                <a href="?module=incident_logging" class="sidebar-link block p-3 text-white rounded-lg <?php echo $module == 'incident_logging' ? 'active' : ''; ?>">
-                    <i class="fas fa-clipboard-list mr-3"></i>
-                    Incident Logging
-                    <?php if (isset($stats['pending_incidents']) && $stats['pending_incidents'] > 0): ?>
-                        <span class="float-right bg-red-500 text-white text-xs rounded-full w-6 h-6 flex items-center justify-center">
-                            <?php echo min($stats['pending_incidents'], 9); ?>
-                        </span>
-                    <?php endif; ?>
+                <a href="?module=settlement_document" class="sidebar-link block p-3 text-white rounded-lg <?php echo $module == 'settlement_document' ? 'active' : ''; ?>">
+                    <i class="fas fa-file-signature mr-3"></i>
+                    Settlement Documents
                 </a>
-                <a href="?module=report_vetting" class="sidebar-link block p-3 text-white rounded-lg <?php echo $module == 'report_vetting' ? 'active' : ''; ?>">
-                    <i class="fas fa-check-circle mr-3"></i>
-                    Report Vetting
-                    <?php if (isset($stats['pending_vetting']) && $stats['pending_vetting'] > 0): ?>
-                        <span class="float-right bg-red-500 text-white text-xs rounded-full w-6 h-6 flex items-center justify-center">
-                            <?php echo min($stats['pending_vetting'], 9); ?>
-                        </span>
-                    <?php endif; ?>
-                </a>
-                <a href="?module=evidence_handover" class="sidebar-link block p-3 text-white rounded-lg <?php echo $module == 'evidence_handover' ? 'active' : ''; ?>">
-                    <i class="fas fa-box mr-3"></i>
-                    Evidence Handover
+                <a href="?module=progress_tracker" class="sidebar-link block p-3 text-white rounded-lg <?php echo $module == 'progress_tracker' ? 'active' : ''; ?>">
+                    <i class="fas fa-chart-line mr-3"></i>
+                    Mediation Progress
                 </a>
             </nav>
             
-            <!-- Duty Status -->
-            <div class="mt-8 pt-8 border-t border-blue-400/30">
-                <div class="mb-6">
-                    <h3 class="text-sm font-semibold text-blue-200 mb-3">CURRENT DUTY STATUS</h3>
-                    <div class="<?php echo ($duty_status && $duty_status['status'] == 'On-Duty') ? 'bg-green-500/20 border-green-500' : 'bg-gray-500/20 border-gray-500'; ?> border rounded-xl p-4">
-                        <div class="flex items-center justify-between mb-2">
-                            <span class="text-white font-medium">Status</span>
-                            <span class="<?php echo ($duty_status && $duty_status['status'] == 'On-Duty') ? 'text-green-300' : 'text-gray-300'; ?>">
-                                <i class="fas fa-circle text-xs mr-1"></i>
-                                <?php echo ($duty_status && $duty_status['status']) ? htmlspecialchars($duty_status['status']) : 'Off-Duty'; ?>
-                            </span>
+            <!-- Status & Stats -->
+            <div class="mt-8 pt-8 border-t border-green-400/30">
+                <div class="mb-4">
+                    <div class="flex items-center p-3 rounded-lg bg-green-500/20 text-green-300">
+                        <i class="fas fa-chart-pie mr-3"></i>
+                        <div class="flex-1">
+                            <div class="text-xs">Success Rate</div>
+                            <div class="font-bold text-lg"><?php echo $stats['success_rate'] ?? 0; ?>%</div>
                         </div>
-                        <button onclick="toggleDuty()" 
-                                class="w-full mt-3 py-2 rounded-lg <?php echo ($duty_status && $duty_status['status'] == 'On-Duty') ? 'bg-red-500 hover:bg-red-600' : 'bg-green-500 hover:bg-green-600'; ?> text-white font-medium transition-colors">
-                            <?php echo ($duty_status && $duty_status['status'] == 'On-Duty') ? 'Clock Out' : 'Clock In'; ?>
-                        </button>
                     </div>
                 </div>
                 
                 <div class="space-y-3">
-                    <a href="?module=profile" class="flex items-center p-3 text-blue-200 hover:text-white hover:bg-white/10 rounded-lg transition">
-                        <i class="fas fa-user-cog mr-3"></i>
-                        Profile Settings
+                    <div class="flex justify-between text-sm">
+                        <span class="text-green-200">Active Cases</span>
+                        <span class="text-white font-bold"><?php echo $stats['assigned_cases'] ?? 0; ?></span>
+                    </div>
+                    <div class="flex justify-between text-sm">
+                        <span class="text-green-200">Successful (30d)</span>
+                        <span class="text-white font-bold"><?php echo $stats['successful_mediations'] ?? 0; ?></span>
+                    </div>
+                    <div class="flex justify-between text-sm">
+                        <span class="text-green-200">Upcoming</span>
+                        <span class="text-white font-bold"><?php echo $stats['upcoming_sessions'] ?? 0; ?></span>
+                    </div>
+                </div>
+                
+                <div class="mt-6">
+                    <a href="?module=profile" class="flex items-center p-3 text-green-200 hover:text-white hover:bg-white/10 rounded-lg transition mb-2">
+                        <i class="fas fa-user mr-3"></i>
+                        Profile & Performance
                     </a>
-                    <a href="../logout.php" class="flex items-center p-3 text-blue-200 hover:text-white hover:bg-white/10 rounded-lg transition">
+                    <a href="../logout.php" class="flex items-center p-3 text-green-200 hover:text-white hover:bg-white/10 rounded-lg transition">
                         <i class="fas fa-sign-out-alt mr-3"></i>
                         Logout
                     </a>
@@ -502,28 +414,29 @@ function getModuleSubtitle($module) {
                     <div class="flex items-center space-x-4">
                         <!-- Notifications -->
                         <div class="relative">
-                            <i class="fas fa-bell text-gray-600 text-xl cursor-pointer hover:text-blue-600"></i>
-                            <span class="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full animate-pulse"></span>
+                            <button onclick="showNotifications()" class="relative">
+                                <i class="fas fa-bell text-gray-600 text-xl cursor-pointer hover:text-green-600"></i>
+                                <span class="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full animate-pulse"></span>
+                            </button>
                         </div>
                         
                         <!-- User Dropdown -->
                         <div class="relative">
                             <button id="userMenuButton" class="flex items-center space-x-2 focus:outline-none">
                                 <?php 
-                                // FIXED: Changed path from ../uploads to ../../uploads
-                                $profile_pic_path = "../../uploads/profile_pictures/" . ($profile_picture ?? '');
+                                $profile_pic_path = "../uploads/profile_pictures/" . ($profile_picture ?? '');
                                 if (!empty($profile_picture) && file_exists($profile_pic_path)): 
                                 ?>
                                     <img src="<?php echo $profile_pic_path; ?>" 
                                          alt="Profile" class="w-10 h-10 rounded-full object-cover border-2 border-white shadow-sm">
                                 <?php else: ?>
-                                    <div class="w-10 h-10 rounded-full bg-gradient-to-r from-blue-600 to-blue-500 flex items-center justify-center text-white font-semibold">
-                                        <?php echo strtoupper(substr($tanod['first_name'], 0, 1)); ?>
+                                    <div class="w-10 h-10 rounded-full bg-gradient-to-r from-green-600 to-green-500 flex items-center justify-center text-white font-semibold">
+                                        <?php echo strtoupper(substr($_SESSION['first_name'], 0, 1)); ?>
                                     </div>
                                 <?php endif; ?>
                                 <div class="hidden md:block text-left">
-                                    <p class="text-sm font-medium text-gray-800"><?php echo htmlspecialchars($tanod['first_name']); ?></p>
-                                    <p class="text-xs text-gray-500">Barangay Tanod</p>
+                                    <p class="text-sm font-medium text-gray-800"><?php echo htmlspecialchars($_SESSION['first_name']); ?></p>
+                                    <p class="text-xs text-gray-500"><?php echo htmlspecialchars($position_name); ?></p>
                                 </div>
                                 <i class="fas fa-chevron-down text-gray-400 hidden md:block"></i>
                             </button>
@@ -532,35 +445,29 @@ function getModuleSubtitle($module) {
                             <div id="userDropdown" class="hidden absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-xl border z-40">
                                 <div class="p-4 border-b">
                                     <div class="flex items-center space-x-3 mb-2">
-                                        <?php 
-                                        $profile_pic_path = "../../uploads/profile_pictures/" . ($profile_picture ?? '');
-                                        if (!empty($profile_picture) && file_exists($profile_pic_path)): ?>
+                                        <?php if (!empty($profile_picture) && file_exists($profile_pic_path)): ?>
                                             <img src="<?php echo $profile_pic_path; ?>" 
                                                  alt="Profile" class="w-10 h-10 rounded-full object-cover">
                                         <?php else: ?>
-                                            <div class="w-10 h-10 rounded-full bg-gradient-to-r from-blue-600 to-blue-500 flex items-center justify-center text-white font-bold">
-                                                <?php echo strtoupper(substr($tanod['first_name'], 0, 1)); ?>
+                                            <div class="w-10 h-10 rounded-full bg-gradient-to-r from-green-600 to-green-500 flex items-center justify-center text-white font-bold">
+                                                <?php echo strtoupper(substr($user_name, 0, 1)); ?>
                                             </div>
                                         <?php endif; ?>
                                         <div>
-                                            <p class="text-sm font-medium text-gray-900"><?php echo htmlspecialchars($tanod['first_name'] . ' ' . $tanod['last_name']); ?></p>
-                                            <p class="text-xs text-gray-500">Barangay Tanod</p>
+                                            <p class="text-sm font-medium text-gray-900"><?php echo htmlspecialchars($user_name); ?></p>
+                                            <p class="text-xs text-gray-500"><?php echo htmlspecialchars($position_name); ?></p>
                                         </div>
                                     </div>
-                                    <div class="text-xs text-gray-500 flex items-center">
-                                        <i class="fas fa-shield-alt mr-1"></i>
-                                        <?php echo ($duty_status && $duty_status['status'] == 'On-Duty') ? '<span class="text-green-600 font-medium">On Duty</span>' : '<span class="text-gray-600">Off Duty</span>'; ?>
+                                    <div class="text-xs text-gray-500">
+                                        <i class="fas fa-chart-line mr-1"></i>
+                                        Success Rate: <?php echo $stats['success_rate'] ?? 0; ?>%
                                     </div>
                                 </div>
                                 <div class="p-2">
                                     <a href="?module=profile" class="flex items-center px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded">
-                                        <i class="fas fa-user-cog mr-2"></i>
-                                        Profile Settings
+                                        <i class="fas fa-user mr-2"></i>
+                                        Profile & Performance
                                     </a>
-                                    <button onclick="toggleDuty()" class="w-full text-left flex items-center px-3 py-2 text-sm <?php echo ($duty_status && $duty_status['status'] == 'On-Duty') ? 'text-red-600' : 'text-green-600'; ?> hover:bg-gray-100 rounded">
-                                        <i class="fas fa-power-off mr-2"></i>
-                                        <?php echo ($duty_status && $duty_status['status'] == 'On-Duty') ? 'Clock Out' : 'Clock In'; ?>
-                                    </button>
                                     <a href="../logout.php" class="flex items-center px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded">
                                         <i class="fas fa-sign-out-alt mr-2"></i>
                                         Logout
@@ -596,197 +503,12 @@ function getModuleSubtitle($module) {
 
         <!-- Load Module Content -->
         <?php
-        if ($module == 'dashboard') {
-            // Dashboard content
-            ?>
-            <div class="mb-8">
-                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-                    <div>
-                        <h1 class="text-3xl font-bold text-gray-800">Welcome, Tanod <?php echo htmlspecialchars($tanod['first_name']); ?>!</h1>
-                        <p class="text-gray-600 mt-1"><?php echo ($duty_status && $duty_status['status'] == 'On-Duty') ? 'You are currently on duty. Stay vigilant!' : 'You are currently off duty.'; ?></p>
-                    </div>
-                    <button onclick="toggleDuty()" 
-                            class="px-6 py-3 rounded-lg font-medium <?php echo ($duty_status && $duty_status['status'] == 'On-Duty') ? 'bg-red-500 hover:bg-red-600' : 'bg-green-500 hover:bg-green-600'; ?> text-white transition-colors">
-                        <i class="fas fa-power-off mr-2"></i>
-                        <?php echo ($duty_status && $duty_status['status'] == 'On-Duty') ? 'Clock Out' : 'Clock In'; ?>
-                    </button>
-                </div>
-
-                <!-- Statistics Cards -->
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-                    <div class="stat-card rounded-xl p-6">
-                        <div class="flex items-center justify-between mb-4">
-                            <div class="h-12 w-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                                <i class="fas fa-clipboard-list text-blue-600 text-xl"></i>
-                            </div>
-                            <span class="text-2xl font-bold text-gray-800"><?php echo $stats['total_incidents'] ?? 0; ?></span>
-                        </div>
-                        <h3 class="text-lg font-semibold text-gray-800 mb-2">Incidents Logged</h3>
-                        <p class="text-gray-600 text-sm">Total incidents you have documented</p>
-                    </div>
-
-                    <div class="stat-card rounded-xl p-6">
-                        <div class="flex items-center justify-between mb-4">
-                            <div class="h-12 w-12 bg-yellow-100 rounded-lg flex items-center justify-center">
-                                <i class="fas fa-clock text-yellow-600 text-xl"></i>
-                            </div>
-                            <span class="text-2xl font-bold text-gray-800"><?php echo $stats['pending_incidents'] ?? 0; ?></span>
-                        </div>
-                        <h3 class="text-lg font-semibold text-gray-800 mb-2">Pending Incidents</h3>
-                        <p class="text-gray-600 text-sm">Incidents requiring follow-up</p>
-                    </div>
-
-                    <div class="stat-card rounded-xl p-6">
-                        <div class="flex items-center justify-between mb-4">
-                            <div class="h-12 w-12 bg-purple-100 rounded-lg flex items-center justify-center">
-                                <i class="fas fa-check-circle text-purple-600 text-xl"></i>
-                            </div>
-                            <span class="text-2xl font-bold text-gray-800"><?php echo $stats['pending_vetting'] ?? 0; ?></span>
-                        </div>
-                        <h3 class="text-lg font-semibold text-gray-800 mb-2">Reports for Vetting</h3>
-                        <p class="text-gray-600 text-sm">Citizen reports to review</p>
-                    </div>
-
-                    <div class="stat-card rounded-xl p-6">
-                        <div class="flex items-center justify-between mb-4">
-                            <div class="h-12 w-12 bg-green-100 rounded-lg flex items-center justify-center">
-                                <i class="fas fa-calendar-alt text-green-600 text-xl"></i>
-                            </div>
-                            <div>
-                                <span class="text-2xl font-bold text-gray-800">
-                                    <?php echo ($duty_status && $duty_status['status'] == 'On-Duty') ? 'ON' : 'OFF'; ?>
-                                </span>
-                                <span class="text-sm text-gray-500 ml-1">DUTY</span>
-                            </div>
-                        </div>
-                        <h3 class="text-lg font-semibold text-gray-800 mb-2">Current Status</h3>
-                        <p class="text-gray-600 text-sm"><?php echo ($duty_status && $duty_status['status'] == 'On-Duty') ? 'You are on active duty' : 'You are currently off duty'; ?></p>
-                    </div>
-                </div>
-
-                <!-- Quick Action Cards -->
-                <h2 class="text-xl font-bold text-gray-800 mb-4">Quick Actions</h2>
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-                    <a href="?module=incident_logging" class="module-card bg-white rounded-xl p-6 cursor-pointer block">
-                        <div class="flex items-center mb-4">
-                            <div class="h-12 w-12 bg-blue-100 rounded-lg flex items-center justify-center mr-4">
-                                <i class="fas fa-plus-circle text-blue-600 text-xl"></i>
-                            </div>
-                            <h3 class="text-lg font-semibold text-gray-800">Log New Incident</h3>
-                        </div>
-                        <p class="text-gray-600 text-sm mb-4">Document a new incident with location and evidence</p>
-                        <span class="inline-block bg-blue-100 text-blue-800 text-xs px-3 py-1 rounded-lg">Quick Action</span>
-                    </a>
-
-                    <a href="?module=report_vetting" class="module-card bg-white rounded-xl p-6 cursor-pointer block">
-                        <div class="flex items-center mb-4">
-                            <div class="h-12 w-12 bg-yellow-100 rounded-lg flex items-center justify-center mr-4">
-                                <i class="fas fa-search text-yellow-600 text-xl"></i>
-                            </div>
-                            <h3 class="text-lg font-semibold text-gray-800">Review Reports</h3>
-                        </div>
-                        <p class="text-gray-600 text-sm mb-4">Vet citizen-submitted reports for verification</p>
-                        <?php if (isset($stats['pending_vetting']) && $stats['pending_vetting'] > 0): ?>
-                            <span class="inline-block bg-red-100 text-red-800 text-xs px-3 py-1 rounded-lg"><?php echo $stats['pending_vetting']; ?> Pending</span>
-                        <?php else: ?>
-                            <span class="inline-block bg-green-100 text-green-800 text-xs px-3 py-1 rounded-lg">Up to date</span>
-                        <?php endif; ?>
-                    </a>
-
-                    <a href="?module=duty_schedule" class="module-card bg-white rounded-xl p-6 cursor-pointer block">
-                        <div class="flex items-center mb-4">
-                            <div class="h-12 w-12 bg-green-100 rounded-lg flex items-center justify-center mr-4">
-                                <i class="fas fa-calendar-check text-green-600 text-xl"></i>
-                            </div>
-                            <h3 class="text-lg font-semibold text-gray-800">View Schedule</h3>
-                        </div>
-                        <p class="text-gray-600 text-sm mb-4">Check your patrol schedule and assigned routes</p>
-                        <span class="inline-block bg-green-100 text-green-800 text-xs px-3 py-1 rounded-lg">View Schedule</span>
-                    </a>
-                </div>
-
-                <!-- Module Cards -->
-                <h2 class="text-xl font-bold text-gray-800 mb-4">Modules</h2>
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    <a href="?module=duty_schedule" class="module-card bg-white rounded-xl p-6 cursor-pointer block">
-                        <div class="flex items-center mb-4">
-                            <div class="h-12 w-12 bg-green-100 rounded-lg flex items-center justify-center mr-4">
-                                <i class="fas fa-calendar-alt text-green-600 text-xl"></i>
-                            </div>
-                            <h3 class="text-lg font-semibold text-gray-800">Duty & Patrol Schedule</h3>
-                        </div>
-                        <p class="text-gray-600 text-sm">View assigned shifts and designated routes. Clock in/out using real-time tracker.</p>
-                        <div class="mt-4">
-                            <span class="inline-block bg-green-100 text-green-800 text-xs px-2 py-1 rounded">Critical: Shift times, Patrol routes</span>
-                        </div>
-                    </a>
-
-                    <a href="?module=incident_logging" class="module-card bg-white rounded-xl p-6 cursor-pointer block">
-                        <div class="flex items-center mb-4">
-                            <div class="h-12 w-12 bg-purple-100 rounded-lg flex items-center justify-center mr-4">
-                                <i class="fas fa-clipboard-list text-purple-600 text-xl"></i>
-                            </div>
-                            <h3 class="text-lg font-semibold text-gray-800">Incident Logging</h3>
-                        </div>
-                        <p class="text-gray-600 text-sm">Quick field form for incidents. GPS location recording and evidence upload.</p>
-                        <div class="mt-4">
-                            <span class="inline-block bg-purple-100 text-purple-800 text-xs px-2 py-1 rounded">Critical: Incident details, GPS, Evidence</span>
-                        </div>
-                    </a>
-
-                    <a href="?module=report_vetting" class="module-card bg-white rounded-xl p-6 cursor-pointer block">
-                        <div class="flex items-center mb-4">
-                            <div class="h-12 w-12 bg-yellow-100 rounded-lg flex items-center justify-center mr-4">
-                                <i class="fas fa-check-circle text-yellow-600 text-xl"></i>
-                            </div>
-                            <h3 class="text-lg font-semibold text-gray-800">Report Vetting</h3>
-                        </div>
-                        <p class="text-gray-600 text-sm">Review citizen reports for field verification. Submit vetting recommendations.</p>
-                        <div class="mt-4">
-                            <span class="inline-block bg-yellow-100 text-yellow-800 text-xs px-2 py-1 rounded">Critical: Report details, Verification notes</span>
-                        </div>
-                    </a>
-
-                    <a href="?module=evidence_handover" class="module-card bg-white rounded-xl p-6 cursor-pointer block">
-                        <div class="flex items-center mb-4">
-                            <div class="h-12 w-12 bg-red-100 rounded-lg flex items-center justify-center mr-4">
-                                <i class="fas fa-box text-red-600 text-xl"></i>
-                            </div>
-                            <h3 class="text-lg font-semibold text-gray-800">Evidence Handover</h3>
-                        </div>
-                        <p class="text-gray-600 text-sm">Formal log for transferring physical evidence. Maintain chain of custody.</p>
-                        <div class="mt-4">
-                            <span class="inline-block bg-red-100 text-red-800 text-xs px-2 py-1 rounded">Critical: Item description, Handover details</span>
-                        </div>
-                    </a>
-
-                    <a href="?module=profile" class="module-card bg-white rounded-xl p-6 cursor-pointer block">
-                        <div class="flex items-center mb-4">
-                            <div class="h-12 w-12 bg-indigo-100 rounded-lg flex items-center justify-center mr-4">
-                                <i class="fas fa-user-cog text-indigo-600 text-xl"></i>
-                            </div>
-                            <h3 class="text-lg font-semibold text-gray-800">Profile & Settings</h3>
-                        </div>
-                        <p class="text-gray-600 text-sm">Manage contact information, profile details, and account settings.</p>
-                        <div class="mt-4">
-                            <span class="inline-block bg-indigo-100 text-indigo-800 text-xs px-2 py-1 rounded">Important: Contact details, Account settings</span>
-                        </div>
-                    </a>
-                </div>
-            </div>
-            <?php
+        $module_file = "modules/{$module}.php";
+        if (file_exists($module_file)) {
+            include $module_file;
         } else {
-            // Load other modules
-            $module_file = "modules/{$module}.php";
-            if (file_exists($module_file)) {
-                include $module_file;
-            } else {
-                echo "<div class='bg-white rounded-xl p-6'>";
-                echo "<h2 class='text-xl font-bold text-gray-800 mb-4'>Module Not Found</h2>";
-                echo "<p class='text-gray-600'>The requested module is not available.</p>";
-                echo "<a href='?module=dashboard' class='mt-4 inline-block px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700'>Go to Dashboard</a>";
-                echo "</div>";
-            }
+            // Default dashboard content
+            include "modules/dashboard.php";
         }
         ?>
     </div>
@@ -799,31 +521,78 @@ function getModuleSubtitle($module) {
                 <span class="text-xs mt-1">Home</span>
             </a>
             
-            <a href="?module=incident_logging" class="flex flex-col items-center text-gray-600 <?php echo $module == 'incident_logging' ? 'mobile-nav-active' : ''; ?>">
-                <i class="fas fa-clipboard-list text-xl"></i>
-                <span class="text-xs mt-1">Incidents</span>
-                <?php if (isset($stats['pending_incidents']) && $stats['pending_incidents'] > 0): ?>
-                    <span class="mobile-nav-badge"><?php echo min($stats['pending_incidents'], 9); ?></span>
+            <a href="?module=case_mediation" class="flex flex-col items-center text-gray-600 <?php echo $module == 'case_mediation' ? 'mobile-nav-active' : ''; ?>">
+                <i class="fas fa-handshake text-xl"></i>
+                <span class="text-xs mt-1">Mediate</span>
+                <?php if (isset($stats['assigned_cases']) && $stats['assigned_cases'] > 0): ?>
+                    <span class="mobile-nav-badge"><?php echo min($stats['assigned_cases'], 9); ?></span>
                 <?php endif; ?>
             </a>
             
-            <a href="?module=report_vetting" class="flex flex-col items-center text-gray-600 <?php echo $module == 'report_vetting' ? 'mobile-nav-active' : ''; ?>">
-                <i class="fas fa-check-circle text-xl"></i>
-                <span class="text-xs mt-1">Vetting</span>
-                <?php if (isset($stats['pending_vetting']) && $stats['pending_vetting'] > 0): ?>
-                    <span class="mobile-nav-badge"><?php echo min($stats['pending_vetting'], 9); ?></span>
-                <?php endif; ?>
-            </a>
-            
-            <a href="?module=duty_schedule" class="flex flex-col items-center text-gray-600 <?php echo $module == 'duty_schedule' ? 'mobile-nav-active' : ''; ?>">
+            <a href="?module=mediation_scheduling" class="flex flex-col items-center text-gray-600 <?php echo $module == 'mediation_scheduling' ? 'mobile-nav-active' : ''; ?>">
                 <i class="fas fa-calendar-alt text-xl"></i>
                 <span class="text-xs mt-1">Schedule</span>
+            </a>
+            
+            <a href="?module=settlement_document" class="flex flex-col items-center text-gray-600 <?php echo $module == 'settlement_document' ? 'mobile-nav-active' : ''; ?>">
+                <i class="fas fa-file-signature text-xl"></i>
+                <span class="text-xs mt-1">Documents</span>
             </a>
             
             <a href="?module=profile" class="flex flex-col items-center text-gray-600 <?php echo $module == 'profile' ? 'mobile-nav-active' : ''; ?>">
                 <i class="fas fa-user text-xl"></i>
                 <span class="text-xs mt-1">Profile</span>
             </a>
+        </div>
+    </div>
+
+    <!-- Notifications Modal -->
+    <div id="notificationsModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-2xl max-w-md w-full max-h-[80vh] overflow-hidden">
+            <div class="flex justify-between items-center p-6 border-b">
+                <h3 class="text-xl font-bold text-gray-800">Notifications</h3>
+                <button onclick="closeNotifications()" class="text-gray-400 hover:text-gray-600">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="p-4 overflow-y-auto max-h-[60vh]">
+                <div class="space-y-4">
+                    <?php
+                    // Fetch notifications
+                    $notif_query = "SELECT * FROM notifications 
+                                   WHERE user_id = :user_id 
+                                   ORDER BY created_at DESC 
+                                   LIMIT 10";
+                    $notif_stmt = $conn->prepare($notif_query);
+                    $notif_stmt->execute([':user_id' => $user_id]);
+                    $notifications = $notif_stmt->fetchAll(PDO::FETCH_ASSOC);
+                    
+                    if (empty($notifications)): ?>
+                        <div class="text-center py-8 text-gray-500">
+                            <i class="fas fa-bell-slash text-3xl mb-3"></i>
+                            <p>No notifications</p>
+                        </div>
+                    <?php else: 
+                        foreach ($notifications as $notif): ?>
+                        <div class="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                            <div class="flex justify-between items-start mb-2">
+                                <h4 class="font-medium text-gray-800"><?php echo htmlspecialchars($notif['title']); ?></h4>
+                                <span class="text-xs text-gray-500"><?php echo date('M d, h:i A', strtotime($notif['created_at'])); ?></span>
+                            </div>
+                            <p class="text-sm text-gray-600 mb-2"><?php echo htmlspecialchars($notif['message']); ?></p>
+                            <?php if (!empty($notif['related_type'])): ?>
+                                <span class="text-xs px-2 py-1 bg-blue-100 text-blue-800 rounded"><?php echo htmlspecialchars($notif['related_type']); ?></span>
+                            <?php endif; ?>
+                        </div>
+                    <?php endforeach;
+                    endif; ?>
+                </div>
+            </div>
+            <div class="p-4 border-t">
+                <button onclick="markAllAsRead()" class="w-full py-2 text-sm text-blue-600 hover:bg-blue-50 rounded-lg">
+                    Mark all as read
+                </button>
+            </div>
         </div>
     </div>
 
@@ -859,24 +628,37 @@ function getModuleSubtitle($module) {
             if (userDropdown) userDropdown.classList.add('hidden');
         });
 
-        // Handle clock in/out
-        function toggleDuty() {
-            fetch('../ajax/toggle_duty.php')
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        // Reload page to update all status indicators
-                        window.location.reload();
-                    } else {
-                        alert(data.message || 'Error toggling duty status');
-                    }
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    alert('An error occurred while updating duty status');
-                });
+        // Notifications modal
+        function showNotifications() {
+            document.getElementById('notificationsModal').classList.remove('hidden');
+            document.getElementById('notificationsModal').classList.add('flex');
         }
-
+        
+        function closeNotifications() {
+            document.getElementById('notificationsModal').classList.add('hidden');
+            document.getElementById('notificationsModal').classList.remove('flex');
+        }
+        
+        function markAllAsRead() {
+            fetch('../ajax/mark_notifications_read.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: 'user_id=<?php echo $user_id; ?>'
+            }).then(() => {
+                location.reload();
+            });
+        }
+        
+        // Close modals when clicking outside
+        window.onclick = function(event) {
+            const notifModal = document.getElementById('notificationsModal');
+            if (event.target == notifModal) {
+                closeNotifications();
+            }
+        }
+        
         // Auto-hide success/error messages after 5 seconds
         setTimeout(function() {
             const alerts = document.querySelectorAll('.bg-green-50, .bg-red-50');
@@ -895,6 +677,24 @@ function getModuleSubtitle($module) {
         if (window.history.replaceState) {
             window.history.replaceState(null, null, window.location.href);
         }
+        
+        // Refresh dashboard stats every 30 seconds
+        if (window.location.search.includes('module=dashboard')) {
+            setInterval(() => {
+                fetch('../ajax/get_lupon_stats.php?user_id=<?php echo $user_id; ?>')
+                    .then(response => response.json())
+                    .then(data => {
+                        // Update stats on the page if needed
+                        console.log('Stats updated:', data);
+                    });
+            }, 30000);
+        }
     </script>
 </body>
 </html>
+<?php
+// Close database connection
+if (isset($conn)) {
+    $conn = null;
+}
+?>
