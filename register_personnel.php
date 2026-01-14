@@ -429,7 +429,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             .mobile-header {
                 flex-shrink: 0;
                 background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                padding: 40px 20px 80px;
+                padding: 40px 30px 80px;
                 text-align: center;
                 color: white;
                 position: relative;
@@ -437,27 +437,37 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 z-index: 1;
             }
             
-            /* NEW WAVE CONTAINER */
-            .wave-container {
+            .mobile-header::after {
+                content: '';
                 position: absolute;
                 bottom: 0;
                 left: 0;
                 width: 100%;
                 height: 120px;
+                background: white;
                 z-index: 2;
-                pointer-events: none;
+                mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 200'%3E%3Cpath fill='white' d='M0 0 C150 60 300 -40 450 20 C600 80 750 -20 900 40 C1050 100 1125 0 1200 60 L1200 200 L0 200 Z'/%3E%3C/svg%3E");
+                -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 200'%3E%3Cpath fill='white' d='M0 0 C150 60 300 -40 450 20 C600 80 750 -20 900 40 C1050 100 1125 0 1200 60 L1200 200 L0 200 Z'/%3E%3C/svg%3E");
+                mask-size: 100% 200px;
+                transform: translateY(80px);
             }
             
-            .wave-container svg {
+            .mobile-header::before {
+                content: '';
                 position: absolute;
-                bottom: 0;
+                bottom: 10px;
                 left: 0;
                 width: 100%;
-                height: 120px;
-                display: block;
+                height: 140px;
+                background: rgba(255, 255, 255, 0.25);
+                z-index: 1;
+                mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 120' preserveAspectRatio='none'%3E%3Cpath fill='%23ffffff' d='M321.39,56.44c58-10.79,114.16-30.13,172-41.86,82.39-16.72,168.19-17.73,250.45-.39C823.78,31,906.67,72,985.66,92.83c70.05,18.48,146.53,26.09,214.34,3V0H0V27.35A600.21,600.21,0,0,0,321.39,56.44Z'/%3E%3C/svg%3E");
+                -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 120' preserveAspectRatio='none'%3E%3Cpath fill='%23ffffff' d='M321.39,56.44c58-10.79,114.16-30.13,172-41.86,82.39-16.72,168.19-17.73,250.45-.39C823.78,31,906.67,72,985.66,92.83c70.05,18.48,146.53,26.09,214.34,3V0H0V27.35A600.21,600.21,0,0,0,321.39,56.44Z'/%3E%3C/svg%3E");
+                mask-size: 1200px 140px;
+                -webkit-mask-size: 1200px 140px;
+                transform: translateY(70px);
             }
-            
-            /* Logo styling */
+                        
             .mobile-logo-circle {
                 display: flex;
                 align-items: center;
@@ -469,21 +479,24 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 border: none;
                 border-radius: 0;
                 backdrop-filter: none;
-                width: 100px;
-                height: 100px;
+                width: 100%;
+                max-width: 200px;
+                height: auto;
+                aspect-ratio: 1;
             }
-            
+
             .mobile-logo-circle img {
-                width: 80px;
-                height: 80px;
+                width: 120px;
+                height: 120px;
+                max-width: 100%;
                 object-fit: contain;
-                filter: drop-shadow(0 0 10px rgba(255, 255, 255, 0.5));
+                filter: drop-shadow(0 0 20px rgba(255, 255, 255, 0.8))
+                    drop-shadow(0 0 40px rgba(255, 255, 255, 0.6));
             }
-            
             .mobile-header h1 {
                 font-size: 24px;
                 font-weight: 700;
-                margin-bottom: 8px;
+                margin-bottom: 5px;
                 position: relative;
                 z-index: 3;
             }
@@ -496,24 +509,39 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 margin-bottom: 20px;
             }
             
-            /* Remove old wave effects */
-            .mobile-header::after,
-            .mobile-header::before {
-                display: none;
+            .mobile-features {
+                display: flex;
+                justify-content: center;
+                gap: 15px;
+                flex-wrap: wrap;
+                margin-top: 20px;
+                position: relative;
+                z-index: 3;
             }
             
-            /* Adjust the form container */
+            .mobile-feature {
+                display: flex;
+                align-items: center;
+                background: rgba(255, 255, 255, 0.1);
+                padding: 8px 12px;
+                border-radius: 20px;
+                font-size: 12px;
+                backdrop-filter: blur(10px);
+            }
+            
+            .mobile-feature i {
+                margin-right: 5px;
+                font-size: 10px;
+            }
+            
             .mobile-form-container {
                 flex: 1;
                 padding: 40px 20px;
                 display: flex;
                 flex-direction: column;
-                background: white;
                 position: relative;
                 z-index: 3;
-                margin-top: -40px;
-                border-radius: 30px 30px 0 0;
-                box-shadow: 0 -5px 20px rgba(0, 0, 0, 0.05);
+                background: white;
             }
             
             .mobile-form-header {
@@ -531,58 +559,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             .mobile-form-header p {
                 color: #718096;
                 font-size: 15px;
-            }
-            
-            /* Remove mobile-features styles */
-            .mobile-features,
-            .mobile-feature {
-                display: none;
-            }
-        }
-        
-        /* Responsive adjustments */
-        @media (max-width: 480px) {
-            .mobile-header {
-                padding: 30px 15px 70px;
-            }
-            
-            .wave-container {
-                height: 100px;
-            }
-            
-            .wave-container svg {
-                height: 100px;
-            }
-            
-            .mobile-logo-circle {
-                width: 80px;
-                height: 80px;
-            }
-            
-            .mobile-logo-circle img {
-                width: 60px;
-                height: 60px;
-            }
-            
-            .mobile-header h1 {
-                font-size: 22px;
-            }
-            
-            .mobile-header p {
-                font-size: 15px;
-            }
-            
-            .mobile-form-container {
-                padding: 30px 15px;
-                margin-top: -30px;
-            }
-            
-            .mobile-form-header h2 {
-                font-size: 24px;
-            }
-            
-            .mobile-form-header p {
-                font-size: 14px;
             }
         }
         
@@ -1393,14 +1369,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             </div>
             <h1>Personnel Registration</h1>
             <p>Register as Barangay Personnel</p>
+            
         </div>
-         <!-- NEW WAVE EFFECT -->
-            <div class="wave-container">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 120" preserveAspectRatio="none">
-                    <path fill="white" fill-opacity="1" d="M0,64L80,69.3C160,75,320,85,480,80C640,75,800,53,960,48C1120,43,1280,53,1360,58.7L1440,64L1440,320L1360,320C1280,320,1120,320,960,320C800,320,640,320,480,320C320,320,160,320,80,320L0,320Z"></path>
-                </svg>
-            </div>
-        </div>
+        
         <div class="mobile-form-container">
             <div class="mobile-form-header">
                 <h2>Personnel Account Registration</h2>
