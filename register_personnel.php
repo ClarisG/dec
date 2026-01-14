@@ -1367,8 +1367,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             </div>
             <h1>Personnel Registration</h1>
             <p>Register as Barangay Personnel</p>
-      </div>
-
+            
             <!-- Add the wave separator from login.php -->
             <div class="wave-separator-index">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 100" preserveAspectRatio="none">
