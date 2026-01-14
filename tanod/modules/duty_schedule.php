@@ -1,6 +1,6 @@
 <?php
 // Fixed path: from modules folder to config folder
-require_once __DIR__ . '/../config/database.php';
+require_once __DIR__ . '/../../config/database.php';
 
 // Don't call session_start() here - it's already started in the main file
 // session_start(); // Remove this line
