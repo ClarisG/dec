@@ -83,19 +83,63 @@ if ($user_data) {
     $active_cases = 0;
 }
 
-// Get system health statistics
-$health_query = "SELECT 
-    (SELECT COUNT(*) FROM users WHERE is_active = 1) as active_users,
-    (SELECT COUNT(*) FROM reports WHERE created_at > DATE_SUB(NOW(), INTERVAL 7 DAY)) as weekly_reports,
-    (SELECT COUNT(*) FROM api_integrations WHERE status = 'active') as active_apis,
-    (SELECT COUNT(*) FROM file_encryption_logs WHERE last_decrypted IS NOT NULL) as decrypted_files,
-    (SELECT COUNT(*) FROM activity_logs WHERE created_at > DATE_SUB(NOW(), INTERVAL 1 HOUR)) as hourly_activity,
-    (SELECT MAX(created_at) FROM activity_logs) as last_activity,
-    (SELECT COUNT(*) FROM reports WHERE status = 'pending') as pending_reports,
-    (SELECT COUNT(*) FROM patrol_logs WHERE DATE(start_time) = CURDATE()) as today_patrols";
-$health_stmt = $conn->prepare($health_query);
-$health_stmt->execute();
-$health_data = $health_stmt->fetch(PDO::FETCH_ASSOC);
+// Get system health statistics with graceful error handling
+$health_data = [
+    'active_users' => 0,
+    'weekly_reports' => 0,
+    'active_apis' => 0,
+    'decrypted_files' => 0,
+    'hourly_activity' => 0,
+    'last_activity' => null,
+    'pending_reports' => 0,
+    'today_patrols' => 0
+];
+
+try {
+    // Tables that definitely exist (core tables)
+    $core_queries = [
+        "active_users" => "SELECT COUNT(*) as count FROM users WHERE is_active = 1",
+        "weekly_reports" => "SELECT COUNT(*) as count FROM reports WHERE created_at > DATE_SUB(NOW(), INTERVAL 7 DAY)",
+        "pending_reports" => "SELECT COUNT(*) as count FROM reports WHERE status = 'pending'",
+        "hourly_activity" => "SELECT COUNT(*) as count FROM activity_logs WHERE created_at > DATE_SUB(NOW(), INTERVAL 1 HOUR)",
+        "last_activity" => "SELECT MAX(created_at) as timestamp FROM activity_logs"
+    ];
+    
+    foreach ($core_queries as $key => $query) {
+        try {
+            $stmt = $conn->prepare($query);
+            $stmt->execute();
+            $result = $stmt->fetch(PDO::FETCH_ASSOC);
+            $health_data[$key] = $result['count'] ?? $result['timestamp'] ?? 0;
+        } catch (PDOException $e) {
+            // Log but continue
+            error_log("Health query failed for $key: " . $e->getMessage());
+        }
+    }
+    
+    // Optional tables - try but don't break if missing
+    $optional_tables = [
+        "active_apis" => "SELECT COUNT(*) as count FROM api_integrations WHERE status = 'active'",
+        "decrypted_files" => "SELECT COUNT(*) as count FROM file_encryption_logs WHERE last_decrypted IS NOT NULL",
+        "today_patrols" => "SELECT COUNT(*) as count FROM patrol_logs WHERE DATE(start_time) = CURDATE()"
+    ];
+    
+    foreach ($optional_tables as $key => $query) {
+        try {
+            $stmt = $conn->prepare($query);
+            $stmt->execute();
+            $result = $stmt->fetch(PDO::FETCH_ASSOC);
+            $health_data[$key] = $result['count'] ?? 0;
+        } catch (PDOException $e) {
+            // Set to 0 if table doesn't exist - no error logging needed
+            $health_data[$key] = 0;
+        }
+    }
+    
+} catch (Exception $e) {
+    // Fallback to ensure dashboard loads even with DB issues
+    error_log("Health stats failed: " . $e->getMessage());
+}
 
 // Get recent system activities
 $activities_query = "SELECT al.*, u.first_name, u.last_name 
