@@ -143,26 +143,36 @@ function getModuleTitle($module) {
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="icon" type="image/png" href="images/10213.png">
     <style>
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
-            font-family: 'Poppins', sans-serif;
+            font-family: 'Inter', sans-serif;
         }
         
         :root {
-            --primary: #667eea;
-            --secondary: #764ba2;
-            --success: #38a169;
-            --warning: #d69e2e;
-            --danger: #e53e3e;
-            --info: #4299e1;
+            --primary-blue: #e3f2fd;
+            --secondary-blue: #bbdefb;
+            --accent-blue: #2196f3;
+            --dark-blue: #0d47a1;
+            --light-blue: #f5fbff;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --info: #3b82f6;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #f5fbff 0%, #e3f2fd 100%);
+            min-height: 100vh;
         }
         
         .sidebar {
+            background: linear-gradient(180deg, #1e3a8a 0%, #0d47a1 100%);
+            box-shadow: 4px 0 15px rgba(0, 0, 0, 0.1);
             transition: all 0.3s ease;
         }
         
@@ -193,13 +203,21 @@ function getModuleTitle($module) {
             }
         }
         
+        .glass-card {
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
         .card {
             transition: transform 0.3s ease, box-shadow 0.3s ease;
+            background: linear-gradient(135deg, #ffffff 0%, #f0f9ff 100%);
+            border: 1px solid #e0f2fe;
         }
         
         .card:hover {
             transform: translateY(-5px);
-            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 10px 25px rgba(33, 150, 243, 0.1);
         }
         
         .status-badge {
@@ -212,11 +230,11 @@ function getModuleTitle($module) {
         }
         
         .status-pending { background: #fed7d7; color: #9b2c2c; }
-        .status-submitted { background: #bee3f8; color: #2c5282; }
-        .status-verification { background: #fed7d7; color: #9b2c2c; }
-        .status-mediation { background: #fefcbf; color: #744210; }
-        .status-referred { background: #c6f6d5; color: #276749; }
-        .status-resolved { background: #c6f6d5; color: #276749; }
+        .status-submitted { background: #dbeafe; color: #1e40af; }
+        .status-verification { background: #fef3c7; color: #92400e; }
+        .status-mediation { background: #fef3c7; color: #92400e; }
+        .status-referred { background: #f3e8ff; color: #5b21b6; }
+        .status-resolved { background: #d1fae5; color: #065f46; }
         .status-closed { background: #e2e8f0; color: #4a5568; }
         
         .module-icon {
@@ -228,12 +246,9 @@ function getModuleTitle($module) {
             justify-content: center;
             font-size: 24px;
             margin-bottom: 15px;
+            background: linear-gradient(135deg, #2196f3, #0d47a1);
+            color: white;
         }
-        
-        .module-1 { background: linear-gradient(135deg, #667eea, #764ba2); color: white; }
-        .module-2 { background: linear-gradient(135deg, #4299e1, #3182ce); color: white; }
-        .module-3 { background: linear-gradient(135deg, #38a169, #2f855a); color: white; }
-        .module-4 { background: linear-gradient(135deg, #d69e2e, #b7791f); color: white; }
         
         .report-card {
             border-left: 4px solid;
@@ -244,8 +259,8 @@ function getModuleTitle($module) {
             transform: translateX(5px);
         }
         
-        .report-barangay { border-left-color: #667eea; }
-        .report-police { border-left-color: #e53e3e; }
+        .report-barangay { border-left-color: #2196f3; }
+        .report-police { border-left-color: #ef4444; }
         
         .stat-card {
             position: relative;
@@ -259,7 +274,7 @@ function getModuleTitle($module) {
             right: -50%;
             width: 100px;
             height: 200px;
-            background: rgba(255, 255, 255, 0.1);
+            background: rgba(33, 150, 243, 0.1);
             transform: rotate(30deg);
             transition: all 0.5s ease;
         }
@@ -272,7 +287,7 @@ function getModuleTitle($module) {
             position: absolute;
             top: -8px;
             right: -8px;
-            background: #e53e3e;
+            background: #ef4444;
             color: white;
             border-radius: 50%;
             width: 20px;
@@ -295,6 +310,7 @@ function getModuleTitle($module) {
             height: 100%;
             border-radius: 4px;
             transition: width 0.5s ease;
+            background: linear-gradient(90deg, #2196f3, #0d47a1);
         }
         
         .active-status {
@@ -318,8 +334,9 @@ function getModuleTitle($module) {
         }
         
         .nav-active {
-            background: linear-gradient(135deg, #667eea, #764ba2);
+            background: rgba(255, 255, 255, 0.15);
             color: white !important;
+            border-left: 3px solid #60a5fa;
         }
         
         .nav-active i {
@@ -327,7 +344,7 @@ function getModuleTitle($module) {
         }
         
         .mobile-nav-active {
-            color: #667eea;
+            color: #2196f3;
             position: relative;
         }
         
@@ -339,29 +356,63 @@ function getModuleTitle($module) {
             transform: translateX(-50%);
             width: 6px;
             height: 6px;
-            background: #667eea;
+            background: #2196f3;
             border-radius: 50%;
+        }
+        
+        .sidebar-link {
+            transition: all 0.3s ease;
+            border-left: 3px solid transparent;
+        }
+        
+        .sidebar-link:hover {
+            background: rgba(255, 255, 255, 0.1);
+            border-left-color: #60a5fa;
+        }
+        
+        .sidebar-link.active {
+            background: rgba(255, 255, 255, 0.15);
+            border-left-color: #3b82f6;
+        }
+        
+        .urgent {
+            border-left: 4px solid #ef4444;
+            background: linear-gradient(135deg, #fef2f2 0%, #fecaca 100%);
+        }
+        
+        .warning {
+            border-left: 4px solid #f59e0b;
+            background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
+        }
+        
+        .success {
+            border-left: 4px solid #10b981;
+            background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
+        }
+        
+        .animate-pulse {
+            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
         }
     </style>
 </head>
 <body class="bg-gray-50">
     <!-- Desktop Sidebar -->
-    <div class="sidebar hidden md:flex md:flex-col md:w-64 bg-white h-screen shadow-lg fixed">
+    <div class="sidebar hidden md:flex md:flex-col md:w-64 h-screen fixed">
         <!-- Logo -->
-        <div class="p-6 border-b">
+        <div class="p-6 border-b border-blue-400/30">
             <div class="flex items-center space-x-3">
                 <div class="w-10 h-10 flex items-center justify-center">
                     <img src="images/10213.png" alt="Logo" class="w-19 h-22 object-contain">
                 </div>
                 <div>
-                    <h1 class="text-xl font-bold text-gray-800">LEIR</h1>
-                    <p class="text-xs text-gray-500">Citizen Dashboard</p>
+                    <h1 class="text-xl font-bold text-white">LEIR</h1>
+                    <p class="text-xs text-blue-200">Citizen Dashboard</p>
                 </div>
             </div>
         </div>
         
         <!-- User Profile -->
-        <div class="p-6 border-b">
+        <div class="p-6 border-b border-blue-400/30">
             <div class="flex items-center space-x-4">
                 <div class="relative">
                     <?php 
@@ -371,20 +422,20 @@ function getModuleTitle($module) {
                         <img src="<?php echo $profile_pic_path; ?>" 
                              alt="Profile" class="w-12 h-12 rounded-full object-cover border-2 border-white shadow-sm">
                     <?php else: ?>
-                        <div class="w-12 h-12 rounded-full bg-gradient-to-r from-purple-600 to-blue-500 flex items-center justify-center text-white font-bold text-lg">
+                        <div class="w-12 h-12 rounded-full bg-gradient-to-r from-blue-600 to-blue-500 flex items-center justify-center text-white font-bold text-lg">
                             <?php echo strtoupper(substr($full_name, 0, 1)); ?>
                         </div>
                     <?php endif; ?>
                     <div class="absolute bottom-0 right-0 w-4 h-4 rounded-full border-2 border-white <?php echo $is_active ? 'bg-green-500' : 'bg-red-500'; ?>"></div>
                 </div>
                 <div class="flex-1">
-                    <h3 class="font-semibold text-gray-800 truncate"><?php echo htmlspecialchars($full_name); ?></h3>
-                    <p class="text-sm text-gray-500">Citizen</p>
+                    <h3 class="font-semibold text-white truncate"><?php echo htmlspecialchars($full_name); ?></h3>
+                    <p class="text-sm text-blue-200">Citizen</p>
                 </div>
             </div>
             <div class="mt-4">
-                <p class="text-sm text-gray-600 flex items-center">
-                    <i class="fas fa-map-marker-alt mr-2 text-gray-400"></i>
+                <p class="text-sm text-blue-200 flex items-center">
+                    <i class="fas fa-map-marker-alt mr-2 text-blue-300"></i>
                     <?php echo htmlspecialchars($user_address ?? $barangay); ?>
                 </p>
             </div>
@@ -394,58 +445,58 @@ function getModuleTitle($module) {
         <nav class="flex-1 p-4 overflow-y-auto">
             <ul class="space-y-2">
                 <li>
-                    <a href="?module=dashboard" class="nav-link flex items-center p-3 rounded-lg text-gray-700 hover:bg-purple-50 hover:text-purple-600 transition-colors <?php echo $current_module == 'dashboard' ? 'nav-active' : ''; ?>">
+                    <a href="?module=dashboard" class="sidebar-link flex items-center p-3 rounded-lg text-white hover:bg-white/10 transition-colors <?php echo $current_module == 'dashboard' ? 'active' : ''; ?>">
                         <i class="fas fa-home mr-3 text-lg"></i>
                         <span class="font-medium">Dashboard</span>
                     </a>
                 </li>
                 <li>
-                    <a href="?module=new-report" class="nav-link flex items-center p-3 rounded-lg text-gray-700 hover:bg-purple-50 hover:text-purple-600 transition-colors <?php echo $current_module == 'new-report' ? 'nav-active' : ''; ?>">
+                    <a href="?module=new-report" class="sidebar-link flex items-center p-3 rounded-lg text-white hover:bg-white/10 transition-colors <?php echo $current_module == 'new-report' ? 'active' : ''; ?>">
                         <i class="fas fa-plus-circle mr-3 text-lg"></i>
                         <span class="font-medium">New Report</span>
                         <?php if ($rate_limit_info && $rate_limit_info['count'] >= 5): ?>
-                            <span class="ml-auto bg-red-100 text-red-600 text-xs font-semibold px-2 py-1 rounded-full">
+                            <span class="ml-auto bg-red-500 text-white text-xs font-semibold px-2 py-1 rounded-full">
                                 <i class="fas fa-clock mr-1"></i> Limit
                             </span>
                         <?php endif; ?>
                     </a>
                 </li>
                 <li>
-                    <a href="?module=my-reports" class="nav-link flex items-center p-3 rounded-lg text-gray-700 hover:bg-purple-50 hover:text-purple-600 transition-colors <?php echo $current_module == 'my-reports' ? 'nav-active' : ''; ?>">
+                    <a href="?module=my-reports" class="sidebar-link flex items-center p-3 rounded-lg text-white hover:bg-white/10 transition-colors <?php echo $current_module == 'my-reports' ? 'active' : ''; ?>">
                         <i class="fas fa-file-alt mr-3 text-lg"></i>
                         <span class="font-medium">My Reports</span>
                         <?php if ($report_counts['total'] > 0): ?>
-                            <span class="ml-auto bg-purple-100 text-purple-600 text-xs font-semibold px-2 py-1 rounded-full">
+                            <span class="ml-auto bg-red-500 text-white text-xs font-semibold px-2 py-1 rounded-full">
                                 <?php echo $report_counts['total']; ?>
                             </span>
                         <?php endif; ?>
                     </a>
                 </li>
                 <li>
-                    <a href="?module=announcements" class="nav-link flex items-center p-3 rounded-lg text-gray-700 hover:bg-purple-50 hover:text-purple-600 transition-colors <?php echo $current_module == 'announcements' ? 'nav-active' : ''; ?>">
+                    <a href="?module=announcements" class="sidebar-link flex items-center p-3 rounded-lg text-white hover:bg-white/10 transition-colors <?php echo $current_module == 'announcements' ? 'active' : ''; ?>">
                         <i class="fas fa-bullhorn mr-3 text-lg"></i>
                         <span class="font-medium">Announcements</span>
                         <?php if (count($announcements) > 0): ?>
-                            <span class="ml-auto bg-red-100 text-red-600 text-xs font-semibold px-2 py-1 rounded-full">
+                            <span class="ml-auto bg-red-500 text-white text-xs font-semibold px-2 py-1 rounded-full">
                                 <?php echo count($announcements); ?>
                             </span>
                         <?php endif; ?>
                     </a>
                 </li>
                 <li>
-                    <a href="?module=profile" class="nav-link flex items-center p-3 rounded-lg text-gray-700 hover:bg-purple-50 hover:text-purple-600 transition-colors <?php echo $current_module == 'profile' ? 'nav-active' : ''; ?>">
+                    <a href="?module=profile" class="sidebar-link flex items-center p-3 rounded-lg text-white hover:bg-white/10 transition-colors <?php echo $current_module == 'profile' ? 'active' : ''; ?>">
                         <i class="fas fa-user mr-3 text-lg"></i>
                         <span class="font-medium">Profile</span>
                     </a>
                 </li>
-                <li class="pt-4 border-t">
+                <li class="pt-4 border-t border-blue-400/30">
                     <form method="POST" action="">
-                        <button type="submit" name="toggle_status" class="w-full flex items-center p-3 rounded-lg <?php echo $is_active ? 'bg-green-50 text-green-700 hover:bg-green-100' : 'bg-red-50 text-red-700 hover:bg-red-100'; ?> transition-colors">
+                        <button type="submit" name="toggle_status" class="w-full flex items-center p-3 rounded-lg <?php echo $is_active ? 'bg-green-500/20 text-green-300 hover:bg-green-500/30' : 'bg-red-500/20 text-red-300 hover:bg-red-500/30'; ?> transition-colors">
                             <i class="fas fa-power-off mr-3 text-lg"></i>
-                            <span class="font-medium">Status: <?php echo $is_active ? 'Active' : 'Inactive'; ?></span>
+                            <span class="font-medium flex-1 text-left">Status: <?php echo $is_active ? 'Active' : 'Inactive'; ?></span>
                             <span class="ml-auto">
                                 <div class="relative">
-                                    <div class="w-10 h-6 flex items-center <?php echo $is_active ? 'bg-green-500' : 'bg-gray-300'; ?> rounded-full p-1 cursor-pointer transition-colors">
+                                    <div class="w-10 h-6 flex items-center <?php echo $is_active ? 'bg-green-500' : 'bg-gray-400'; ?> rounded-full p-1 cursor-pointer transition-colors">
                                         <div class="bg-white w-4 h-4 rounded-full shadow-md transform <?php echo $is_active ? 'translate-x-4' : 'translate-x-0'; ?> transition-transform"></div>
                                     </div>
                                 </div>
@@ -457,8 +508,8 @@ function getModuleTitle($module) {
         </nav>
         
         <!-- Footer -->
-        <div class="p-4 border-t text-center">
-            <p class="text-xs text-gray-500">
+        <div class="p-4 border-t border-blue-400/30 text-center">
+            <p class="text-xs text-blue-300">
                 <i class="fas fa-shield-alt mr-1"></i>
                 Secure Incident Reporting
             </p>
@@ -499,7 +550,7 @@ function getModuleTitle($module) {
                                     <img src="<?php echo $profile_pic_path; ?>" 
                                          alt="Profile" class="w-10 h-10 rounded-full object-cover border-2 border-white shadow-sm">
                                 <?php else: ?>
-                                    <div class="w-10 h-10 rounded-full bg-gradient-to-r from-purple-600 to-blue-500 flex items-center justify-center text-white font-semibold">
+                                    <div class="w-10 h-10 rounded-full bg-gradient-to-r from-blue-600 to-blue-500 flex items-center justify-center text-white font-semibold">
                                         <?php echo strtoupper(substr($full_name, 0, 1)); ?>
                                     </div>
                                 <?php endif; ?>
@@ -515,7 +566,7 @@ function getModuleTitle($module) {
                                             <img src="<?php echo $profile_pic_path; ?>" 
                                                  alt="Profile" class="w-10 h-10 rounded-full object-cover">
                                         <?php else: ?>
-                                            <div class="w-10 h-10 rounded-full bg-gradient-to-r from-purple-600 to-blue-500 flex items-center justify-center text-white font-bold">
+                                            <div class="w-10 h-10 rounded-full bg-gradient-to-r from-blue-600 to-blue-500 flex items-center justify-center text-white font-bold">
                                                 <?php echo strtoupper(substr($full_name, 0, 1)); ?>
                                             </div>
                                         <?php endif; ?>
@@ -588,7 +639,7 @@ function getModuleTitle($module) {
                         
                         <!-- Rate Limit Warning -->
                         <?php if ($rate_limit_info && $rate_limit_info['count'] >= 5): ?>
-                            <div class="bg-yellow-50 border-l-4 border-yellow-500 p-4 mb-6 rounded-r-lg">
+                            <div class="warning p-4 mb-6 rounded-lg">
                                 <div class="flex items-center">
                                     <i class="fas fa-exclamation-triangle text-yellow-500 text-xl mr-3"></i>
                                     <div class="flex-1">
@@ -603,13 +654,13 @@ function getModuleTitle($module) {
                         
                         <!-- Quick Stats -->
                         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-                            <div class="stat-card bg-white rounded-xl p-6 shadow-sm border">
+                            <div class="card stat-card rounded-xl p-6">
                                 <div class="flex items-center justify-between">
                                     <div>
                                         <p class="text-sm text-gray-500">Total Reports</p>
                                         <h3 class="text-2xl font-bold text-gray-800"><?php echo $report_counts['total'] ?? 0; ?></h3>
                                     </div>
-                                    <div class="module-icon module-1">
+                                    <div class="module-icon">
                                         <i class="fas fa-file-alt"></i>
                                     </div>
                                 </div>
@@ -623,7 +674,7 @@ function getModuleTitle($module) {
                                 </div>
                             </div>
                             
-                            <div class="stat-card bg-white rounded-xl p-6 shadow-sm border">
+                            <div class="card stat-card rounded-xl p-6">
                                 <div class="flex items-center justify-between">
                                     <div>
                                         <p class="text-sm text-gray-500">Active Status</p>
@@ -631,7 +682,7 @@ function getModuleTitle($module) {
                                             <?php echo $is_active ? 'Active' : 'Inactive'; ?>
                                         </h3>
                                     </div>
-                                    <div class="module-icon module-4">
+                                    <div class="module-icon">
                                         <i class="fas fa-power-off"></i>
                                     </div>
                                 </div>
@@ -645,13 +696,13 @@ function getModuleTitle($module) {
                                 </div>
                             </div>
                             
-                            <div class="stat-card bg-white rounded-xl p-6 shadow-sm border">
+                            <div class="card stat-card rounded-xl p-6">
                                 <div class="flex items-center justify-between">
                                     <div>
                                         <p class="text-sm text-gray-500">Pending Actions</p>
                                         <h3 class="text-2xl font-bold text-yellow-600"><?php echo ($report_counts['pending'] ?? 0) + ($report_counts['verification'] ?? 0); ?></h3>
                                     </div>
-                                    <div class="module-icon module-2">
+                                    <div class="module-icon">
                                         <i class="fas fa-clock"></i>
                                     </div>
                                 </div>
@@ -665,19 +716,19 @@ function getModuleTitle($module) {
                                 </div>
                             </div>
                             
-                            <div class="stat-card bg-white rounded-xl p-6 shadow-sm border">
+                            <div class="card stat-card rounded-xl p-6">
                                 <div class="flex items-center justify-between">
                                     <div>
                                         <p class="text-sm text-gray-500">New Announcements</p>
-                                        <h3 class="text-2xl font-bold text-purple-600"><?php echo count($announcements); ?></h3>
+                                        <h3 class="text-2xl font-bold text-blue-600"><?php echo count($announcements); ?></h3>
                                     </div>
-                                    <div class="module-icon module-3">
+                                    <div class="module-icon">
                                         <i class="fas fa-bullhorn"></i>
                                     </div>
                                 </div>
                                 <div class="mt-4">
                                     <div class="flex items-center text-sm">
-                                        <span class="text-purple-500 mr-2">
+                                        <span class="text-blue-500 mr-2">
                                             <i class="fas fa-bell"></i>
                                         </span>
                                         <span class="text-gray-600">Latest community updates</span>
@@ -689,10 +740,10 @@ function getModuleTitle($module) {
                         <!-- Recent Reports & Announcements -->
                         <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
                             <!-- Recent Reports -->
-                            <div class="bg-white rounded-xl shadow-sm border p-6">
+                            <div class="card rounded-xl p-6">
                                 <div class="flex items-center justify-between mb-6">
                                     <h3 class="text-lg font-semibold text-gray-800">Recent Reports</h3>
-                                    <a href="?module=my-reports" class="nav-link text-sm text-purple-600 hover:text-purple-700 font-medium">
+                                    <a href="?module=my-reports" class="text-sm text-blue-600 hover:text-blue-700 font-medium">
                                         View All <i class="fas fa-arrow-right ml-1"></i>
                                     </a>
                                 </div>
@@ -738,7 +789,7 @@ function getModuleTitle($module) {
                                             <i class="fas fa-file-alt text-gray-400 text-2xl"></i>
                                         </div>
                                         <p class="text-gray-500 mb-3">No reports submitted yet</p>
-                                        <a href="?module=new-report" class="nav-link inline-flex items-center px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700">
+                                        <a href="?module=new-report" class="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
                                             <i class="fas fa-plus mr-2"></i>
                                             Create Your First Report
                                         </a>
@@ -747,10 +798,10 @@ function getModuleTitle($module) {
                             </div>
                             
                             <!-- Latest Announcements -->
-                            <div class="bg-white rounded-xl shadow-sm border p-6">
+                            <div class="card rounded-xl p-6">
                                 <div class="flex items-center justify-between mb-6">
                                     <h3 class="text-lg font-semibold text-gray-800">Latest Announcements</h3>
-                                    <a href="?module=announcements" class="nav-link text-sm text-purple-600 hover:text-purple-700 font-medium">
+                                    <a href="?module=announcements" class="text-sm text-blue-600 hover:text-blue-700 font-medium">
                                         View All <i class="fas fa-arrow-right ml-1"></i>
                                     </a>
                                 </div>
@@ -761,8 +812,8 @@ function getModuleTitle($module) {
                                             <div class="p-4 border rounded-lg hover:bg-gray-50 transition-colors">
                                                 <div class="flex items-start">
                                                     <div class="flex-shrink-0">
-                                                        <div class="w-10 h-10 rounded-lg bg-purple-100 flex items-center justify-center">
-                                                            <i class="fas fa-bullhorn text-purple-600"></i>
+                                                        <div class="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center">
+                                                            <i class="fas fa-bullhorn text-blue-600"></i>
                                                         </div>
                                                     </div>
                                                     <div class="ml-4 flex-1">
@@ -798,22 +849,22 @@ function getModuleTitle($module) {
                         
                         <!-- Quick Actions -->
                         <div class="mt-8 grid grid-cols-1 md:grid-cols-3 gap-6">
-                            <a href="?module=new-report" class="nav-link group">
-                                <div class="bg-white rounded-xl p-6 border hover:border-purple-500 hover:shadow-lg transition-all">
+                            <a href="?module=new-report" class="group">
+                                <div class="card rounded-xl p-6 hover:border-blue-500 hover:shadow-lg transition-all">
                                     <div class="flex items-center">
-                                        <div class="w-12 h-12 rounded-lg bg-gradient-to-r from-purple-600 to-blue-500 flex items-center justify-center text-white mr-4">
+                                        <div class="w-12 h-12 rounded-lg bg-gradient-to-r from-blue-600 to-blue-500 flex items-center justify-center text-white mr-4">
                                             <i class="fas fa-plus text-xl"></i>
                                         </div>
                                         <div>
-                                            <h4 class="font-semibold text-gray-800 group-hover:text-purple-600">New Report</h4>
+                                            <h4 class="font-semibold text-gray-800 group-hover:text-blue-600">New Report</h4>
                                             <p class="text-sm text-gray-500">File a new incident report</p>
                                         </div>
                                     </div>
                                 </div>
                             </a>
                             
-                            <a href="?module=my-reports" class="nav-link group">
-                                <div class="bg-white rounded-xl p-6 border hover:border-blue-500 hover:shadow-lg transition-all">
+                            <a href="?module=my-reports" class="group">
+                                <div class="card rounded-xl p-6 hover:border-blue-500 hover:shadow-lg transition-all">
                                     <div class="flex items-center">
                                         <div class="w-12 h-12 rounded-lg bg-gradient-to-r from-blue-600 to-cyan-500 flex items-center justify-center text-white mr-4">
                                             <i class="fas fa-file-alt text-xl"></i>
@@ -826,14 +877,14 @@ function getModuleTitle($module) {
                                 </div>
                             </a>
                             
-                            <a href="?module=profile" class="nav-link group">
-                                <div class="bg-white rounded-xl p-6 border hover:border-green-500 hover:shadow-lg transition-all">
+                            <a href="?module=profile" class="group">
+                                <div class="card rounded-xl p-6 hover:border-blue-500 hover:shadow-lg transition-all">
                                     <div class="flex items-center">
-                                        <div class="w-12 h-12 rounded-lg bg-gradient-to-r from-green-600 to-teal-500 flex items-center justify-center text-white mr-4">
+                                        <div class="w-12 h-12 rounded-lg bg-gradient-to-r from-blue-600 to-teal-500 flex items-center justify-center text-white mr-4">
                                             <i class="fas fa-user-cog text-xl"></i>
                                         </div>
                                         <div>
-                                            <h4 class="font-semibold text-gray-800 group-hover:text-green-600">Update Profile</h4>
+                                            <h4 class="font-semibold text-gray-800 group-hover:text-blue-600">Update Profile</h4>
                                             <p class="text-sm text-gray-500">Manage your information</p>
                                         </div>
                                     </div>
@@ -891,7 +942,7 @@ function getModuleTitle($module) {
                 <i class="fas fa-file-alt text-xl"></i>
                 <span class="text-xs mt-1">Reports</span>
                 <?php if ($report_counts['total'] > 0): ?>
-                    <span class="absolute mt-[-5px] ml-6 bg-purple-600 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                    <span class="absolute mt-[-5px] ml-6 bg-blue-600 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
                         <?php echo min($report_counts['total'], 9); ?>
                     </span>
                 <?php endif; ?>
