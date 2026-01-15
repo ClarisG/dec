@@ -847,51 +847,7 @@ function getModuleTitle($module) {
                             </div>
                         </div>
                         
-                        <!-- Quick Actions -->
-                        <div class="mt-8 grid grid-cols-1 md:grid-cols-3 gap-6">
-                            <a href="?module=new-report" class="group">
-                                <div class="card rounded-xl p-6 hover:border-blue-500 hover:shadow-lg transition-all">
-                                    <div class="flex items-center">
-                                        <div class="w-12 h-12 rounded-lg bg-gradient-to-r from-blue-600 to-blue-500 flex items-center justify-center text-white mr-4">
-                                            <i class="fas fa-plus text-xl"></i>
-                                        </div>
-                                        <div>
-                                            <h4 class="font-semibold text-gray-800 group-hover:text-blue-600">New Report</h4>
-                                            <p class="text-sm text-gray-500">File a new incident report</p>
-                                        </div>
-                                    </div>
-                                </div>
-                            </a>
-                            
-                            <a href="?module=my-reports" class="group">
-                                <div class="card rounded-xl p-6 hover:border-blue-500 hover:shadow-lg transition-all">
-                                    <div class="flex items-center">
-                                        <div class="w-12 h-12 rounded-lg bg-gradient-to-r from-blue-600 to-cyan-500 flex items-center justify-center text-white mr-4">
-                                            <i class="fas fa-file-alt text-xl"></i>
-                                        </div>
-                                        <div>
-                                            <h4 class="font-semibold text-gray-800 group-hover:text-blue-600">Track Reports</h4>
-                                            <p class="text-sm text-gray-500">Monitor your submissions</p>
-                                        </div>
-                                    </div>
-                                </div>
-                            </a>
-                            
-                            <a href="?module=profile" class="group">
-                                <div class="card rounded-xl p-6 hover:border-blue-500 hover:shadow-lg transition-all">
-                                    <div class="flex items-center">
-                                        <div class="w-12 h-12 rounded-lg bg-gradient-to-r from-blue-600 to-teal-500 flex items-center justify-center text-white mr-4">
-                                            <i class="fas fa-user-cog text-xl"></i>
-                                        </div>
-                                        <div>
-                                            <h4 class="font-semibold text-gray-800 group-hover:text-blue-600">Update Profile</h4>
-                                            <p class="text-sm text-gray-500">Manage your information</p>
-                                        </div>
-                                    </div>
-                                </div>
-                            </a>
-                        </div>
-                    </div>
+                        
                     <?php
                     break;
                     
