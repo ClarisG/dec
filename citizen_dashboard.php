@@ -351,7 +351,7 @@ function getModuleTitle($module) {
         <div class="p-6 border-b">
             <div class="flex items-center space-x-3">
                 <div class="w-10 h-10 flex items-center justify-center">
-                    <img src="/dec/images/10213.png" alt="Logo" class="w-19 h-22 object-contain">
+                    <img src="images/10213.png" alt="Logo" class="w-19 h-22 object-contain">
                 </div>
                 <div>
                     <h1 class="text-xl font-bold text-gray-800">LEIR</h1>
