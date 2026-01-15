@@ -399,16 +399,17 @@ function getModuleTitle($module) {
     <!-- Desktop Sidebar -->
     <div class="sidebar hidden md:flex md:flex-col md:w-64 h-screen fixed">
         <!-- Logo -->
-        <div class="p-6 border-b border-blue-400/30">
-            <div class="flex items-center space-x-3">
-                <div class="w-10 h-10 flex items-center justify-center">
-                    <img src="images/10213.png" alt="Logo" class="w-19 h-22 object-contain">
-                </div>
-                <div>
-                    <h1 class="text-xl font-bold text-white">LEIR</h1>
-                </div>
-            </div>
+       <div class="p-6">
+    <div class="flex flex-col items-center justify-center">
+        <!-- Logo with white shadow -->
+        <div class="w-16 h-16 flex items-center justify-center mb-3">
+            <img src="images/10213.png" alt="Logo" 
+                 class="w-16 h-16 object-contain drop-shadow-[0_0_10px_rgba(255,255,255,0.8)]">
         </div>
+        <!-- Centered LEIR text -->
+        <h1 class="text-xl font-bold text-white text-center">LEIR</h1>
+    </div>
+</div>
         
         <!-- User Profile -->
         <div class="p-6 border-b border-blue-400/30">
