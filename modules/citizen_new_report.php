@@ -64,7 +64,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['submit_report'])) {
             $involved_persons = trim($_POST['involved_persons'] ?? '');
             $witnesses = trim($_POST['witnesses'] ?? '');
             
-            $is_anonymous = isset($_POST['is_anonymous']) ? 1 : 0;
+            $is_anonymous = isset($_POST['is_anonymous']) && $_POST['is_anonymous'] == '1' ? 1 : 0;
             $category = $_POST['category'] ?? 'incident';
             
             // Validate required fields
@@ -461,9 +461,12 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['submit_report'])) {
             
             <!-- Anonymous Option -->
             <div class="bg-gray-50 rounded-xl p-6 mb-6">
+                <!-- Hidden input for unchecked state -->
+                <input type="hidden" name="is_anonymous" value="0">
                 <div class="flex items-center">
                     <input type="checkbox" id="incident_is_anonymous" name="is_anonymous" value="1" 
-                           class="h-5 w-5 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                           class="h-5 w-5 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                           <?php echo (isset($_POST['is_anonymous']) && $_POST['is_anonymous'] == 1) ? 'checked' : ''; ?>>
                     <label for="incident_is_anonymous" class="ml-3 block text-sm font-medium text-gray-700">
                         Submit anonymously
                     </label>
@@ -632,9 +635,12 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['submit_report'])) {
             
             <!-- Anonymous Option -->
             <div class="bg-gray-50 rounded-xl p-6 mb-6">
+                <!-- Hidden input for unchecked state -->
+                <input type="hidden" name="is_anonymous" value="0">
                 <div class="flex items-center">
                     <input type="checkbox" id="complaint_is_anonymous" name="is_anonymous" value="1" 
-                           class="h-5 w-5 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                           class="h-5 w-5 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                           <?php echo (isset($_POST['is_anonymous']) && $_POST['is_anonymous'] == 1) ? 'checked' : ''; ?>>
                     <label for="complaint_is_anonymous" class="ml-3 block text-sm font-medium text-gray-700">
                         Submit anonymously
                     </label>
@@ -803,9 +809,12 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['submit_report'])) {
             
             <!-- Anonymous Option -->
             <div class="bg-gray-50 rounded-xl p-6 mb-6">
+                <!-- Hidden input for unchecked state -->
+                <input type="hidden" name="is_anonymous" value="0">
                 <div class="flex items-center">
                     <input type="checkbox" id="blotter_is_anonymous" name="is_anonymous" value="1" 
-                           class="h-5 w-5 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                           class="h-5 w-5 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                           <?php echo (isset($_POST['is_anonymous']) && $_POST['is_anonymous'] == 1) ? 'checked' : ''; ?>>
                     <label for="blotter_is_anonymous" class="ml-3 block text-sm font-medium text-gray-700">
                         Submit anonymously
                     </label>
@@ -1469,7 +1478,7 @@ function updateCharCount(category, count) {
     }
 }
 
-// File Upload Functions
+// File Upload Functions - FIXED VERSION
 const uploadedFiles = {
     incident: [],
     complaint: [],
@@ -1481,12 +1490,8 @@ function handleFileUpload(files, formType) {
     const fileCount = document.getElementById(formType + 'FileCount');
     const maxFiles = 10;
     
-    // Convert FileList to array and filter new files
-    const newFiles = Array.from(files).filter(newFile => {
-        return !uploadedFiles[formType].some(existingFile => 
-            existingFile.name === newFile.name && existingFile.size === newFile.size
-        );
-    });
+    // Convert FileList to array
+    const newFiles = Array.from(files);
     
     // Check if adding new files would exceed limit
     if (uploadedFiles[formType].length + newFiles.length > maxFiles) {
@@ -1517,6 +1522,8 @@ function handleFileUpload(files, formType) {
         // Create file preview
         const fileItem = document.createElement('div');
         fileItem.className = 'file-item flex items-center justify-between p-3 bg-gray-50 rounded-lg border animate-fadeIn';
+        fileItem.dataset.fileName = file.name;
+        fileItem.dataset.fileSize = file.size;
         fileItem.innerHTML = `
             <div class="flex items-center flex-1">
                 <div class="flex-shrink-0">
@@ -1531,17 +1538,12 @@ function handleFileUpload(files, formType) {
                     </div>
                 </div>
             </div>
-            <button type="button" onclick="removeFile('${formType}', '${file.name.replace(/'/g, "\\'")}', ${file.size})" 
+            <button type="button" onclick="removeFile('${formType}', this)" 
                     class="ml-3 p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors">
                 <i class="fas fa-times"></i>
             </button>
         `;
         fileList.appendChild(fileItem);
-        
-        // Preview image files
-        if (file.type.startsWith('image/')) {
-            previewImageFile(file, formType);
-        }
     });
     
     // Update count
@@ -1553,67 +1555,72 @@ function handleFileUpload(files, formType) {
     }
 }
 
-// Preview image files
-function previewImageFile(file, formType) {
-    const reader = new FileReader();
-    reader.onload = function(e) {
-        const previewId = formType + '_' + file.name.replace(/[^a-zA-Z0-9]/g, '_');
-        const previewHtml = `
-            <div id="${previewId}" class="file-preview mb-2 p-2 border rounded">
-                <img src="${e.target.result}" alt="${file.name}" class="max-w-full max-h-40 mx-auto">
-                <p class="text-xs text-center mt-1">${file.name}</p>
-            </div>
-        `;
-        const fileList = document.getElementById(formType + 'FileList');
-        fileList.insertAdjacentHTML('afterbegin', previewHtml);
-    };
-    reader.readAsDataURL(file);
-}
-
-function removeFile(formType, fileName, fileSize) {
+function removeFile(formType, buttonElement) {
+    const fileItem = buttonElement.closest('.file-item');
+    const fileName = fileItem.dataset.fileName;
+    const fileSize = parseInt(fileItem.dataset.fileSize);
+    
+    // Remove from uploadedFiles array
     uploadedFiles[formType] = uploadedFiles[formType].filter(file => 
         !(file.name === fileName && file.size === fileSize)
     );
     
-    const fileList = document.getElementById(formType + 'FileList');
-    const fileItems = fileList.querySelectorAll('.file-item');
-    fileItems.forEach(item => {
-        const itemFileName = item.querySelector('.text-gray-800').textContent;
-        if (itemFileName === fileName) {
-            item.classList.add('animate-fadeOut');
-            setTimeout(() => {
-                if (item.parentNode) {
-                    item.remove();
-                }
-            }, 300);
-        }
-    });
+    // Remove from DOM with animation
+    fileItem.classList.add('animate-fadeOut');
+    setTimeout(() => {
+        fileItem.remove();
+    }, 300);
     
+    // Update count
     document.getElementById(formType + 'FileCount').textContent = uploadedFiles[formType].length;
     updateFileInput(formType);
+    
+    showToast('File removed', 'info');
 }
 
 function clearFiles(formType) {
     if (uploadedFiles[formType].length === 0) return;
     
     if (confirm(`Are you sure you want to remove all ${uploadedFiles[formType].length} files?`)) {
+        // Clear the array
         uploadedFiles[formType] = [];
-        document.getElementById(formType + 'FileList').innerHTML = '';
+        
+        // Remove all file items from DOM with animation
+        const fileList = document.getElementById(formType + 'FileList');
+        const fileItems = fileList.querySelectorAll('.file-item');
+        
+        fileItems.forEach(item => {
+            item.classList.add('animate-fadeOut');
+        });
+        
+        setTimeout(() => {
+            fileList.innerHTML = '';
+        }, 300);
+        
+        // Update count
         document.getElementById(formType + 'FileCount').textContent = '0';
         updateFileInput(formType);
+        
         showToast('All files cleared', 'info');
     }
 }
 
 function updateFileInput(formType) {
     const fileInput = document.getElementById(formType + '_evidence_files');
+    
+    // Create a new DataTransfer object
     const dataTransfer = new DataTransfer();
     
+    // Add all files from the uploadedFiles array
     uploadedFiles[formType].forEach(file => {
         dataTransfer.items.add(file);
     });
     
+    // Replace the files in the input
     fileInput.files = dataTransfer.files;
+    
+    // Force a change event to ensure the input is updated
+    fileInput.dispatchEvent(new Event('change', { bubbles: true }));
 }
 
 // Helper functions
@@ -1643,25 +1650,31 @@ function formatFileSize(bytes) {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 }
 
-// Drag and drop
+// Drag and drop - FIXED VERSION
 document.querySelectorAll('.drop-zone').forEach(dropZone => {
     dropZone.addEventListener('dragover', (e) => {
         e.preventDefault();
+        e.stopPropagation();
         dropZone.classList.add('border-blue-400', 'bg-blue-50');
     });
     
     dropZone.addEventListener('dragleave', (e) => {
         e.preventDefault();
+        e.stopPropagation();
         dropZone.classList.remove('border-blue-400', 'bg-blue-50');
     });
     
     dropZone.addEventListener('drop', (e) => {
         e.preventDefault();
+        e.stopPropagation();
         dropZone.classList.remove('border-blue-400', 'bg-blue-50');
         
         const files = e.dataTransfer.files;
         const formType = dropZone.closest('.report-form').id.replace('Form', '').toLowerCase();
-        handleFileUpload(files, formType);
+        
+        if (files.length > 0) {
+            handleFileUpload(files, formType);
+        }
     });
 });
 
