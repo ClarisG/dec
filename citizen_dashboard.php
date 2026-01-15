@@ -406,7 +406,6 @@ function getModuleTitle($module) {
                 </div>
                 <div>
                     <h1 class="text-xl font-bold text-white">LEIR</h1>
-                    <p class="text-xs text-blue-200">Citizen Dashboard</p>
                 </div>
             </div>
         </div>
