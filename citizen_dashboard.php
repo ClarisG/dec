@@ -584,26 +584,7 @@ function getModuleTitle($module) {
                     ?>
                     <!-- Dashboard Module -->
                     <div id="dashboard-module">
-                        <!-- Welcome Banner -->
-                        <div class="bg-gradient-to-r from-purple-600 to-blue-500 rounded-xl p-6 text-white mb-8">
-                            <div class="flex flex-col md:flex-row md:items-center justify-between">
-                                <div>
-                                    <h1 class="text-2xl font-bold mb-2">Welcome, <?php echo htmlspecialchars($_SESSION['first_name']); ?>!</h1>
-                                    <p class="opacity-90">Your community safety is our priority. Report incidents, track cases, and stay updated.</p>
-                                </div>
-                                <div class="mt-4 md:mt-0">
-                                    <div class="flex items-center space-x-2 bg-white bg-opacity-20 backdrop-blur-sm rounded-lg p-3">
-                                        <div class="w-10 h-10 rounded-full bg-white bg-opacity-30 flex items-center justify-center">
-                                            <i class="fas fa-map-marker-alt"></i>
-                                        </div>
-                                        <div>
-                                            <p class="text-sm opacity-90">Your Address</p>
-                                            <p class="font-semibold"><?php echo htmlspecialchars($user_address ?? $barangay); ?></p>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
+    
                         
                         <!-- Rate Limit Warning -->
                         <?php if ($rate_limit_info && $rate_limit_info['count'] >= 5): ?>

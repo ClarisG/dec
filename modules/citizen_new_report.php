@@ -235,12 +235,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['submit_report'])) {
 ?>
 
 <div class="max-w-6xl mx-auto">
-    <!-- Header -->
-    <div class="mb-8">
-        <h2 class="text-2xl font-bold text-gray-800 mb-2">New Report</h2>
-        <p class="text-gray-600">Report incidents, complaints, or requests for official documentation</p>
-    </div>
-    
     <!-- Error/Success Messages -->
     <?php if ($error): ?>
         <div class="bg-red-50 border-l-4 border-red-500 p-4 mb-6 rounded animate-fadeIn">

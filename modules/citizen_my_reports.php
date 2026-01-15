@@ -158,11 +158,6 @@ try {
 ?>
 
 <div class="max-w-7xl mx-auto">
-    <!-- Header -->
-    <div class="mb-8">
-        <h2 class="text-2xl font-bold text-gray-800 mb-2">My Reports</h2>
-        <p class="text-gray-600">View and manage all your submitted reports, complaints, and blotter entries</p>
-    </div>
     
     <!-- Error/Success Messages -->
     <?php if ($error): ?>
