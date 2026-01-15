@@ -45,6 +45,12 @@ $category_filter = isset($_GET['category']) ? $_GET['category'] : 'all';
 $date_from = isset($_GET['date_from']) ? $_GET['date_from'] : '';
 $date_to = isset($_GET['date_to']) ? $_GET['date_to'] : '';
 
+// Pagination settings
+$records_per_page = 10;
+$current_page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
+if ($current_page < 1) $current_page = 1;
+$offset = ($current_page - 1) * $records_per_page;
+
 try {
     $conn = getDbConnection();
     
@@ -98,8 +104,43 @@ try {
     
     $query .= " ORDER BY r.created_at DESC";
     
+    // Count total records for pagination (without LIMIT)
+    $count_query = str_replace(
+        "SELECT r.id, r.report_number, r.title, r.description, r.location, r.incident_date, r.status, r.created_at, r.category, r.is_anonymous, r.evidence_files, r.priority, rt.type_name, rt.jurisdiction, u.first_name, u.last_name",
+        "SELECT COUNT(*) as total",
+        $query
+    );
+    
+    $count_stmt = $conn->prepare($count_query);
+    $count_stmt->execute($params);
+    $total_records = $count_stmt->fetch(PDO::FETCH_ASSOC)['total'] ?? 0;
+    
+    // Calculate total pages
+    $total_pages = ceil($total_records / $records_per_page);
+    
+    // Ensure current page is within bounds
+    if ($current_page > $total_pages && $total_pages > 0) {
+        $current_page = $total_pages;
+        $offset = ($current_page - 1) * $records_per_page;
+    }
+    
+    // Add pagination to main query
+    $query .= " LIMIT :limit OFFSET :offset";
+    $params[':limit'] = $records_per_page;
+    $params[':offset'] = $offset;
+    
     $stmt = $conn->prepare($query);
-    $stmt->execute($params);
+    
+    // Bind parameters with types for LIMIT and OFFSET
+    foreach ($params as $key => $value) {
+        $type = PDO::PARAM_STR;
+        if ($key === ':limit' || $key === ':offset') {
+            $type = PDO::PARAM_INT;
+        }
+        $stmt->bindValue($key, $value, $type);
+    }
+    
+    $stmt->execute();
     $reports = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
     // Get statistics
@@ -303,9 +344,21 @@ try {
     <!-- Reports List -->
     <div class="bg-white rounded-xl shadow-sm border overflow-hidden">
         <!-- Table Header -->
-        <div class="px-4 py-3 border-b">
-            <h3 class="font-semibold text-gray-800 text-sm md:text-base">My Submitted Reports</h3>
-            <p class="text-xs text-gray-500">Showing <?php echo count($reports); ?> report(s)</p>
+        <div class="px-4 py-3 border-b flex flex-col sm:flex-row sm:items-center sm:justify-between">
+            <div>
+                <h3 class="font-semibold text-gray-800 text-sm md:text-base">My Submitted Reports</h3>
+                <p class="text-xs text-gray-500">
+                    Showing <?php echo count($reports); ?> of <?php echo $total_records; ?> report(s) 
+                    (Page <?php echo $current_page; ?> of <?php echo max(1, $total_pages); ?>)
+                </p>
+            </div>
+            
+            <!-- Pagination Info -->
+            <?php if ($total_records > 0): ?>
+            <div class="mt-2 sm:mt-0 text-xs text-gray-500">
+                Reports <?php echo $offset + 1; ?> - <?php echo min($offset + $records_per_page, $total_records); ?> of <?php echo $total_records; ?>
+            </div>
+            <?php endif; ?>
         </div>
         
         <?php if (empty($reports)): ?>
@@ -517,6 +570,107 @@ try {
                     </tbody>
                 </table>
             </div>
+            
+            <!-- Pagination -->
+            <?php if ($total_pages > 1): ?>
+            <div class="px-4 py-3 border-t">
+                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+                    <div class="text-sm text-gray-500 mb-3 sm:mb-0">
+                        Page <?php echo $current_page; ?> of <?php echo $total_pages; ?>
+                    </div>
+                    
+                    <div class="flex items-center space-x-1">
+                        <!-- First Page -->
+                        <a href="?module=my-reports&status=<?php echo $status_filter; ?>&category=<?php echo $category_filter; ?>&date_from=<?php echo $date_from; ?>&date_to=<?php echo $date_to; ?>&page=1"
+                           class="px-3 py-1.5 text-xs border border-gray-300 rounded-l-lg <?php echo $current_page == 1 ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-white text-gray-700 hover:bg-gray-50'; ?>"
+                           <?php echo $current_page == 1 ? 'onclick="return false;"' : ''; ?>>
+                            <i class="fas fa-angle-double-left"></i>
+                        </a>
+                        
+                        <!-- Previous Page -->
+                        <a href="?module=my-reports&status=<?php echo $status_filter; ?>&category=<?php echo $category_filter; ?>&date_from=<?php echo $date_from; ?>&date_to=<?php echo $date_to; ?>&page=<?php echo max(1, $current_page - 1); ?>"
+                           class="px-3 py-1.5 text-xs border border-gray-300 <?php echo $current_page == 1 ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-white text-gray-700 hover:bg-gray-50'; ?>"
+                           <?php echo $current_page == 1 ? 'onclick="return false;"' : ''; ?>>
+                            <i class="fas fa-angle-left"></i>
+                        </a>
+                        
+                        <!-- Page Numbers -->
+                        <?php
+                        // Calculate page range to show
+                        $start_page = max(1, $current_page - 2);
+                        $end_page = min($total_pages, $current_page + 2);
+                        
+                        // Adjust if we're near the beginning
+                        if ($start_page == 1) {
+                            $end_page = min(5, $total_pages);
+                        }
+                        
+                        // Adjust if we're near the end
+                        if ($end_page == $total_pages) {
+                            $start_page = max(1, $total_pages - 4);
+                        }
+                        
+                        // Show first page with ellipsis if needed
+                        if ($start_page > 1): ?>
+                            <a href="?module=my-reports&status=<?php echo $status_filter; ?>&category=<?php echo $category_filter; ?>&date_from=<?php echo $date_from; ?>&date_to=<?php echo $date_to; ?>&page=1"
+                               class="px-3 py-1.5 text-xs border border-gray-300 bg-white text-gray-700 hover:bg-gray-50">
+                                1
+                            </a>
+                            <?php if ($start_page > 2): ?>
+                                <span class="px-2 py-1.5 text-xs text-gray-500">...</span>
+                            <?php endif; ?>
+                        <?php endif; ?>
+                        
+                        <!-- Page Numbers -->
+                        <?php for ($i = $start_page; $i <= $end_page; $i++): ?>
+                            <a href="?module=my-reports&status=<?php echo $status_filter; ?>&category=<?php echo $category_filter; ?>&date_from=<?php echo $date_from; ?>&date_to=<?php echo $date_to; ?>&page=<?php echo $i; ?>"
+                               class="px-3 py-1.5 text-xs border border-gray-300 <?php echo $i == $current_page ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 hover:bg-gray-50'; ?>">
+                                <?php echo $i; ?>
+                            </a>
+                        <?php endfor; ?>
+                        
+                        <!-- Show last page with ellipsis if needed -->
+                        <?php if ($end_page < $total_pages): ?>
+                            <?php if ($end_page < $total_pages - 1): ?>
+                                <span class="px-2 py-1.5 text-xs text-gray-500">...</span>
+                            <?php endif; ?>
+                            <a href="?module=my-reports&status=<?php echo $status_filter; ?>&category=<?php echo $category_filter; ?>&date_from=<?php echo $date_from; ?>&date_to=<?php echo $date_to; ?>&page=<?php echo $total_pages; ?>"
+                               class="px-3 py-1.5 text-xs border border-gray-300 bg-white text-gray-700 hover:bg-gray-50">
+                                <?php echo $total_pages; ?>
+                            </a>
+                        <?php endif; ?>
+                        
+                        <!-- Next Page -->
+                        <a href="?module=my-reports&status=<?php echo $status_filter; ?>&category=<?php echo $category_filter; ?>&date_from=<?php echo $date_from; ?>&date_to=<?php echo $date_to; ?>&page=<?php echo min($total_pages, $current_page + 1); ?>"
+                           class="px-3 py-1.5 text-xs border border-gray-300 <?php echo $current_page == $total_pages ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-white text-gray-700 hover:bg-gray-50'; ?>"
+                           <?php echo $current_page == $total_pages ? 'onclick="return false;"' : ''; ?>>
+                            <i class="fas fa-angle-right"></i>
+                        </a>
+                        
+                        <!-- Last Page -->
+                        <a href="?module=my-reports&status=<?php echo $status_filter; ?>&category=<?php echo $category_filter; ?>&date_from=<?php echo $date_from; ?>&date_to=<?php echo $date_to; ?>&page=<?php echo $total_pages; ?>"
+                           class="px-3 py-1.5 text-xs border border-gray-300 rounded-r-lg <?php echo $current_page == $total_pages ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-white text-gray-700 hover:bg-gray-50'; ?>"
+                           <?php echo $current_page == $total_pages ? 'onclick="return false;"' : ''; ?>>
+                            <i class="fas fa-angle-double-right"></i>
+                        </a>
+                    </div>
+                    
+                    <!-- Records Per Page Selector -->
+                    <div class="mt-3 sm:mt-0">
+                        <div class="flex items-center">
+                            <span class="text-xs text-gray-500 mr-2">Show:</span>
+                            <select onchange="changeRecordsPerPage(this.value)" class="text-xs border border-gray-300 rounded px-2 py-1">
+                                <option value="10" selected>10</option>
+                                <option value="20">20</option>
+                                <option value="50">50</option>
+                                <option value="100">100</option>
+                            </select>
+                            <span class="text-xs text-gray-500 ml-2">per page</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <?php endif; ?>
         <?php endif; ?>
     </div>
     
@@ -1002,6 +1156,14 @@ function closeModal() {
     document.getElementById('modalContent').innerHTML = '';
 }
 
+// Change records per page
+function changeRecordsPerPage(perPage) {
+    const url = new URL(window.location.href);
+    url.searchParams.set('per_page', perPage);
+    url.searchParams.set('page', 1); // Reset to first page
+    window.location.href = url.toString();
+}
+
 // Toast notification
 function showToast(message, type = 'info') {
     // Remove existing toasts
@@ -1060,6 +1222,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 e.preventDefault();
                 return false;
             }
+            // Reset to page 1 when applying filters
+            const pageInput = document.createElement('input');
+            pageInput.type = 'hidden';
+            pageInput.name = 'page';
+            pageInput.value = '1';
+            this.appendChild(pageInput);
             return true;
         });
     }
@@ -1258,4 +1426,31 @@ button:hover {
 .file-icon.document { background: #e0e7ff; color: #4f46e5; }
 .file-icon.spreadsheet { background: #dcfce7; color: #16a34a; }
 .file-icon.other { background: #f3f4f6; color: #6b7280; }
+
+/* Pagination styles */
+.pagination-link {
+    transition: all 0.2s ease;
+}
+
+.pagination-link:hover {
+    background-color: #f3f4f6;
+}
+
+.pagination-link.active {
+    background-color: #3b82f6;
+    color: white;
+    border-color: #3b82f6;
+}
+
+.pagination-link.disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+}
+
+/* Records per page selector */
+select:focus {
+    outline: none;
+    ring: 2px;
+    ring-color: #3b82f6;
+}
 </style>
