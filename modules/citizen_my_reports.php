@@ -46,7 +46,7 @@ $date_from = isset($_GET['date_from']) ? $_GET['date_from'] : '';
 $date_to = isset($_GET['date_to']) ? $_GET['date_to'] : '';
 
 // Pagination settings
-$records_per_page = 10;
+$records_per_page = isset($_GET['per_page']) ? (int)$_GET['per_page'] : 10;
 $current_page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
 if ($current_page < 1) $current_page = 1;
 $offset = ($current_page - 1) * $records_per_page;
@@ -293,7 +293,7 @@ try {
             <!-- Status Filter -->
             <div>
                 <label class="block text-xs md:text-sm font-medium text-gray-700 mb-1">Status</label>
-                <select name="status" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-blue-500 focus:border-blue-500">
+                <select name="status" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-blue-500 focus:border-blue-500" style="font-size: 16px;">
                     <option value="all" <?php echo $status_filter == 'all' ? 'selected' : ''; ?>>All Status</option>
                     <option value="pending" <?php echo $status_filter == 'pending' ? 'selected' : ''; ?>>Pending</option>
                     <option value="assigned" <?php echo $status_filter == 'assigned' ? 'selected' : ''; ?>>Assigned</option>
@@ -307,7 +307,7 @@ try {
             <!-- Category Filter -->
             <div>
                 <label class="block text-xs md:text-sm font-medium text-gray-700 mb-1">Category</label>
-                <select name="category" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-blue-500 focus:border-blue-500">
+                <select name="category" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-blue-500 focus:border-blue-500" style="font-size: 16px;">
                     <option value="all" <?php echo $category_filter == 'all' ? 'selected' : ''; ?>>All Categories</option>
                     <option value="incident" <?php echo $category_filter == 'incident' ? 'selected' : ''; ?>>Incident Reports</option>
                     <option value="complaint" <?php echo $category_filter == 'complaint' ? 'selected' : ''; ?>>Complaints</option>
@@ -319,23 +319,23 @@ try {
             <div>
                 <label class="block text-xs md:text-sm font-medium text-gray-700 mb-1">From Date</label>
                 <input type="date" name="date_from" value="<?php echo htmlspecialchars($date_from); ?>"
-                       class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-blue-500 focus:border-blue-500">
+                       class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-blue-500 focus:border-blue-500" style="font-size: 16px;">
             </div>
             
             <!-- Date To -->
             <div>
                 <label class="block text-xs md:text-sm font-medium text-gray-700 mb-1">To Date</label>
                 <input type="date" name="date_to" value="<?php echo htmlspecialchars($date_to); ?>"
-                       class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-blue-500 focus:border-blue-500">
+                       class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-blue-500 focus:border-blue-500" style="font-size: 16px;">
             </div>
             
             <!-- Filter Buttons -->
             <div class="md:col-span-4 flex justify-end space-x-2 pt-3 border-t">
-                <a href="?module=my-reports" class="px-3 py-2 text-sm border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50">
+                <a href="?module=my-reports" class="px-4 py-3 text-sm border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 active:bg-gray-100 min-h-[44px] flex items-center justify-center">
                     Clear
                 </a>
-                <button type="submit" class="px-3 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-1 focus:ring-blue-500">
-                    <i class="fas fa-filter mr-1"></i> Apply
+                <button type="submit" class="px-4 py-3 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 active:bg-blue-800 focus:outline-none focus:ring-1 focus:ring-blue-500 min-h-[44px] flex items-center justify-center">
+                    <i class="fas fa-filter mr-2"></i> Apply
                 </button>
             </div>
         </form>
@@ -369,12 +369,12 @@ try {
                 </div>
                 <h3 class="text-base font-medium text-gray-700 mb-2">No reports found</h3>
                 <p class="text-gray-500 text-sm mb-4">You haven't submitted any reports yet.</p>
-                <a href="?module=new-report" class="inline-flex items-center px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm">
-                    <i class="fas fa-plus mr-1"></i> Submit New Report
+                <a href="?module=new-report" class="inline-flex items-center px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 active:bg-blue-800 text-sm min-h-[44px]">
+                    <i class="fas fa-plus mr-2"></i> Submit New Report
                 </a>
             </div>
         <?php else: ?>
-            <!-- Reports List - Mobile View -->
+            <!-- Reports List - Mobile View (Enhanced for Touch) -->
             <div class="md:hidden">
                 <div class="divide-y divide-gray-200">
                     <?php foreach ($reports as $index => $report): ?>
@@ -395,48 +395,83 @@ try {
                         $created_date = date('M d, Y', strtotime($report['created_at']));
                         ?>
                         
-                        <div class="p-4" data-report-id="<?php echo $report['id']; ?>">
-                            <div class="flex justify-between items-start mb-2">
-                                <div class="flex-1">
-                                    <h4 class="font-medium text-gray-900 text-sm">
-                                        <a href="#" onclick="viewReportDetails(<?php echo $report['id']; ?>); return false;" class="hover:text-blue-600">
+                        <div class="p-4 touch-manipulation mobile-report-card" data-report-id="<?php echo $report['id']; ?>">
+                            <div class="flex justify-between items-start mb-3">
+                                <div class="flex-1 mr-2">
+                                    <!-- Title with better touch target -->
+                                    <h4 class="font-medium text-gray-900 text-base mb-1">
+                                        <a href="#" onclick="viewReportDetails(<?php echo $report['id']; ?>); return false;" 
+                                           class="block py-2 -my-2 px-2 -mx-2 hover:text-blue-600 active:bg-blue-50 active:rounded active:text-blue-700 touch-target">
                                             <?php echo htmlspecialchars($report['title']); ?>
                                         </a>
                                     </h4>
-                                    <p class="text-xs text-gray-500 mt-1">
+                                    <p class="text-sm text-gray-500 mt-1">
                                         <i class="fas fa-hashtag mr-1"></i> <?php echo htmlspecialchars($report['report_number']); ?>
                                     </p>
                                 </div>
-                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium <?php echo $status_color; ?> ml-2">
+                                <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium <?php echo $status_color; ?> min-h-[28px] min-w-[80px] justify-center touch-none">
                                     <?php echo ucfirst($report['status']); ?>
                                 </span>
                             </div>
                             
-                            <div class="text-xs text-gray-600 mb-3">
-                                <div class="flex items-center mb-1">
-                                    <i class="fas fa-file-alt mr-2 text-gray-400"></i>
-                                    <span><?php echo htmlspecialchars($report['type_name']); ?></span>
+                            <div class="text-sm text-gray-600 mb-3 space-y-1">
+                                <div class="flex items-center">
+                                    <i class="fas fa-file-alt mr-2 text-gray-400 w-5"></i>
+                                    <span class="truncate"><?php echo htmlspecialchars($report['type_name']); ?></span>
                                 </div>
                                 <div class="flex items-center">
-                                    <i class="fas fa-calendar mr-2 text-gray-400"></i>
+                                    <i class="fas fa-calendar mr-2 text-gray-400 w-5"></i>
                                     <span><?php echo $created_date; ?></span>
                                 </div>
+                                <?php if (!empty($report['first_name'])): ?>
+                                    <div class="flex items-center">
+                                        <i class="fas fa-user-check mr-2 text-gray-400 w-5"></i>
+                                        <span class="truncate"><?php echo htmlspecialchars($report['first_name'] . ' ' . $report['last_name']); ?></span>
+                                    </div>
+                                <?php endif; ?>
+                                <?php if ($report['unread_messages'] > 0): ?>
+                                    <div class="flex items-center text-blue-600 font-medium">
+                                        <i class="fas fa-envelope mr-2 w-5"></i>
+                                        <span><?php echo $report['unread_messages']; ?> new message<?php echo $report['unread_messages'] > 1 ? 's' : ''; ?></span>
+                                    </div>
+                                <?php endif; ?>
                             </div>
                             
-                            <!-- Mobile Actions -->
-                            <div class="flex space-x-2">
-                                <button onclick="viewReportDetails(<?php echo $report['id']; ?>); return false;" 
-                                        class="flex-1 px-3 py-1.5 bg-blue-50 text-blue-700 rounded text-xs hover:bg-blue-100">
-                                    <i class="fas fa-eye mr-1"></i> View
+                            <!-- Mobile Actions with better touch targets -->
+                            <div class="flex space-x-3 mt-4">
+                                <button onclick="viewReportDetails(<?php echo $report['id']; ?>);" 
+                                        class="flex-1 px-3 py-3 bg-blue-50 text-blue-700 rounded-lg text-sm font-medium hover:bg-blue-100 active:bg-blue-200 active:scale-95 transition-transform duration-150 min-h-[44px] touch-button flex flex-col items-center justify-center">
+                                    <i class="fas fa-eye text-lg mb-1"></i>
+                                    <span class="text-xs font-medium">View</span>
                                 </button>
-                                <button onclick="viewReportTimeline(<?php echo $report['id']; ?>); return false;" 
-                                        class="flex-1 px-3 py-1.5 bg-gray-50 text-gray-700 rounded text-xs hover:bg-gray-100">
-                                    <i class="fas fa-history mr-1"></i> Timeline
+                                <button onclick="viewReportTimeline(<?php echo $report['id']; ?>);" 
+                                        class="flex-1 px-3 py-3 bg-gray-50 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-100 active:bg-gray-200 active:scale-95 transition-transform duration-150 min-h-[44px] touch-button flex flex-col items-center justify-center">
+                                    <i class="fas fa-history text-lg mb-1"></i>
+                                    <span class="text-xs font-medium">Timeline</span>
                                 </button>
-                                <button onclick="printReport(<?php echo $report['id']; ?>); return false;" 
-                                        class="flex-1 px-3 py-1.5 bg-green-500 text-white rounded text-xs hover:bg-green-600">
-                                    <i class="fas fa-print mr-1"></i> Print
+                                <button onclick="printReport(<?php echo $report['id']; ?>);" 
+                                        class="flex-1 px-3 py-3 bg-green-500 text-white rounded-lg text-sm font-medium hover:bg-green-600 active:bg-green-700 active:scale-95 transition-transform duration-150 min-h-[44px] touch-button flex flex-col items-center justify-center">
+                                    <i class="fas fa-print text-lg mb-1"></i>
+                                    <span class="text-xs font-medium">Print</span>
                                 </button>
+                            </div>
+                            
+                            <!-- Additional Info -->
+                            <div class="mt-3 pt-3 border-t border-gray-100">
+                                <div class="flex justify-between items-center text-xs text-gray-500">
+                                    <span class="flex items-center">
+                                        <i class="fas fa-map-marker-alt mr-1"></i>
+                                        <span class="truncate max-w-[120px] inline-block align-middle">
+                                            <?php echo htmlspecialchars($report['location']); ?>
+                                        </span>
+                                    </span>
+                                    <?php if (!empty($report['evidence_files_parsed'])): ?>
+                                        <span class="text-blue-600 flex items-center">
+                                            <i class="fas fa-paperclip mr-1"></i>
+                                            <?php echo count($report['evidence_files_parsed']); ?> file<?php echo count($report['evidence_files_parsed']) > 1 ? 's' : ''; ?>
+                                        </span>
+                                    <?php endif; ?>
+                                </div>
                             </div>
                         </div>
                     <?php endforeach; ?>
@@ -552,15 +587,15 @@ try {
                                 <td class="px-4 py-4 whitespace-nowrap text-sm font-medium">
                                     <div class="flex space-x-2">
                                         <button onclick="viewReportDetails(<?php echo $report['id']; ?>); return false;" 
-                                                class="px-3 py-1.5 bg-blue-50 text-blue-700 rounded text-xs hover:bg-blue-100">
+                                                class="px-3 py-2 bg-blue-50 text-blue-700 rounded text-sm hover:bg-blue-100 min-h-[36px] min-w-[70px] flex items-center justify-center">
                                             <i class="fas fa-eye mr-1"></i> View
                                         </button>
                                         <button onclick="viewReportTimeline(<?php echo $report['id'] ?>); return false;" 
-                                                class="px-3 py-1.5 bg-gray-50 text-gray-700 rounded text-xs hover:bg-gray-100">
+                                                class="px-3 py-2 bg-gray-50 text-gray-700 rounded text-sm hover:bg-gray-100 min-h-[36px] min-w-[70px] flex items-center justify-center">
                                             <i class="fas fa-history mr-1"></i> Timeline
                                         </button>
                                         <button onclick="printReport(<?php echo $report['id']; ?>); return false;" 
-                                                class="px-3 py-1.5 bg-green-500 text-white rounded text-xs hover:bg-green-600">
+                                                class="px-3 py-2 bg-green-500 text-white rounded text-sm hover:bg-green-600 min-h-[36px] min-w-[70px] flex items-center justify-center">
                                             <i class="fas fa-print mr-1"></i> Print
                                         </button>
                                     </div>
@@ -582,14 +617,14 @@ try {
                     <div class="flex items-center space-x-1">
                         <!-- First Page -->
                         <a href="?module=my-reports&status=<?php echo $status_filter; ?>&category=<?php echo $category_filter; ?>&date_from=<?php echo $date_from; ?>&date_to=<?php echo $date_to; ?>&page=1"
-                           class="px-3 py-1.5 text-xs border border-gray-300 rounded-l-lg <?php echo $current_page == 1 ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-white text-gray-700 hover:bg-gray-50'; ?>"
+                           class="px-3 py-2 text-sm border border-gray-300 rounded-l-lg <?php echo $current_page == 1 ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-white text-gray-700 hover:bg-gray-50'; ?> min-h-[36px] min-w-[36px] flex items-center justify-center"
                            <?php echo $current_page == 1 ? 'onclick="return false;"' : ''; ?>>
                             <i class="fas fa-angle-double-left"></i>
                         </a>
                         
                         <!-- Previous Page -->
                         <a href="?module=my-reports&status=<?php echo $status_filter; ?>&category=<?php echo $category_filter; ?>&date_from=<?php echo $date_from; ?>&date_to=<?php echo $date_to; ?>&page=<?php echo max(1, $current_page - 1); ?>"
-                           class="px-3 py-1.5 text-xs border border-gray-300 <?php echo $current_page == 1 ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-white text-gray-700 hover:bg-gray-50'; ?>"
+                           class="px-3 py-2 text-sm border border-gray-300 <?php echo $current_page == 1 ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-white text-gray-700 hover:bg-gray-50'; ?> min-h-[36px] min-w-[36px] flex items-center justify-center"
                            <?php echo $current_page == 1 ? 'onclick="return false;"' : ''; ?>>
                             <i class="fas fa-angle-left"></i>
                         </a>
@@ -613,18 +648,18 @@ try {
                         // Show first page with ellipsis if needed
                         if ($start_page > 1): ?>
                             <a href="?module=my-reports&status=<?php echo $status_filter; ?>&category=<?php echo $category_filter; ?>&date_from=<?php echo $date_from; ?>&date_to=<?php echo $date_to; ?>&page=1"
-                               class="px-3 py-1.5 text-xs border border-gray-300 bg-white text-gray-700 hover:bg-gray-50">
+                               class="px-3 py-2 text-sm border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 min-h-[36px] min-w-[36px] flex items-center justify-center">
                                 1
                             </a>
                             <?php if ($start_page > 2): ?>
-                                <span class="px-2 py-1.5 text-xs text-gray-500">...</span>
+                                <span class="px-2 py-2 text-sm text-gray-500">...</span>
                             <?php endif; ?>
                         <?php endif; ?>
                         
                         <!-- Page Numbers -->
                         <?php for ($i = $start_page; $i <= $end_page; $i++): ?>
                             <a href="?module=my-reports&status=<?php echo $status_filter; ?>&category=<?php echo $category_filter; ?>&date_from=<?php echo $date_from; ?>&date_to=<?php echo $date_to; ?>&page=<?php echo $i; ?>"
-                               class="px-3 py-1.5 text-xs border border-gray-300 <?php echo $i == $current_page ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 hover:bg-gray-50'; ?>">
+                               class="px-3 py-2 text-sm border border-gray-300 <?php echo $i == $current_page ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 hover:bg-gray-50'; ?> min-h-[36px] min-w-[36px] flex items-center justify-center">
                                 <?php echo $i; ?>
                             </a>
                         <?php endfor; ?>
@@ -632,24 +667,24 @@ try {
                         <!-- Show last page with ellipsis if needed -->
                         <?php if ($end_page < $total_pages): ?>
                             <?php if ($end_page < $total_pages - 1): ?>
-                                <span class="px-2 py-1.5 text-xs text-gray-500">...</span>
+                                <span class="px-2 py-2 text-sm text-gray-500">...</span>
                             <?php endif; ?>
                             <a href="?module=my-reports&status=<?php echo $status_filter; ?>&category=<?php echo $category_filter; ?>&date_from=<?php echo $date_from; ?>&date_to=<?php echo $date_to; ?>&page=<?php echo $total_pages; ?>"
-                               class="px-3 py-1.5 text-xs border border-gray-300 bg-white text-gray-700 hover:bg-gray-50">
+                               class="px-3 py-2 text-sm border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 min-h-[36px] min-w-[36px] flex items-center justify-center">
                                 <?php echo $total_pages; ?>
                             </a>
                         <?php endif; ?>
                         
                         <!-- Next Page -->
                         <a href="?module=my-reports&status=<?php echo $status_filter; ?>&category=<?php echo $category_filter; ?>&date_from=<?php echo $date_from; ?>&date_to=<?php echo $date_to; ?>&page=<?php echo min($total_pages, $current_page + 1); ?>"
-                           class="px-3 py-1.5 text-xs border border-gray-300 <?php echo $current_page == $total_pages ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-white text-gray-700 hover:bg-gray-50'; ?>"
+                           class="px-3 py-2 text-sm border border-gray-300 <?php echo $current_page == $total_pages ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-white text-gray-700 hover:bg-gray-50'; ?> min-h-[36px] min-w-[36px] flex items-center justify-center"
                            <?php echo $current_page == $total_pages ? 'onclick="return false;"' : ''; ?>>
                             <i class="fas fa-angle-right"></i>
                         </a>
                         
                         <!-- Last Page -->
                         <a href="?module=my-reports&status=<?php echo $status_filter; ?>&category=<?php echo $category_filter; ?>&date_from=<?php echo $date_from; ?>&date_to=<?php echo $date_to; ?>&page=<?php echo $total_pages; ?>"
-                           class="px-3 py-1.5 text-xs border border-gray-300 rounded-r-lg <?php echo $current_page == $total_pages ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-white text-gray-700 hover:bg-gray-50'; ?>"
+                           class="px-3 py-2 text-sm border border-gray-300 rounded-r-lg <?php echo $current_page == $total_pages ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-white text-gray-700 hover:bg-gray-50'; ?> min-h-[36px] min-w-[36px] flex items-center justify-center"
                            <?php echo $current_page == $total_pages ? 'onclick="return false;"' : ''; ?>>
                             <i class="fas fa-angle-double-right"></i>
                         </a>
@@ -658,14 +693,14 @@ try {
                     <!-- Records Per Page Selector -->
                     <div class="mt-3 sm:mt-0">
                         <div class="flex items-center">
-                            <span class="text-xs text-gray-500 mr-2">Show:</span>
-                            <select onchange="changeRecordsPerPage(this.value)" class="text-xs border border-gray-300 rounded px-2 py-1">
-                                <option value="10" selected>10</option>
-                                <option value="20">20</option>
-                                <option value="50">50</option>
-                                <option value="100">100</option>
+                            <span class="text-sm text-gray-500 mr-2">Show:</span>
+                            <select onchange="changeRecordsPerPage(this.value)" class="text-sm border border-gray-300 rounded px-2 py-2" style="font-size: 16px;">
+                                <option value="10" <?php echo $records_per_page == 10 ? 'selected' : ''; ?>>10</option>
+                                <option value="20" <?php echo $records_per_page == 20 ? 'selected' : ''; ?>>20</option>
+                                <option value="50" <?php echo $records_per_page == 50 ? 'selected' : ''; ?>>50</option>
+                                <option value="100" <?php echo $records_per_page == 100 ? 'selected' : ''; ?>>100</option>
                             </select>
-                            <span class="text-xs text-gray-500 ml-2">per page</span>
+                            <span class="text-sm text-gray-500 ml-2">per page</span>
                         </div>
                     </div>
                 </div>
@@ -684,7 +719,7 @@ try {
             </div>
             <div class="flex space-x-3">
                 <button type="button" onclick="printAllReports()"
-                        class="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 flex items-center text-sm">
+                        class="px-4 py-3 bg-green-500 text-white rounded-lg hover:bg-green-600 active:bg-green-700 flex items-center text-sm min-h-[44px]">
                     <i class="fas fa-print mr-2"></i> Print All Filtered Reports
                 </button>
             </div>
@@ -699,7 +734,7 @@ try {
         <!-- Modal Header -->
         <div class="flex justify-between items-center mb-4 pb-3 border-b sticky top-0 bg-white z-10">
             <h3 class="text-lg font-bold text-gray-800" id="modalTitle">Report Details</h3>
-            <button type="button" onclick="closeModal()" class="text-gray-400 hover:text-gray-600 text-xl">
+            <button type="button" onclick="closeModal()" class="text-gray-400 hover:text-gray-600 text-xl min-h-[44px] min-w-[44px] flex items-center justify-center">
                 <i class="fas fa-times"></i>
             </button>
         </div>
@@ -716,7 +751,7 @@ try {
     <div class="relative top-4 mx-auto p-4 border w-full max-w-6xl shadow-lg rounded-lg bg-white max-h-[90vh] overflow-hidden">
         <div class="flex justify-between items-center mb-4 pb-3 border-b sticky top-0 bg-white z-10">
             <h3 class="text-lg font-bold text-gray-800" id="attachmentTitle">Attachment Viewer</h3>
-            <button type="button" onclick="closeAttachmentViewer()" class="text-gray-400 hover:text-gray-600 text-xl">
+            <button type="button" onclick="closeAttachmentViewer()" class="text-gray-400 hover:text-gray-600 text-xl min-h-[44px] min-w-[44px] flex items-center justify-center">
                 <i class="fas fa-times"></i>
             </button>
         </div>
@@ -731,8 +766,26 @@ try {
 const BASE_URL = "<?php echo BASE_URL; ?>";
 const AJAX_URL = "<?php echo AJAX_URL; ?>";
 
+// Mobile touch device detection
+const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+
+// Prevent double-tap zoom on mobile
+let lastTouchEnd = 0;
+document.addEventListener('touchend', function(event) {
+    const now = Date.now();
+    if (now - lastTouchEnd <= 300) {
+        event.preventDefault();
+    }
+    lastTouchEnd = now;
+}, false);
+
 // View Report Details
 function viewReportDetails(reportId) {
+    // Haptic feedback for mobile
+    if (isTouchDevice && navigator.vibrate) {
+        navigator.vibrate(20);
+    }
+    
     // Show loading
     document.getElementById('modalContent').innerHTML = `
         <div class="flex justify-center items-center h-48">
@@ -767,7 +820,7 @@ function viewReportDetails(reportId) {
                     <i class="fas fa-exclamation-circle text-red-500 text-3xl mb-3"></i>
                     <p class="text-gray-700">Error loading report details. Please try again.</p>
                     <p class="text-sm text-gray-500 mt-1">${error.message}</p>
-                    <button onclick="viewReportDetails(${reportId})" class="mt-3 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+                    <button onclick="viewReportDetails(${reportId})" class="mt-3 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 min-h-[44px]">
                         Retry
                     </button>
                 </div>
@@ -777,6 +830,11 @@ function viewReportDetails(reportId) {
 
 // View Report Timeline
 function viewReportTimeline(reportId) {
+    // Haptic feedback for mobile
+    if (isTouchDevice && navigator.vibrate) {
+        navigator.vibrate(20);
+    }
+    
     document.getElementById('modalContent').innerHTML = `
         <div class="flex justify-center items-center h-48">
             <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600"></div>
@@ -806,7 +864,7 @@ function viewReportTimeline(reportId) {
                     <i class="fas fa-exclamation-circle text-red-500 text-3xl mb-3"></i>
                     <p class="text-gray-700">Error loading timeline.</p>
                     <p class="text-sm text-gray-500 mt-1">${error.message}</p>
-                    <button onclick="viewReportTimeline(${reportId})" class="mt-3 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+                    <button onclick="viewReportTimeline(${reportId})" class="mt-3 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 min-h-[44px]">
                         Retry
                     </button>
                 </div>
@@ -882,11 +940,11 @@ function viewAttachment(filePath, fileName, fileType) {
                 </div>
                 <div class="mt-4 flex justify-center space-x-4">
                     <button onclick="downloadAttachment('${filePath}', '${fileName}')" 
-                            class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                            class="px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 active:bg-blue-800 min-h-[44px]">
                         <i class="fas fa-download mr-2"></i> Download
                     </button>
                     <button onclick="closeAttachmentViewer()" 
-                            class="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700">
+                            class="px-4 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 active:bg-gray-800 min-h-[44px]">
                         <i class="fas fa-times mr-2"></i> Close
                     </button>
                 </div>
@@ -909,15 +967,15 @@ function viewAttachment(filePath, fileName, fileType) {
                 </div>
                 <div class="mt-4 flex justify-center space-x-4">
                     <a href="${filePath}" target="_blank" 
-                       class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 no-underline">
+                       class="px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 active:bg-blue-800 no-underline min-h-[44px] flex items-center justify-center">
                         <i class="fas fa-external-link-alt mr-2"></i> Open in New Tab
                     </a>
                     <button onclick="downloadAttachment('${filePath}', '${fileName}')" 
-                            class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">
+                            class="px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 active:bg-green-800 min-h-[44px] flex items-center justify-center">
                         <i class="fas fa-download mr-2"></i> Download
                     </button>
                     <button onclick="closeAttachmentViewer()" 
-                            class="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700">
+                            class="px-4 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 active:bg-gray-800 min-h-[44px] flex items-center justify-center">
                         <i class="fas fa-times mr-2"></i> Close
                     </button>
                 </div>
@@ -939,11 +997,11 @@ function viewAttachment(filePath, fileName, fileType) {
                 </div>
                 <div class="mt-4 flex justify-center space-x-4">
                     <button onclick="downloadAttachment('${filePath}', '${fileName}')" 
-                            class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                            class="px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 active:bg-blue-800 min-h-[44px]">
                         <i class="fas fa-download mr-2"></i> Download
                     </button>
                     <button onclick="closeAttachmentViewer()" 
-                            class="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700">
+                            class="px-4 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 active:bg-gray-800 min-h-[44px]">
                         <i class="fas fa-times mr-2"></i> Close
                     </button>
                 </div>
@@ -965,11 +1023,11 @@ function viewAttachment(filePath, fileName, fileType) {
                 </div>
                 <div class="mt-4 flex justify-center space-x-4">
                     <button onclick="downloadAttachment('${filePath}', '${fileName}')" 
-                            class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                            class="px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 active:bg-blue-800 min-h-[44px]">
                         <i class="fas fa-download mr-2"></i> Download
                     </button>
                     <button onclick="closeAttachmentViewer()" 
-                            class="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700">
+                            class="px-4 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 active:bg-gray-800 min-h-[44px]">
                         <i class="fas fa-times mr-2"></i> Close
                     </button>
                 </div>
@@ -987,11 +1045,11 @@ function viewAttachment(filePath, fileName, fileType) {
                 <p class="text-gray-600 mb-6">This file type cannot be previewed. Please download to view.</p>
                 <div class="flex justify-center space-x-4">
                     <button onclick="downloadAttachment('${filePath}', '${fileName}')" 
-                            class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                            class="px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 active:bg-blue-800 min-h-[44px]">
                         <i class="fas fa-download mr-2"></i> Download File
                     </button>
                     <button onclick="closeAttachmentViewer()" 
-                            class="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700">
+                            class="px-4 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 active:bg-gray-800 min-h-[44px]">
                         <i class="fas fa-times mr-2"></i> Close
                     </button>
                 </div>
@@ -1003,6 +1061,11 @@ function viewAttachment(filePath, fileName, fileType) {
 // Download Attachment
 function downloadAttachment(filePath, fileName) {
     showToast('Preparing download...', 'info');
+    
+    // Haptic feedback for mobile
+    if (isTouchDevice && navigator.vibrate) {
+        navigator.vibrate(20);
+    }
     
     // Create a temporary anchor element
     const link = document.createElement('a');
@@ -1026,6 +1089,11 @@ function closeAttachmentViewer() {
 
 // Print Report
 function printReport(reportId) {
+    // Haptic feedback for mobile
+    if (isTouchDevice && navigator.vibrate) {
+        navigator.vibrate(50);
+    }
+    
     // Show toast notification
     showToast('Opening print preview...', 'info');
     
@@ -1102,6 +1170,11 @@ function printUsingIframe(reportId) {
 
 // Print All Reports
 function printAllReports() {
+    // Haptic feedback for mobile
+    if (isTouchDevice && navigator.vibrate) {
+        navigator.vibrate(50);
+    }
+    
     showToast('Preparing to print all reports...', 'info');
     
     // Store current scroll position
@@ -1178,7 +1251,7 @@ function showToast(message, type = 'info') {
         'info': 'bg-blue-600'
     };
     
-    toast.className = `toast-notification fixed top-4 right-4 px-4 py-2 rounded-lg shadow-lg text-white z-50 transform transition-all duration-300 ${typeClasses[type] || 'bg-blue-600'} text-sm`;
+    toast.className = `toast-notification fixed top-4 right-4 px-4 py-3 rounded-lg shadow-lg text-white z-50 transform transition-all duration-300 ${typeClasses[type] || 'bg-blue-600'} text-sm min-h-[44px] flex items-center`;
     toast.innerHTML = `
         <div class="flex items-center">
             <i class="fas ${type === 'success' ? 'fa-check-circle' : type === 'error' ? 'fa-exclamation-circle' : type === 'warning' ? 'fa-exclamation-triangle' : 'fa-info-circle'} mr-2"></i>
@@ -1210,9 +1283,187 @@ function validateDateRange() {
     return true;
 }
 
+// Mobile touch event handlers
+function setupMobileTouchEvents() {
+    if (!isTouchDevice) return;
+    
+    console.log('Setting up mobile touch events');
+    
+    // Add touch feedback for buttons
+    const buttons = document.querySelectorAll('.touch-button');
+    buttons.forEach(button => {
+        button.addEventListener('touchstart', function(e) {
+            e.preventDefault();
+            this.classList.add('active', 'scale-95');
+        });
+        
+        button.addEventListener('touchend', function(e) {
+            e.preventDefault();
+            this.classList.remove('active', 'scale-95');
+        });
+        
+        button.addEventListener('touchcancel', function(e) {
+            e.preventDefault();
+            this.classList.remove('active', 'scale-95');
+        });
+    });
+    
+    // Add swipe detection for report cards (optional feature)
+    const reportCards = document.querySelectorAll('.mobile-report-card');
+    reportCards.forEach(card => {
+        let startX, startY, isScrolling;
+        
+        card.addEventListener('touchstart', function(e) {
+            startX = e.touches[0].clientX;
+            startY = e.touches[0].clientY;
+            isScrolling = undefined;
+        }, { passive: true });
+        
+        card.addEventListener('touchmove', function(e) {
+            if (!startX || !startY) return;
+            
+            const currentX = e.touches[0].clientX;
+            const currentY = e.touches[0].clientY;
+            
+            const diffX = startX - currentX;
+            const diffY = startY - currentY;
+            
+            if (isScrolling === undefined) {
+                isScrolling = Math.abs(diffY) > Math.abs(diffX);
+            }
+            
+            // If vertical scrolling, don't prevent default
+            if (isScrolling) return;
+            
+            // Horizontal swipe - prevent vertical scroll
+            e.preventDefault();
+        }, { passive: false });
+        
+        card.addEventListener('touchend', function(e) {
+            if (!startX || !startY) return;
+            
+            const endX = e.changedTouches[0].clientX;
+            const endY = e.changedTouches[0].clientY;
+            
+            const diffX = startX - endX;
+            const diffY = startY - endY;
+            
+            // Only trigger swipe if it's mostly horizontal and significant
+            if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 50) {
+                const reportId = this.dataset.reportId;
+                if (reportId) {
+                    // Right swipe (negative diffX) - show quick actions
+                    if (diffX < 0) {
+                        showMobileQuickActions(reportId);
+                    }
+                }
+            }
+            
+            startX = null;
+            startY = null;
+        }, { passive: true });
+    });
+}
+
+// Show mobile quick actions on swipe
+function showMobileQuickActions(reportId) {
+    // Remove existing quick actions
+    const existingActions = document.querySelector('.mobile-quick-actions');
+    if (existingActions) existingActions.remove();
+    
+    const quickActions = document.createElement('div');
+    quickActions.className = 'mobile-quick-actions fixed inset-x-0 bottom-0 bg-white border-t p-4 shadow-lg z-50 animate-slide-up';
+    quickActions.innerHTML = `
+        <div class="flex justify-between items-center mb-3">
+            <h4 class="font-medium text-gray-800 text-base">Quick Actions</h4>
+            <button onclick="closeMobileQuickActions()" class="text-gray-500 min-h-[44px] min-w-[44px] flex items-center justify-center">
+                <i class="fas fa-times text-xl"></i>
+            </button>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+            <button onclick="viewReportDetails(${reportId}); closeMobileQuickActions();" 
+                    class="p-3 bg-blue-50 text-blue-700 rounded-lg text-sm font-medium active:bg-blue-100 active:scale-95 transition-transform min-h-[44px] flex items-center justify-center">
+                <i class="fas fa-eye mr-2"></i> View Details
+            </button>
+            <button onclick="viewReportTimeline(${reportId}); closeMobileQuickActions();" 
+                    class="p-3 bg-gray-50 text-gray-700 rounded-lg text-sm font-medium active:bg-gray-100 active:scale-95 transition-transform min-h-[44px] flex items-center justify-center">
+                <i class="fas fa-history mr-2"></i> Timeline
+            </button>
+            <button onclick="printReport(${reportId}); closeMobileQuickActions();" 
+                    class="p-3 bg-green-500 text-white rounded-lg text-sm font-medium active:bg-green-600 active:scale-95 transition-transform min-h-[44px] flex items-center justify-center">
+                <i class="fas fa-print mr-2"></i> Print
+            </button>
+            <button onclick="shareReport(${reportId}); closeMobileQuickActions();" 
+                    class="p-3 bg-purple-500 text-white rounded-lg text-sm font-medium active:bg-purple-600 active:scale-95 transition-transform min-h-[44px] flex items-center justify-center">
+                <i class="fas fa-share-alt mr-2"></i> Share
+            </button>
+        </div>
+    `;
+    
+    document.body.appendChild(quickActions);
+    
+    // Add overlay
+    const overlay = document.createElement('div');
+    overlay.className = 'fixed inset-0 bg-black bg-opacity-25 z-40';
+    overlay.onclick = closeMobileQuickActions;
+    document.body.appendChild(overlay);
+}
+
+function closeMobileQuickActions() {
+    const actions = document.querySelector('.mobile-quick-actions');
+    const overlay = document.querySelector('.fixed.inset-0.bg-black.bg-opacity-25');
+    
+    if (actions) {
+        actions.classList.remove('animate-slide-up');
+        actions.classList.add('animate-slide-down');
+        setTimeout(() => actions.remove(), 300);
+    }
+    
+    if (overlay) {
+        overlay.remove();
+    }
+}
+
+// Share report function
+function shareReport(reportId) {
+    if (navigator.share) {
+        // Use Web Share API if available
+        navigator.share({
+            title: 'Report Details',
+            text: 'Check out this report',
+            url: `${BASE_URL}/?module=my-reports&view=${reportId}`
+        })
+        .then(() => showToast('Report shared successfully', 'success'))
+        .catch(error => {
+            console.log('Sharing cancelled or failed:', error);
+            showToast('Sharing cancelled', 'info');
+        });
+    } else {
+        // Fallback: copy to clipboard
+        const url = `${BASE_URL}/?module=my-reports&view=${reportId}`;
+        navigator.clipboard.writeText(url)
+            .then(() => showToast('Report link copied to clipboard', 'success'))
+            .catch(() => showToast('Failed to copy link', 'error'));
+    }
+}
+
 // Initialize
 document.addEventListener('DOMContentLoaded', function() {
     console.log('My Reports module loaded');
+    
+    // Add touch device class to HTML if detected
+    if (isTouchDevice) {
+        document.documentElement.classList.add('touch-device');
+        setupMobileTouchEvents();
+    }
+    
+    // Add viewport meta tag for mobile if not present
+    if (!document.querySelector('meta[name="viewport"]') && isTouchDevice) {
+        const meta = document.createElement('meta');
+        meta.name = 'viewport';
+        meta.content = 'width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes';
+        document.head.appendChild(meta);
+    }
     
     // Add event listener for filter form
     const filterForm = document.getElementById('filterForm');
@@ -1256,6 +1507,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (e.key === 'Escape') {
             closeModal();
             closeAttachmentViewer();
+            closeMobileQuickActions();
         }
     });
 });
@@ -1299,6 +1551,37 @@ document.addEventListener('DOMContentLoaded', function() {
         transform: translateX(0);
         opacity: 1;
     }
+}
+
+/* Mobile quick actions animations */
+@keyframes slideUp {
+    from {
+        transform: translateY(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+@keyframes slideDown {
+    from {
+        transform: translateY(0);
+        opacity: 1;
+    }
+    to {
+        transform: translateY(100%);
+        opacity: 0;
+    }
+}
+
+.animate-slide-up {
+    animation: slideUp 0.3s ease-out;
+}
+
+.animate-slide-down {
+    animation: slideDown 0.3s ease-out;
 }
 
 /* Responsive table */
@@ -1350,32 +1633,146 @@ img {
     }
 }
 
-/* Better mobile touch targets */
+/* Mobile touch enhancements */
 @media (max-width: 768px) {
-    button, a {
+    /* Minimum touch target size (44px x 44px recommended by Apple) */
+    .touch-target,
+    .touch-button,
+    button:not(.touch-none),
+    a.button-like,
+    input[type="submit"],
+    input[type="button"] {
         min-height: 44px;
         min-width: 44px;
     }
-}
-
-/* Improve mobile scrolling */
-@media (max-width: 768px) {
-    body {
-        -webkit-tap-highlight-color: transparent;
+    
+    /* Better spacing for touch */
+    .space-touch > * + * {
+        margin-top: 12px;
     }
     
-    /* Better scrolling on iOS */
+    /* Larger font sizes for readability */
+    body {
+        font-size: 16px;
+    }
+    
+    /* Prevent unwanted text selection */
+    .touch-manipulation {
+        -webkit-user-select: none;
+        user-select: none;
+        -webkit-touch-callout: none;
+    }
+    
+    /* Better feedback for touch interactions */
+    .touch-button:active,
+    button:active:not(:disabled) {
+        transform: scale(0.95);
+        transition: transform 0.1s;
+    }
+    
+    /* Improve form inputs on mobile */
+    select,
+    input[type="date"],
+    input[type="text"],
+    input[type="email"],
+    input[type="password"] {
+        font-size: 16px !important; /* Prevents iOS zoom on focus */
+        height: 44px;
+    }
+    
+    /* Better scroll experience */
     .overflow-y-auto {
         -webkit-overflow-scrolling: touch;
+    }
+    
+    /* Remove hover effects on touch devices */
+    .touch-device .hover\:bg-blue-100:hover,
+    .touch-device .hover\:bg-blue-600:hover,
+    .touch-device .hover\:bg-gray-100:hover,
+    .touch-device .hover\:bg-green-600:hover {
+        background-color: inherit !important;
+    }
+    
+    /* Add active states for touch */
+    .active\:bg-blue-50:active {
+        background-color: #eff6ff !important;
+    }
+    
+    .active\:bg-blue-200:active {
+        background-color: #bfdbfe !important;
+    }
+    
+    .active\:scale-95:active {
+        transform: scale(0.95) !important;
+    }
+    
+    /* Larger hit areas for mobile */
+    .mobile-hit-area {
+        padding: 12px;
+        margin: -12px;
+    }
+    
+    /* Mobile report card improvements */
+    .mobile-report-card {
+        position: relative;
+        transition: transform 0.2s ease;
+    }
+    
+    .mobile-report-card:active:not(.swiping) {
+        background-color: #f9fafb;
+    }
+    
+    /* Swipe indicators */
+    .mobile-report-card::after {
+        content: '';
+        position: absolute;
+        right: 10px;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 20px;
+        height: 20px;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%236b7280'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M9 5l7 7-7 7'%3E%3C/path%3E%3C/svg%3E");
+        background-repeat: no-repeat;
+        background-position: center;
+        opacity: 0.5;
+        transition: opacity 0.2s;
+    }
+    
+    .mobile-report-card:hover::after {
+        opacity: 0.8;
+    }
+}
+
+/* Desktop hover effects (only apply on non-touch) */
+@media (hover: hover) and (pointer: fine) {
+    .hover\:bg-blue-100:hover {
+        background-color: #dbeafe !important;
+    }
+    
+    .hover\:bg-blue-600:hover {
+        background-color: #2563eb !important;
+    }
+    
+    .hover\:bg-gray-100:hover {
+        background-color: #f3f4f6 !important;
+    }
+    
+    .hover\:bg-green-600:hover {
+        background-color: #16a34a !important;
+    }
+    
+    /* Remove mobile swipe indicators on desktop */
+    .mobile-report-card::after {
+        display: none;
     }
 }
 
 /* Button hover effects */
-button {
+button:not(:disabled) {
     transition: all 0.2s ease;
 }
 
-button:hover {
+button:not(:disabled):hover {
     transform: translateY(-1px);
 }
 
@@ -1451,5 +1848,77 @@ button:hover {
 select:focus {
     outline: 2px solid #3b82f6;
     outline-offset: 2px;
+}
+
+/* iOS specific fixes */
+@supports (-webkit-touch-callout: none) {
+    /* Safari specific styles */
+    select,
+    input[type="date"] {
+        height: 44px;
+    }
+    
+    /* Prevent zoom on iOS */
+    @media screen and (max-width: 768px) {
+        input,
+        select,
+        textarea {
+            font-size: 16px !important;
+        }
+    }
+}
+
+/* Android specific fixes */
+@supports not (-webkit-touch-callout: none) {
+    /* Android specific styles */
+    .touch-button:active {
+        background-color: rgba(0, 0, 0, 0.1);
+    }
+}
+
+/* Dark mode support (optional) */
+@media (prefers-color-scheme: dark) {
+    .dark\:bg-gray-800 {
+        background-color: #1f2937;
+    }
+    
+    .dark\:text-white {
+        color: white;
+    }
+    
+    .dark\:bg-gray-700 {
+        background-color: #374151;
+    }
+}
+
+/* Accessibility improvements */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+}
+
+/* Focus styles for keyboard navigation */
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible {
+    outline: 2px solid #3b82f6;
+    outline-offset: 2px;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.5);
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+    .status-pending { border: 2px solid #92400e; }
+    .status-assigned { border: 2px solid #1e40af; }
+    .status-investigating { border: 2px solid #5b21b6; }
+    .status-resolved { border: 2px solid #065f46; }
+    .status-referred { border: 2px solid #9a3412; }
+    .status-closed { border: 2px solid #374151; }
 }
 </style>
