@@ -803,8 +803,8 @@ try {
     <?php endif; ?>
 </div>
 
-<!-- Report Details Modal - FIXED STRUCTURE -->
-<div id="reportDetailsModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4" style="display: none !important;">
+<!-- Report Details Modal - UPDATED STRUCTURE -->
+<div id="reportDetailsModal" class="fixed inset-0 z-50 items-center justify-center p-4 hidden">
     <div class="absolute inset-0 bg-black bg-opacity-50"></div>
     <div class="bg-white rounded-xl shadow-lg max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col relative z-10">
         <!-- Modal Header -->
@@ -832,8 +832,8 @@ try {
     </div>
 </div>
 
-<!-- Attachment Viewer Modal - FIXED STRUCTURE -->
-<div id="attachmentViewerModal" class="fixed inset-0 z-[60] hidden items-center justify-center p-4" style="display: none !important;">
+<!-- Attachment Viewer Modal - UPDATED STRUCTURE -->
+<div id="attachmentViewerModal" class="fixed inset-0 z-[60] items-center justify-center p-4 hidden">
     <div class="absolute inset-0 bg-black bg-opacity-90"></div>
     <div class="bg-white rounded-xl shadow-lg max-w-6xl w-full max-h-[90vh] overflow-hidden flex flex-col relative z-10">
         <div class="px-6 py-4 border-b flex-shrink-0">
@@ -946,8 +946,10 @@ function viewReportDetails(reportId) {
     // Show modal with proper display
     const modal = document.getElementById('reportDetailsModal');
     modal.classList.remove('hidden');
-    modal.style.display = 'flex';
     document.getElementById('modalTitle').textContent = 'Report Details';
+    
+    // Prevent body scrolling when modal is open
+    document.body.style.overflow = 'hidden';
     
     // Load report details via AJAX
     const url = `${AJAX_URL}get_report_details.php?id=${reportId}`;
@@ -990,7 +992,6 @@ function viewReportTimeline(reportId) {
     
     const modal = document.getElementById('reportDetailsModal');
     modal.classList.remove('hidden');
-    modal.style.display = 'flex';
     document.getElementById('modalTitle').textContent = 'Report Timeline';
     
     const url = `${AJAX_URL}get_report_timeline.php?id=${reportId}`;
@@ -1062,7 +1063,9 @@ function viewAttachment(filePath, fileName, fileType) {
     
     // Show modal with proper display
     modal.classList.remove('hidden');
-    modal.style.display = 'flex';
+    
+    // Prevent body scrolling when modal is open
+    document.body.style.overflow = 'hidden';
     
     // Determine file type and render accordingly
     const imageTypes = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'];
@@ -1236,8 +1239,9 @@ function closeAttachmentViewer() {
     const modal = document.getElementById('attachmentViewerModal');
     if (modal) {
         modal.classList.add('hidden');
-        modal.style.display = 'none';
         document.getElementById('attachmentViewerContent').innerHTML = '';
+        // Restore body scrolling
+        document.body.style.overflow = 'auto';
     }
 }
 
@@ -1382,8 +1386,9 @@ function closeModal() {
     const modal = document.getElementById('reportDetailsModal');
     if (modal) {
         modal.classList.add('hidden');
-        modal.style.display = 'none';
         document.getElementById('modalContent').innerHTML = '';
+        // Restore body scrolling
+        document.body.style.overflow = 'auto';
     }
 }
 
@@ -1451,16 +1456,15 @@ document.addEventListener('DOMContentLoaded', function() {
     
     if (reportModal) {
         reportModal.classList.add('hidden');
-        reportModal.style.display = 'none';
     }
     
     if (attachmentModal) {
         attachmentModal.classList.add('hidden');
-        attachmentModal.style.display = 'none';
     }
     
     // Ensure body scroll is enabled
-    document.body.style.overflow = '';
+    document.body.style.overflow = 'auto';
+    document.body.style.position = 'static';
     
     if (isTouchDevice) {
         console.log('Touch device detected');
@@ -1590,24 +1594,44 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 }
 
-/* Modal styles - UPDATED */
+/* Fix the modal overlay issue */
 #reportDetailsModal,
 #attachmentViewerModal {
-    transition: opacity 0.3s ease;
-}
-
-#reportDetailsModal.hidden,
-#attachmentViewerModal.hidden {
-    display: none !important;
     opacity: 0;
     pointer-events: none;
+    transition: opacity 0.3s ease;
+    z-index: 9999; /* Lower than header but above content */
 }
 
 #reportDetailsModal:not(.hidden),
 #attachmentViewerModal:not(.hidden) {
-    display: flex !important;
     opacity: 1;
     pointer-events: all;
+    display: flex !important;
+}
+
+#reportDetailsModal .bg-black,
+#attachmentViewerModal .bg-black {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 1;
+}
+
+#reportDetailsModal > div,
+#attachmentViewerModal > div {
+    position: relative;
+    z-index: 2;
+    margin: 1rem;
+    max-height: calc(100vh - 2rem);
+}
+
+/* Ensure main content is always accessible */
+.max-w-7xl {
+    position: relative;
+    z-index: 1;
 }
 
 /* Print styles */
@@ -1759,5 +1783,23 @@ select:focus-visible {
     outline: 2px solid #3b82f6;
     outline-offset: 2px;
     box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.5);
+}
+
+/* IMPORTANT: Ensure content is always accessible */
+body {
+    overflow-x: hidden;
+    position: relative;
+}
+
+/* Remove any gray overlay from body or main content */
+body::before,
+main::before {
+    display: none !important;
+}
+
+/* Ensure modals don't block the entire screen when hidden */
+#reportDetailsModal.hidden,
+#attachmentViewerModal.hidden {
+    display: none !important;
 }
 </style>
