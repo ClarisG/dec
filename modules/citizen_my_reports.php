@@ -803,9 +803,10 @@ try {
     <?php endif; ?>
 </div>
 
-<!-- Report Details Modal - SIMPLIFIED STRUCTURE -->
-<div id="reportDetailsModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-black bg-opacity-50">
-    <div class="bg-white rounded-xl shadow-lg max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+<!-- Report Details Modal - FIXED STRUCTURE -->
+<div id="reportDetailsModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4" style="display: none !important;">
+    <div class="absolute inset-0 bg-black bg-opacity-50"></div>
+    <div class="bg-white rounded-xl shadow-lg max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col relative z-10">
         <!-- Modal Header -->
         <div class="px-6 py-4 border-b flex-shrink-0">
             <div class="flex justify-between items-center">
@@ -831,9 +832,10 @@ try {
     </div>
 </div>
 
-<!-- Attachment Viewer Modal - SIMPLIFIED STRUCTURE -->
-<div id="attachmentViewerModal" class="fixed inset-0 z-[60] hidden items-center justify-center p-4 bg-black bg-opacity-90">
-    <div class="bg-white rounded-xl shadow-lg max-w-6xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+<!-- Attachment Viewer Modal - FIXED STRUCTURE -->
+<div id="attachmentViewerModal" class="fixed inset-0 z-[60] hidden items-center justify-center p-4" style="display: none !important;">
+    <div class="absolute inset-0 bg-black bg-opacity-90"></div>
+    <div class="bg-white rounded-xl shadow-lg max-w-6xl w-full max-h-[90vh] overflow-hidden flex flex-col relative z-10">
         <div class="px-6 py-4 border-b flex-shrink-0">
             <div class="flex justify-between items-center">
                 <h3 class="text-xl font-bold text-gray-800" id="attachmentTitle">Attachment Viewer</h3>
@@ -941,8 +943,10 @@ function viewReportDetails(reportId) {
         </div>
     `;
     
-    // Show modal
-    document.getElementById('reportDetailsModal').classList.remove('hidden');
+    // Show modal with proper display
+    const modal = document.getElementById('reportDetailsModal');
+    modal.classList.remove('hidden');
+    modal.style.display = 'flex';
     document.getElementById('modalTitle').textContent = 'Report Details';
     
     // Load report details via AJAX
@@ -984,7 +988,9 @@ function viewReportTimeline(reportId) {
         </div>
     `;
     
-    document.getElementById('reportDetailsModal').classList.remove('hidden');
+    const modal = document.getElementById('reportDetailsModal');
+    modal.classList.remove('hidden');
+    modal.style.display = 'flex';
     document.getElementById('modalTitle').textContent = 'Report Timeline';
     
     const url = `${AJAX_URL}get_report_timeline.php?id=${reportId}`;
@@ -1042,6 +1048,7 @@ function initializeAttachmentViewers() {
 function viewAttachment(filePath, fileName, fileType) {
     const viewerContent = document.getElementById('attachmentViewerContent');
     const viewerTitle = document.getElementById('attachmentTitle');
+    const modal = document.getElementById('attachmentViewerModal');
     
     viewerTitle.textContent = `Viewing: ${fileName}`;
     
@@ -1053,8 +1060,9 @@ function viewAttachment(filePath, fileName, fileType) {
         </div>
     `;
     
-    // Show modal
-    document.getElementById('attachmentViewerModal').classList.remove('hidden');
+    // Show modal with proper display
+    modal.classList.remove('hidden');
+    modal.style.display = 'flex';
     
     // Determine file type and render accordingly
     const imageTypes = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'];
@@ -1223,10 +1231,14 @@ function downloadAttachment(filePath, fileName) {
     showToast('Download started', 'success');
 }
 
-// Close Attachment Viewer
+// Close Attachment Viewer - UPDATED
 function closeAttachmentViewer() {
-    document.getElementById('attachmentViewerModal').classList.add('hidden');
-    document.getElementById('attachmentViewerContent').innerHTML = '';
+    const modal = document.getElementById('attachmentViewerModal');
+    if (modal) {
+        modal.classList.add('hidden');
+        modal.style.display = 'none';
+        document.getElementById('attachmentViewerContent').innerHTML = '';
+    }
 }
 
 // Print Report
@@ -1365,10 +1377,14 @@ function printAllReports() {
     }
 }
 
-// Close Modal
+// Close Modal - UPDATED
 function closeModal() {
-    document.getElementById('reportDetailsModal').classList.add('hidden');
-    document.getElementById('modalContent').innerHTML = '';
+    const modal = document.getElementById('reportDetailsModal');
+    if (modal) {
+        modal.classList.add('hidden');
+        modal.style.display = 'none';
+        document.getElementById('modalContent').innerHTML = '';
+    }
 }
 
 // Change records per page
@@ -1429,9 +1445,19 @@ function validateDateRange() {
 document.addEventListener('DOMContentLoaded', function() {
     console.log('My Reports module loaded');
     
-    // Close any open modals on page load
-    closeModal();
-    closeAttachmentViewer();
+    // Ensure modals are properly hidden on page load
+    const reportModal = document.getElementById('reportDetailsModal');
+    const attachmentModal = document.getElementById('attachmentViewerModal');
+    
+    if (reportModal) {
+        reportModal.classList.add('hidden');
+        reportModal.style.display = 'none';
+    }
+    
+    if (attachmentModal) {
+        attachmentModal.classList.add('hidden');
+        attachmentModal.style.display = 'none';
+    }
     
     // Ensure body scroll is enabled
     document.body.style.overflow = '';
@@ -1564,7 +1590,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 }
 
-/* Modal styles - SIMPLIFIED */
+/* Modal styles - UPDATED */
 #reportDetailsModal,
 #attachmentViewerModal {
     transition: opacity 0.3s ease;
@@ -1573,6 +1599,15 @@ document.addEventListener('DOMContentLoaded', function() {
 #reportDetailsModal.hidden,
 #attachmentViewerModal.hidden {
     display: none !important;
+    opacity: 0;
+    pointer-events: none;
+}
+
+#reportDetailsModal:not(.hidden),
+#attachmentViewerModal:not(.hidden) {
+    display: flex !important;
+    opacity: 1;
+    pointer-events: all;
 }
 
 /* Print styles */
