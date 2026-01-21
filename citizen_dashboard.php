@@ -16,7 +16,6 @@ require_once 'config/database.php';
 require_once 'config/rate_limit.php';
 require_once 'config/base_url.php';
 
-
 // Get user data
 $user_id = $_SESSION['user_id'];
 $username = $_SESSION['username'];
@@ -43,14 +42,12 @@ try {
     
     if ($user_data) {
         $is_active = $user_data['is_active'] ?? 1;
-        // Update session with current address
+        // Update session with current address and profile picture
         $_SESSION['permanent_address'] = $user_data['user_address'];
         $_SESSION['barangay'] = $user_data['barangay_display'];
+        $_SESSION['profile_picture'] = $user_data['profile_picture'];
         $user_address = $user_data['user_address'];
         $profile_picture = $user_data['profile_picture'];
-        
-        // Store profile picture in session for immediate access
-        $_SESSION['profile_picture'] = $profile_picture;
     } else {
         $error = "User not found.";
         $is_active = 1;
@@ -396,6 +393,15 @@ function getModuleTitle($module) {
         .animate-pulse {
             animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
         }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .animate-fade-in {
+            animation: fadeIn 0.3s ease-out;
+        }
     </style>
 </head>
 <body class="bg-gray-50">
@@ -419,8 +425,9 @@ function getModuleTitle($module) {
                 <div class="relative">
                     <?php 
                     $profile_pic_path = "uploads/profile_pictures/" . ($_SESSION['profile_picture'] ?? $profile_picture ?? '');
-                    $timestamp = file_exists($profile_pic_path) ? filemtime($profile_pic_path) : time();
-                    if (!empty($_SESSION['profile_picture'] ?? $profile_picture) && file_exists($profile_pic_path)): 
+                    $full_path = __DIR__ . "/" . $profile_pic_path;
+                    $timestamp = (!empty($_SESSION['profile_picture'] ?? $profile_picture) && file_exists($full_path)) ? filemtime($full_path) : time();
+                    if (!empty($_SESSION['profile_picture'] ?? $profile_picture) && file_exists($full_path)): 
                     ?>
                         <img id="sidebarProfileImage" src="<?php echo $profile_pic_path . '?t=' . $timestamp; ?>" 
                              alt="Profile" class="w-12 h-12 rounded-full object-cover border-2 border-white shadow-sm">
@@ -547,9 +554,10 @@ function getModuleTitle($module) {
                         <div class="relative">
                             <button id="userMenuButton" class="flex items-center space-x-2 focus:outline-none">
                                 <?php 
-                                $profile_pic_path = "../uploads/profile_pictures/" . ($_SESSION['profile_picture'] ?? $profile_picture ?? '');
-                                $timestamp = file_exists($profile_pic_path) ? filemtime($profile_pic_path) : time();
-                                if (!empty($_SESSION['profile_picture'] ?? $profile_picture) && file_exists($profile_pic_path)): 
+                                $profile_pic_path = "uploads/profile_pictures/" . ($_SESSION['profile_picture'] ?? $profile_picture ?? '');
+                                $full_path = __DIR__ . "/" . $profile_pic_path;
+                                $timestamp = (!empty($_SESSION['profile_picture'] ?? $profile_picture) && file_exists($full_path)) ? filemtime($full_path) : time();
+                                if (!empty($_SESSION['profile_picture'] ?? $profile_picture) && file_exists($full_path)): 
                                 ?>
                                     <img id="headerProfileImage" src="<?php echo $profile_pic_path . '?t=' . $timestamp; ?>" 
                                          alt="Profile" class="w-10 h-10 rounded-full object-cover border-2 border-white shadow-sm">
@@ -567,7 +575,7 @@ function getModuleTitle($module) {
                                 <div class="p-4 border-b">
                                     <div class="flex items-center space-x-3 mb-2">
                                         <?php 
-                                        if (!empty($_SESSION['profile_picture'] ?? $profile_picture) && file_exists($profile_pic_path)): 
+                                        if (!empty($_SESSION['profile_picture'] ?? $profile_picture) && file_exists($full_path)): 
                                         ?>
                                             <img id="dropdownProfileImage" src="<?php echo $profile_pic_path . '?t=' . $timestamp; ?>" 
                                                  alt="Profile" class="w-10 h-10 rounded-full object-cover">
@@ -603,7 +611,7 @@ function getModuleTitle($module) {
         <main class="p-4 sm:p-6 lg:p-8">
             <!-- Alerts -->
             <?php if (isset($_SESSION['success'])): ?>
-                <div class="mb-6 bg-green-50 border-l-4 border-green-500 p-4 rounded">
+                <div class="mb-6 bg-green-50 border-l-4 border-green-500 p-4 rounded animate-fade-in">
                     <div class="flex items-center">
                         <i class="fas fa-check-circle text-green-500 mr-3"></i>
                         <div class="flex-1">
@@ -618,7 +626,7 @@ function getModuleTitle($module) {
             <?php endif; ?>
             
             <?php if (isset($_SESSION['error'])): ?>
-                <div class="mb-6 bg-red-50 border-l-4 border-red-500 p-4 rounded">
+                <div class="mb-6 bg-red-50 border-l-4 border-red-500 p-4 rounded animate-fade-in">
                     <div class="flex items-center">
                         <i class="fas fa-exclamation-circle text-red-500 mr-3"></i>
                         <div class="flex-1">
@@ -981,12 +989,13 @@ function getModuleTitle($module) {
         // Function to update profile images across the dashboard
         function updateProfileImages(imageUrl) {
             const timestamp = new Date().getTime();
+            const fullImageUrl = imageUrl + '?t=' + timestamp;
             
             // Update sidebar image
             const sidebarImg = document.getElementById('sidebarProfileImage');
             const sidebarDefault = document.getElementById('sidebarProfileDefault');
             if (sidebarImg) {
-                sidebarImg.src = imageUrl + '?t=' + timestamp;
+                sidebarImg.src = fullImageUrl;
                 sidebarImg.style.display = 'block';
             }
             if (sidebarDefault) {
@@ -997,7 +1006,7 @@ function getModuleTitle($module) {
             const headerImg = document.getElementById('headerProfileImage');
             const headerDefault = document.getElementById('headerProfileDefault');
             if (headerImg) {
-                headerImg.src = imageUrl + '?t=' + timestamp;
+                headerImg.src = fullImageUrl;
                 headerImg.style.display = 'block';
             }
             if (headerDefault) {
@@ -1008,29 +1017,55 @@ function getModuleTitle($module) {
             const dropdownImg = document.getElementById('dropdownProfileImage');
             const dropdownDefault = document.getElementById('dropdownProfileDefault');
             if (dropdownImg) {
-                dropdownImg.src = imageUrl + '?t=' + timestamp;
+                dropdownImg.src = fullImageUrl;
                 dropdownImg.style.display = 'block';
             }
             if (dropdownDefault) {
                 dropdownDefault.style.display = 'none';
             }
             
-            // Also update the image in profile module if it exists
-            const profileModuleImg = document.getElementById('currentProfileImage');
-            if (profileModuleImg) {
-                profileModuleImg.src = imageUrl + '?t=' + timestamp;
-                profileModuleImg.style.display = 'block';
-            }
-            const profileModuleDefault = document.getElementById('defaultProfileImage');
-            if (profileModuleDefault) {
-                profileModuleDefault.style.display = 'none';
-            }
+            // Show success notification
+            showNotification('Profile picture updated successfully!', 'success');
+        }
+        
+        // Show notification function
+        function showNotification(message, type = 'success') {
+            const notification = document.createElement('div');
+            notification.className = `fixed top-4 right-4 z-50 p-4 rounded-lg shadow-lg transform transition-all duration-300 animate-fade-in ${
+                type === 'success' ? 'bg-green-500 text-white' : 'bg-red-500 text-white'
+            }`;
+            notification.innerHTML = `
+                <div class="flex items-center">
+                    <i class="fas fa-${type === 'success' ? 'check' : 'exclamation'}-circle mr-3 text-xl"></i>
+                    <p class="font-medium">${message}</p>
+                </div>
+            `;
+            
+            document.body.appendChild(notification);
+            
+            // Remove notification after 3 seconds
+            setTimeout(() => {
+                notification.style.opacity = '0';
+                notification.style.transform = 'translateX(100%)';
+                setTimeout(() => {
+                    if (notification.parentNode) {
+                        notification.remove();
+                    }
+                }, 300);
+            }, 3000);
         }
         
         // Listen for profile picture updates from the profile module
         document.addEventListener('profilePictureUpdated', function(e) {
             if (e.detail && e.detail.imageUrl) {
                 updateProfileImages(e.detail.imageUrl);
+            }
+        });
+        
+        // Also handle iframe messages (for the profile module)
+        window.addEventListener('message', function(event) {
+            if (event.data.type === 'profilePictureUpdated' && event.data.imageUrl) {
+                updateProfileImages(event.data.imageUrl);
             }
         });
     </script>
