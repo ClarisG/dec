@@ -555,29 +555,6 @@ function getModuleTitle($module) {
                         <p class="text-sm text-gray-600 hidden md:block">Welcome back, <?php echo htmlspecialchars($_SESSION['first_name']); ?>!</p>
                     </div>
                     
-                    <!-- Right: User Dropdown -->
-                    <div class="flex items-center space-x-4">
-                        <!-- User Menu -->
-                        <div class="relative">
-                            <button id="userMenuButton" class="flex items-center space-x-2 focus:outline-none">
-                                <?php 
-                                $profile_pic_path = "uploads/profile_pictures/" . ($_SESSION['profile_picture'] ?? $profile_picture ?? '');
-                                $full_path = __DIR__ . "/../" . $profile_pic_path;
-                                $timestamp = file_exists($full_path) ? filemtime($full_path) : time();
-                                if (!empty($_SESSION['profile_picture'] ?? $profile_picture) && file_exists($full_path)): 
-                                ?>
-                                    <img id="headerProfileImage" src="<?php echo $profile_pic_path . '?t=' . $timestamp; ?>" 
-                                         alt="Profile" class="w-10 h-10 rounded-full object-cover border-2 border-white shadow-sm">
-                                <?php else: ?>
-                                    <div id="headerProfileDefault" class="w-10 h-10 rounded-full bg-gradient-to-r from-blue-600 to-blue-500 flex items-center justify-center text-white font-semibold">
-                                        <?php echo strtoupper(substr($full_name, 0, 1)); ?>
-                                    </div>
-                                <?php endif; ?>
-                                <span class="hidden md:inline text-gray-700 font-medium"><?php echo htmlspecialchars($_SESSION['first_name']); ?></span>
-                                <i class="fas fa-chevron-down text-gray-400"></i>
-                            </button>
-                                  
-                        </div>
                     </div>
                 </div>
             </div>
