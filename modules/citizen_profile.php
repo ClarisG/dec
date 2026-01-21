@@ -39,7 +39,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             
             // Handle profile picture upload
             $profile_picture = $user['profile_picture'];
-            $file_uploaded = false;
             
             if (!empty($_FILES['profile_picture']['name'])) {
                 $upload_dir = "../uploads/profile_pictures/";
@@ -60,21 +59,18 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                         $error = "File size must be less than 2MB.";
                     } else {
                         if (move_uploaded_file($_FILES['profile_picture']['tmp_name'], $file_path)) {
-                            // Delete old profile picture if exists and not default
-                            if (!empty($profile_picture) && file_exists($upload_dir . $profile_picture) && !str_contains($profile_picture, 'default_')) {
+                            // Delete old profile picture if exists
+                            if (!empty($profile_picture) && file_exists($upload_dir . $profile_picture)) {
                                 unlink($upload_dir . $profile_picture);
                             }
                             
                             $profile_picture = $file_name;
-                            $file_uploaded = true;
                             
                             // Update session immediately
                             $_SESSION['profile_picture'] = $profile_picture;
                             
                             // Set flag for immediate refresh
                             $_SESSION['profile_updated'] = time();
-                        } else {
-                            $error = "Failed to upload file. Please try again.";
                         }
                     }
                 } else {
@@ -107,6 +103,14 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 $_SESSION['permanent_address'] = $permanent_address;
                 $_SESSION['contact_number'] = $contact_number;
                 
+                // Also update first_name and last_name in session if they exist in POST
+                if (isset($_POST['first_name'])) {
+                    $_SESSION['first_name'] = trim($_POST['first_name']);
+                }
+                if (isset($_POST['last_name'])) {
+                    $_SESSION['last_name'] = trim($_POST['last_name']);
+                }
+                
                 $success = "Profile updated successfully!";
                 
                 // Force refresh user data
@@ -120,21 +124,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 $user['profile_picture'] = $profile_picture;
                 
                 // Set flag for JavaScript
-                echo '<script>
-                    sessionStorage.setItem("profileUpdated", "' . time() . '");
-                    if (window.parent) {
-                        window.parent.postMessage({type: "profilePictureChanged", timestamp: "' . time() . '"}, "*");
-                    }
-                </script>';
-                
-                // If file was uploaded, refresh immediately
-                if ($file_uploaded) {
-                    echo '<script>
-                        setTimeout(function() {
-                            window.location.reload();
-                        }, 500);
-                    </script>';
-                }
+                echo '<script>sessionStorage.setItem("profileUpdated", "' . time() . '");</script>';
             }
             
         } catch(PDOException $e) {
@@ -170,14 +160,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         }
     }
 }
-
-// Get current profile picture for display
-$current_profile_pic = $_SESSION['profile_picture'] ?? $user['profile_picture'] ?? '';
-$profile_pic_path = "../uploads/profile_pictures/" . $current_profile_pic;
-$has_profile_pic = !empty($current_profile_pic) && file_exists($profile_pic_path);
 ?>
 
-<div class="max-w-4xl mx-auto" id="profile-module">
+<div class="max-w-4xl mx-auto">
     <!-- Error/Success Messages -->
     <?php if ($error): ?>
         <div class="bg-red-50 border-l-4 border-red-500 p-4 mb-6 rounded">
@@ -205,21 +190,19 @@ $has_profile_pic = !empty($current_profile_pic) && file_exists($profile_pic_path
                     <!-- Profile Picture -->
                     <div class="relative w-32 h-32 mx-auto mb-4">
                         <div id="profileImagePreview" class="w-full h-full rounded-full overflow-hidden bg-gray-200 border-4 border-white shadow-lg">
-                            <?php if ($has_profile_pic): 
+                            <?php 
+                            // Use session variable first, then database
+                            $current_profile_pic = $_SESSION['profile_picture'] ?? $user['profile_picture'] ?? '';
+                            $profile_pic_path = "../uploads/profile_pictures/" . $current_profile_pic;
+                            
+                            if (!empty($current_profile_pic) && file_exists($profile_pic_path)): 
+                                // Add cache-busting timestamp
                                 $timestamp = filemtime($profile_pic_path);
                             ?>
-                                <img src="../uploads/profile_pictures/<?php echo $current_profile_pic; ?>?t=<?php echo $timestamp; ?>" 
+                                <img src="<?php echo $profile_pic_path . '?t=' . $timestamp; ?>" 
                                      alt="Profile Picture" 
                                      class="w-full h-full object-cover"
-                                     id="currentProfileImage"
-                                     onerror="this.style.display='none'; document.getElementById('defaultProfileImage').style.display='flex';">
-                                <div class="w-full h-full hidden items-center justify-center bg-gradient-to-r from-purple-600 to-blue-500 text-white text-4xl font-bold"
-                                     id="defaultProfileImage">
-                                    <?php 
-                                    $firstName = $_SESSION['first_name'] ?? $user['first_name'] ?? '';
-                                    echo strtoupper(substr($firstName, 0, 1)); 
-                                    ?>
-                                </div>
+                                     id="currentProfileImage">
                             <?php else: ?>
                                 <div class="w-full h-full flex items-center justify-center bg-gradient-to-r from-purple-600 to-blue-500 text-white text-4xl font-bold"
                                      id="defaultProfileImage">
@@ -239,11 +222,6 @@ $has_profile_pic = !empty($current_profile_pic) && file_exists($profile_pic_path
                     <h3 class="text-xl font-bold text-gray-800"><?php echo htmlspecialchars($user['first_name'] . ' ' . $user['last_name']); ?></h3>
                     <p class="text-gray-600">Citizen</p>
                     <p class="text-sm text-gray-500 mt-2">Member since <?php echo date('M Y', strtotime($user['created_at'])); ?></p>
-                    
-                    <!-- File info display -->
-                    <div id="fileInfo" class="mt-2 text-xs text-gray-500 hidden">
-                        <span id="fileName"></span> (<span id="fileSize"></span>)
-                    </div>
                 </div>
                 
                 <div class="space-y-4">
@@ -315,8 +293,20 @@ $has_profile_pic = !empty($current_profile_pic) && file_exists($profile_pic_path
                         <p class="text-xs text-gray-500 mt-1">Complete address including barangay</p>
                     </div>
                     
+                    <div class="mb-6">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Profile Picture</label>
+                        <div class="flex items-center space-x-4">
+                            <div class="flex-1">
+                                <p class="text-sm text-gray-600 mb-2">Upload a new profile picture (max 2MB)</p>
+                                <input type="file" name="profile_picture" 
+                                       class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                                       accept="image/*" onchange="previewProfileImage(this)">
+                            </div>
+                        </div>
+                    </div>
+                    
                     <div class="flex justify-end pt-4 border-t">
-                        <button type="submit" name="update_profile" id="saveProfileBtn"
+                        <button type="submit" name="update_profile"
                                 class="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all font-medium">
                             <i class="fas fa-save mr-2"></i>
                             Save Changes
@@ -329,7 +319,7 @@ $has_profile_pic = !empty($current_profile_pic) && file_exists($profile_pic_path
             <div class="bg-white rounded-xl shadow-sm border p-6">
                 <h3 class="text-lg font-semibold text-gray-800 mb-6 pb-3 border-b">Change Password</h3>
                 
-                <form method="POST" id="passwordForm">
+                <form method="POST">
                     <div class="space-y-4">
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-2">Current Password</label>
@@ -354,7 +344,7 @@ $has_profile_pic = !empty($current_profile_pic) && file_exists($profile_pic_path
                     </div>
                     
                     <div class="mt-6 pt-4 border-t flex justify-end">
-                        <button type="submit" name="change_password" id="changePasswordBtn"
+                        <button type="submit" name="change_password"
                                 class="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition-all font-medium">
                             <i class="fas fa-key mr-2"></i>
                             Change Password
@@ -370,145 +360,70 @@ $has_profile_pic = !empty($current_profile_pic) && file_exists($profile_pic_path
 // Function to preview profile image
 function previewProfileImage(input) {
     if (input.files && input.files[0]) {
-        const file = input.files[0];
         const reader = new FileReader();
         const preview = document.getElementById('profileImagePreview');
         
-        // Show file info
-        const fileInfo = document.getElementById('fileInfo');
-        const fileName = document.getElementById('fileName');
-        const fileSize = document.getElementById('fileSize');
-        
-        fileName.textContent = file.name;
-        fileSize.textContent = formatFileSize(file.size);
-        fileInfo.classList.remove('hidden');
-        
-        // Check file size (2MB limit)
-        if (file.size > 2097152) {
-            showAlert('File size must be less than 2MB.', 'error');
-            input.value = '';
-            fileInfo.classList.add('hidden');
-            return;
-        }
-        
-        // Check file type
-        const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif'];
-        if (!allowedTypes.includes(file.type)) {
-            showAlert('Only JPG, JPEG, PNG & GIF files are allowed.', 'error');
-            input.value = '';
-            fileInfo.classList.add('hidden');
-            return;
-        }
-        
         reader.onload = function(e) {
-            // Hide default profile image and show the uploaded image
-            const defaultImage = document.getElementById('defaultProfileImage');
-            if (defaultImage) {
-                defaultImage.style.display = 'none';
-            }
-            
-            // Update the preview immediately
+            // Update the preview
             preview.innerHTML = `<img src="${e.target.result}" alt="Profile Preview" class="w-full h-full object-cover">`;
-            
-            // Show success message
-            showAlert('Profile picture selected. Click "Save Changes" to update.', 'success');
-            
-            // Auto-hide file info after 5 seconds
-            setTimeout(() => {
-                fileInfo.classList.add('hidden');
-            }, 5000);
         }
         
-        reader.readAsDataURL(file);
+        reader.readAsDataURL(input.files[0]);
     }
 }
 
-// Format file size
-function formatFileSize(bytes) {
-    if (bytes < 1024) return bytes + ' bytes';
-    else if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
-    else return (bytes / 1048576).toFixed(1) + ' MB';
-}
-
-// Show alert message
-function showAlert(message, type = 'info') {
-    // Create alert element
-    const alertDiv = document.createElement('div');
-    alertDiv.className = `fixed top-4 right-4 z-50 p-4 rounded-lg shadow-lg ${type === 'success' ? 'bg-green-500' : 'bg-red-500'} text-white`;
-    alertDiv.innerHTML = `
-        <div class="flex items-center">
-            <i class="fas ${type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle'} mr-2"></i>
-            <span>${message}</span>
-        </div>
-    `;
-    
-    document.body.appendChild(alertDiv);
-    
-    // Auto remove after 3 seconds
-    setTimeout(() => {
-        alertDiv.remove();
-    }, 3000);
-}
-
-// Handle form submission
+// When form is submitted, handle immediate profile picture update
 document.addEventListener('DOMContentLoaded', function() {
     const profileForm = document.getElementById('profileForm');
-    const passwordForm = document.getElementById('passwordForm');
-    const saveProfileBtn = document.getElementById('saveProfileBtn');
-    const changePasswordBtn = document.getElementById('changePasswordBtn');
     
     if (profileForm) {
         profileForm.addEventListener('submit', function(e) {
-            // Check if profile picture was selected
-            const fileInput = document.getElementById('profile_picture');
-            const hasNewPicture = fileInput && fileInput.files.length > 0;
+            // Check if profile picture is being uploaded
+            const fileInput = document.querySelector('input[name="profile_picture"]');
+            const hasFile = fileInput && fileInput.files.length > 0;
             
-            if (hasNewPicture) {
+            if (hasFile) {
                 // Set flag for immediate refresh
                 sessionStorage.setItem('profileUpdated', Date.now());
-            }
-            
-            // Show loading state
-            if (saveProfileBtn) {
-                const originalText = saveProfileBtn.innerHTML;
-                saveProfileBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Saving...';
-                saveProfileBtn.disabled = true;
                 
-                // Reset button after 5 seconds if still disabled (fallback)
-                setTimeout(() => {
-                    if (saveProfileBtn.disabled) {
-                        saveProfileBtn.innerHTML = originalText;
-                        saveProfileBtn.disabled = false;
-                    }
-                }, 5000);
+                // Show loading state
+                const submitBtn = this.querySelector('button[type="submit"]');
+                if (submitBtn) {
+                    const originalText = submitBtn.innerHTML;
+                    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Saving...';
+                    submitBtn.disabled = true;
+                    
+                    // Reset button after 3 seconds if still disabled (fallback)
+                    setTimeout(() => {
+                        if (submitBtn.disabled) {
+                            submitBtn.innerHTML = originalText;
+                            submitBtn.disabled = false;
+                        }
+                    }, 3000);
+                }
+                
+                // Dispatch custom event to notify parent window
+                if (window.parent) {
+                    window.parent.dispatchEvent(new CustomEvent('profilePictureChanged'));
+                }
+                
+                // Dispatch event to same window
+                window.dispatchEvent(new CustomEvent('profilePictureChanged'));
             }
         });
     }
     
-    if (passwordForm) {
-        passwordForm.addEventListener('submit', function(e) {
-            // Show loading state
-            if (changePasswordBtn) {
-                const originalText = changePasswordBtn.innerHTML;
-                changePasswordBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Changing...';
-                changePasswordBtn.disabled = true;
-                
-                // Reset button after 5 seconds if still disabled (fallback)
-                setTimeout(() => {
-                    if (changePasswordBtn.disabled) {
-                        changePasswordBtn.innerHTML = originalText;
-                        changePasswordBtn.disabled = false;
-                    }
-                }, 5000);
+    // Listen for profile picture change events
+    window.addEventListener('profilePictureChanged', function() {
+        // Refresh the preview image
+        const currentProfilePic = '<?php echo $_SESSION["profile_picture"] ?? ""; ?>';
+        if (currentProfilePic) {
+            const profilePicPath = '../uploads/profile_pictures/' + currentProfilePic;
+            const preview = document.getElementById('profileImagePreview');
+            if (preview) {
+                const timestamp = Date.now();
+                preview.innerHTML = `<img src="${profilePicPath}?t=${timestamp}" alt="Profile Picture" class="w-full h-full object-cover">`;
             }
-        });
-    }
-    
-    // Listen for profile picture change events from parent
-    window.addEventListener('message', function(event) {
-        if (event.data.type === 'refreshProfile') {
-            // Reload the page to show updated profile picture
-            window.location.reload();
         }
     });
 });

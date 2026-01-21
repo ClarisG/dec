@@ -16,8 +16,6 @@ require_once 'config/database.php';
 require_once 'config/rate_limit.php';
 require_once 'config/base_url.php';
 
-// Check if profile was recently updated
-$profile_updated = isset($_SESSION['profile_updated']) ? $_SESSION['profile_updated'] : 0;
 
 // Get user data
 $user_id = $_SESSION['user_id'];
@@ -133,21 +131,6 @@ function getModuleTitle($module) {
         'profile' => 'Profile Settings'
     ];
     return $titles[$module] ?? 'Dashboard';
-}
-
-// Prepare profile picture URLs with cache busting
-$profile_pic_path = "../uploads/profile_pictures/" . ($profile_picture ?? '');
-$profile_pic_url = '';
-$profile_pic_timestamp = time();
-
-if (!empty($profile_picture) && file_exists($profile_pic_path)) {
-    $timestamp = filemtime($profile_pic_path);
-    $profile_pic_url = "../uploads/profile_pictures/" . $profile_picture . '?t=' . $timestamp;
-    $profile_pic_timestamp = $timestamp;
-} elseif (isset($_SESSION['profile_updated'])) {
-    // If profile was recently updated, use session timestamp
-    $profile_pic_url = "../uploads/profile_pictures/" . ($profile_picture ?? '') . '?t=' . $_SESSION['profile_updated'];
-    $profile_pic_timestamp = $_SESSION['profile_updated'];
 }
 ?>
 <!DOCTYPE html>
@@ -410,33 +393,9 @@ if (!empty($profile_picture) && file_exists($profile_pic_path)) {
         .animate-pulse {
             animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
         }
-        
-        .profile-pic {
-            transition: all 0.3s ease;
-            object-fit: cover;
-        }
-        
-        .profile-pic-updating {
-            opacity: 0.7;
-            filter: blur(2px);
-        }
-        
-        .profile-image-container {
-            position: relative;
-            display: inline-block;
-        }
-        
-        .profile-initials {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: linear-gradient(135deg, #2196f3, #0d47a1);
-            color: white;
-            font-weight: bold;
-        }
     </style>
 </head>
-<body class="bg-gray-50" data-profile-updated="<?php echo $profile_updated; ?>">
+<body class="bg-gray-50">
     <!-- Desktop Sidebar -->
     <div class="sidebar hidden md:flex md:flex-col md:w-64 h-screen fixed">
         <!-- Logo -->
@@ -455,15 +414,12 @@ if (!empty($profile_picture) && file_exists($profile_pic_path)) {
         <div class="p-6 border-b border-blue-400/30">
             <div class="flex items-center space-x-4">
                 <div class="relative">
-                    <?php if (!empty($profile_picture) && !empty($profile_pic_url)): ?>
-                        <div class="w-12 h-12 rounded-full overflow-hidden border-2 border-white shadow-sm">
-                            <img src="<?php echo $profile_pic_url; ?>" 
-                                 alt="Profile" 
-                                 class="w-full h-full profile-pic"
-                                 id="sidebarProfilePic"
-                                 data-timestamp="<?php echo $profile_pic_timestamp; ?>"
-                                 onerror="this.style.display='none'; this.parentElement.classList.add('bg-gradient-to-r', 'from-blue-600', 'to-blue-500'); this.parentElement.innerHTML='<div class="w-full h-full flex items-center justify-center text-white font-bold"><?php echo strtoupper(substr($full_name, 0, 1)); ?></div>';">
-                        </div>
+                    <?php 
+                    $profile_pic_path = "../uploads/profile_pictures/" . ($profile_picture ?? '');
+                    if (!empty($profile_picture) && file_exists($profile_pic_path)): 
+                    ?>
+                        <img src="<?php echo $profile_pic_path; ?>" 
+                             alt="Profile" class="w-12 h-12 rounded-full object-cover border-2 border-white shadow-sm">
                     <?php else: ?>
                         <div class="w-12 h-12 rounded-full bg-gradient-to-r from-blue-600 to-blue-500 flex items-center justify-center text-white font-bold text-lg">
                             <?php echo strtoupper(substr($full_name, 0, 1)); ?>
@@ -586,15 +542,12 @@ if (!empty($profile_picture) && file_exists($profile_pic_path)) {
                         <!-- User Menu -->
                         <div class="relative">
                             <button id="userMenuButton" class="flex items-center space-x-2 focus:outline-none">
-                                <?php if (!empty($profile_picture) && !empty($profile_pic_url)): ?>
-                                    <div class="w-10 h-10 rounded-full overflow-hidden border-2 border-white shadow-sm">
-                                        <img src="<?php echo $profile_pic_url; ?>" 
-                                             alt="Profile" 
-                                             class="w-full h-full profile-pic"
-                                             id="headerProfilePic"
-                                             data-timestamp="<?php echo $profile_pic_timestamp; ?>"
-                                             onerror="this.style.display='none'; this.parentElement.classList.add('bg-gradient-to-r', 'from-blue-600', 'to-blue-500'); this.parentElement.innerHTML='<div class="w-full h-full flex items-center justify-center text-white font-semibold"><?php echo strtoupper(substr($full_name, 0, 1)); ?></div>';">
-                                    </div>
+                                <?php 
+                                $profile_pic_path = "../uploads/profile_pictures/" . ($profile_picture ?? '');
+                                if (!empty($profile_picture) && file_exists($profile_pic_path)): 
+                                ?>
+                                    <img src="<?php echo $profile_pic_path; ?>" 
+                                         alt="Profile" class="w-10 h-10 rounded-full object-cover border-2 border-white shadow-sm">
                                 <?php else: ?>
                                     <div class="w-10 h-10 rounded-full bg-gradient-to-r from-blue-600 to-blue-500 flex items-center justify-center text-white font-semibold">
                                         <?php echo strtoupper(substr($full_name, 0, 1)); ?>
@@ -608,15 +561,9 @@ if (!empty($profile_picture) && file_exists($profile_pic_path)) {
                             <div id="userDropdown" class="hidden absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-xl border z-40">
                                 <div class="p-4 border-b">
                                     <div class="flex items-center space-x-3 mb-2">
-                                        <?php if (!empty($profile_picture) && !empty($profile_pic_url)): ?>
-                                            <div class="w-10 h-10 rounded-full overflow-hidden">
-                                                <img src="<?php echo $profile_pic_url; ?>" 
-                                                     alt="Profile" 
-                                                     class="w-full h-full profile-pic"
-                                                     id="dropdownProfilePic"
-                                                     data-timestamp="<?php echo $profile_pic_timestamp; ?>"
-                                                     onerror="this.style.display='none'; this.parentElement.classList.add('bg-gradient-to-r', 'from-blue-600', 'to-blue-500'); this.parentElement.innerHTML='<div class="w-full h-full flex items-center justify-center text-white font-bold"><?php echo strtoupper(substr($full_name, 0, 1)); ?></div>';">
-                                            </div>
+                                        <?php if (!empty($profile_picture) && file_exists($profile_pic_path)): ?>
+                                            <img src="<?php echo $profile_pic_path; ?>" 
+                                                 alt="Profile" class="w-10 h-10 rounded-full object-cover">
                                         <?php else: ?>
                                             <div class="w-10 h-10 rounded-full bg-gradient-to-r from-blue-600 to-blue-500 flex items-center justify-center text-white font-bold">
                                                 <?php echo strtoupper(substr($full_name, 0, 1)); ?>
@@ -1023,105 +970,10 @@ if (!empty($profile_picture) && file_exists($profile_pic_path)) {
         if (window.history.replaceState) {
             window.history.replaceState(null, null, window.location.href);
         }
-        
-        // Function to refresh profile images
-        function refreshProfileImages() {
-            const timestamp = Date.now();
-            const profilePics = document.querySelectorAll('.profile-pic');
-            
-            profilePics.forEach(pic => {
-                const currentSrc = pic.src.split('?')[0];
-                if (currentSrc.includes('profile_pictures')) {
-                    // Add cache busting timestamp
-                    pic.src = currentSrc + '?t=' + timestamp;
-                    pic.setAttribute('data-timestamp', timestamp);
-                    
-                    // Add loading effect
-                    pic.classList.add('profile-pic-updating');
-                    
-                    // Remove loading effect when image loads
-                    pic.onload = function() {
-                        this.classList.remove('profile-pic-updating');
-                    };
-                    
-                    // Handle errors
-                    pic.onerror = function() {
-                        this.classList.remove('profile-pic-updating');
-                        // If image fails to load, show initials
-                        const parent = this.parentElement;
-                        if (parent && !parent.classList.contains('profile-initials')) {
-                            const initials = '<?php echo strtoupper(substr($full_name, 0, 1)); ?>';
-                            parent.classList.add('bg-gradient-to-r', 'from-blue-600', 'to-blue-500', 'profile-initials');
-                            parent.innerHTML = `<div class="w-full h-full flex items-center justify-center text-white font-bold">${initials}</div>`;
-                        }
-                    };
-                }
-            });
-        }
-        
-        // Check for profile updates
-        function checkProfileUpdates() {
-            // Check sessionStorage for update flag
-            const profileUpdated = sessionStorage.getItem('profileUpdated');
-            
-            if (profileUpdated) {
-                // Clear the flag
-                sessionStorage.removeItem('profileUpdated');
-                
-                // Refresh images
-                refreshProfileImages();
-                
-                // Refresh again after delay
-                setTimeout(refreshProfileImages, 500);
-                setTimeout(refreshProfileImages, 2000);
-            }
-            
-            // Check body attribute for profile update
-            const body = document.querySelector('body');
-            const profileUpdatedAttr = body.getAttribute('data-profile-updated');
-            if (profileUpdatedAttr && profileUpdatedAttr > 0) {
-                refreshProfileImages();
-            }
-        }
-        
-        // Initialize when DOM is loaded
-        document.addEventListener('DOMContentLoaded', function() {
-            // Check for profile updates
-            checkProfileUpdates();
-            
-            // Listen for messages from profile module
-            window.addEventListener('message', function(event) {
-                if (event.data.type === 'profilePictureChanged') {
-                    console.log('Profile picture changed event received');
-                    refreshProfileImages();
-                    
-                    // Update sessionStorage flag
-                    sessionStorage.setItem('profileUpdated', Date.now());
-                    
-                    // Refresh multiple times to ensure image loads
-                    setTimeout(refreshProfileImages, 300);
-                    setTimeout(refreshProfileImages, 1000);
-                    setTimeout(refreshProfileImages, 3000);
-                }
-            });
-            
-            // Check for updates every 5 seconds
-            setInterval(checkProfileUpdates, 5000);
-        });
-        
-        // Also check when page becomes visible
-        document.addEventListener('visibilitychange', function() {
-            if (!document.hidden) {
-                checkProfileUpdates();
-            }
-        });
     </script>
 </body>
 </html>
 <?php
-// Clear profile update flag
-unset($_SESSION['profile_updated']);
-
 // Close database connection
 $conn = null;
 ?>
