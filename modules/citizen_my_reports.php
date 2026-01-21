@@ -391,84 +391,159 @@ try {
                         
                         $status_color = $status_colors[$report['status']] ?? 'bg-gray-100 text-gray-800';
                         
-                        // Format date
+                        // Format dates
                         $created_date = date('M d, Y', strtotime($report['created_at']));
+                        $incident_date = !empty($report['incident_date']) && $report['incident_date'] != '0000-00-00' ? 
+                            date('M d, Y', strtotime($report['incident_date'])) : 'Not specified';
+                        
+                        // Get category display name
+                        $category_names = [
+                            'incident' => 'Incident Report',
+                            'complaint' => 'Complaint Report',
+                            'blotter' => 'Blotter Report'
+                        ];
+                        $category_name = $category_names[$report['category']] ?? 'Report';
                         ?>
                         
                         <div class="p-4 touch-manipulation mobile-report-card" data-report-id="<?php echo $report['id']; ?>">
+                            <!-- Report Header with Status -->
                             <div class="flex justify-between items-start mb-3">
                                 <div class="flex-1 mr-2">
-                                    <!-- Title with better touch target -->
-                                    <h4 class="font-medium text-gray-900 text-base mb-1">
-                                        <a href="#" onclick="viewReportDetails(<?php echo $report['id']; ?>); return false;" 
-                                           class="block py-2 -my-2 px-2 -mx-2 hover:text-blue-600 active:bg-blue-50 active:rounded active:text-blue-700 touch-target">
-                                            <?php echo htmlspecialchars($report['title']); ?>
-                                        </a>
+                                    <!-- Report Title -->
+                                    <h4 class="font-bold text-gray-900 text-base mb-1">
+                                        <?php echo htmlspecialchars($report['title']); ?>
                                     </h4>
-                                    <p class="text-sm text-gray-500 mt-1">
-                                        <i class="fas fa-hashtag mr-1"></i> <?php echo htmlspecialchars($report['report_number']); ?>
-                                    </p>
+                                    
+                                    <!-- Report Number and Status -->
+                                    <div class="flex items-center mb-2">
+                                        <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium <?php echo $status_color; ?> mr-2">
+                                            <?php echo ucfirst($report['status']); ?>
+                                        </span>
+                                        <span class="text-xs text-gray-600">
+                                            <i class="fas fa-hashtag mr-1"></i><?php echo htmlspecialchars($report['report_number']); ?>
+                                        </span>
+                                    </div>
                                 </div>
-                                <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium <?php echo $status_color; ?> min-h-[28px] min-w-[80px] justify-center touch-none">
-                                    <?php echo ucfirst($report['status']); ?>
-                                </span>
+                                
+                                <!-- Quick View Icon -->
+                                <button onclick="mobileViewReportDetails(<?php echo $report['id']; ?>);" 
+                                        class="ml-2 p-2 text-blue-600 hover:text-blue-800 active:text-blue-900 min-h-[44px] min-w-[44px] flex items-center justify-center">
+                                    <i class="fas fa-external-link-alt text-lg"></i>
+                                </button>
                             </div>
                             
-                            <div class="text-sm text-gray-600 mb-3 space-y-1">
-                                <div class="flex items-center">
-                                    <i class="fas fa-file-alt mr-2 text-gray-400 w-5"></i>
+                            <!-- Report Details -->
+                            <div class="space-y-2 mb-4">
+                                <!-- Report Type -->
+                                <div class="flex items-center text-sm text-gray-700">
+                                    <div class="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center mr-2 flex-shrink-0">
+                                        <?php if ($report['category'] == 'incident'): ?>
+                                            <i class="fas fa-exclamation-triangle text-red-500 text-xs"></i>
+                                        <?php elseif ($report['category'] == 'complaint'): ?>
+                                            <i class="fas fa-comments text-yellow-500 text-xs"></i>
+                                        <?php elseif ($report['category'] == 'blotter'): ?>
+                                            <i class="fas fa-file-alt text-green-500 text-xs"></i>
+                                        <?php else: ?>
+                                            <i class="fas fa-file text-gray-500 text-xs"></i>
+                                        <?php endif; ?>
+                                    </div>
                                     <span class="truncate"><?php echo htmlspecialchars($report['type_name']); ?></span>
                                 </div>
-                                <div class="flex items-center">
-                                    <i class="fas fa-calendar mr-2 text-gray-400 w-5"></i>
-                                    <span><?php echo $created_date; ?></span>
+                                
+                                <!-- Incident Date -->
+                                <div class="flex items-center text-sm text-gray-700">
+                                    <div class="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center mr-2 flex-shrink-0">
+                                        <i class="fas fa-calendar text-blue-500 text-xs"></i>
+                                    </div>
+                                    <span><?php echo $incident_date; ?></span>
                                 </div>
+                                
+                                <!-- Location -->
+                                <div class="flex items-center text-sm text-gray-700">
+                                    <div class="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center mr-2 flex-shrink-0">
+                                        <i class="fas fa-map-marker-alt text-green-500 text-xs"></i>
+                                    </div>
+                                    <span class="truncate"><?php echo htmlspecialchars($report['location']); ?></span>
+                                </div>
+                                
+                                <!-- Assigned Officer (if any) -->
                                 <?php if (!empty($report['first_name'])): ?>
-                                    <div class="flex items-center">
-                                        <i class="fas fa-user-check mr-2 text-gray-400 w-5"></i>
+                                    <div class="flex items-center text-sm text-gray-700">
+                                        <div class="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center mr-2 flex-shrink-0">
+                                            <i class="fas fa-user-check text-purple-500 text-xs"></i>
+                                        </div>
                                         <span class="truncate"><?php echo htmlspecialchars($report['first_name'] . ' ' . $report['last_name']); ?></span>
                                     </div>
                                 <?php endif; ?>
+                                
+                                <!-- Unread Messages -->
                                 <?php if ($report['unread_messages'] > 0): ?>
-                                    <div class="flex items-center text-blue-600 font-medium">
-                                        <i class="fas fa-envelope mr-2 w-5"></i>
+                                    <div class="flex items-center text-sm font-medium text-blue-600">
+                                        <div class="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center mr-2 flex-shrink-0">
+                                            <i class="fas fa-envelope text-blue-600 text-xs"></i>
+                                        </div>
                                         <span><?php echo $report['unread_messages']; ?> new message<?php echo $report['unread_messages'] > 1 ? 's' : ''; ?></span>
+                                    </div>
+                                <?php endif; ?>
+                                
+                                <!-- Evidence Files -->
+                                <?php if (!empty($report['evidence_files_parsed'])): ?>
+                                    <div class="flex items-center text-sm text-gray-700">
+                                        <div class="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center mr-2 flex-shrink-0">
+                                            <i class="fas fa-paperclip text-gray-500 text-xs"></i>
+                                        </div>
+                                        <span><?php echo count($report['evidence_files_parsed']); ?> attachment<?php echo count($report['evidence_files_parsed']) > 1 ? 's' : ''; ?></span>
                                     </div>
                                 <?php endif; ?>
                             </div>
                             
-                            <!-- Mobile Actions with better touch targets -->
-                            <div class="flex space-x-3 mt-4">
-                                <button onclick="viewReportDetails(<?php echo $report['id']; ?>);" 
-                                        class="flex-1 px-3 py-3 bg-blue-50 text-blue-700 rounded-lg text-sm font-medium hover:bg-blue-100 active:bg-blue-200 active:scale-95 transition-transform duration-150 min-h-[44px] touch-button flex flex-col items-center justify-center">
-                                    <i class="fas fa-eye text-lg mb-1"></i>
+                            <!-- Action Buttons -->
+                            <div class="flex space-x-2 mt-4">
+                                <!-- View Button -->
+                                <button onclick="mobileViewReportDetails(<?php echo $report['id']; ?>);" 
+                                        class="flex-1 px-3 py-3 bg-blue-50 border border-blue-200 text-blue-700 rounded-lg text-sm font-medium hover:bg-blue-100 active:bg-blue-200 active:scale-95 transition-transform duration-150 min-h-[44px] touch-button flex flex-col items-center justify-center">
+                                    <i class="fas fa-eye text-base mb-1"></i>
                                     <span class="text-xs font-medium">View</span>
                                 </button>
-                                <button onclick="viewReportTimeline(<?php echo $report['id']; ?>);" 
-                                        class="flex-1 px-3 py-3 bg-gray-50 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-100 active:bg-gray-200 active:scale-95 transition-transform duration-150 min-h-[44px] touch-button flex flex-col items-center justify-center">
-                                    <i class="fas fa-history text-lg mb-1"></i>
+                                
+                                <!-- Timeline Button -->
+                                <button onclick="mobileViewReportTimeline(<?php echo $report['id']; ?>);" 
+                                        class="flex-1 px-3 py-3 bg-gray-50 border border-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-100 active:bg-gray-200 active:scale-95 transition-transform duration-150 min-h-[44px] touch-button flex flex-col items-center justify-center">
+                                    <i class="fas fa-history text-base mb-1"></i>
                                     <span class="text-xs font-medium">Timeline</span>
                                 </button>
-                                <button onclick="printReport(<?php echo $report['id']; ?>);" 
-                                        class="flex-1 px-3 py-3 bg-green-500 text-white rounded-lg text-sm font-medium hover:bg-green-600 active:bg-green-700 active:scale-95 transition-transform duration-150 min-h-[44px] touch-button flex flex-col items-center justify-center">
-                                    <i class="fas fa-print text-lg mb-1"></i>
+                                
+                                <!-- Print Button -->
+                                <button onclick="mobilePrintReport(<?php echo $report['id']; ?>);" 
+                                        class="flex-1 px-3 py-3 bg-green-500 border border-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-600 active:bg-green-700 active:scale-95 transition-transform duration-150 min-h-[44px] touch-button flex flex-col items-center justify-center">
+                                    <i class="fas fa-print text-base mb-1"></i>
                                     <span class="text-xs font-medium">Print</span>
                                 </button>
                             </div>
                             
-                            <!-- Additional Info -->
+                            <!-- Additional Quick Actions -->
                             <div class="mt-3 pt-3 border-t border-gray-100">
-                                <div class="flex justify-between items-center text-xs text-gray-500">
-                                    <span class="flex items-center">
-                                        <i class="fas fa-map-marker-alt mr-1"></i>
-                                        <span class="truncate max-w-[120px] inline-block align-middle">
-                                            <?php echo htmlspecialchars($report['location']); ?>
-                                        </span>
-                                    </span>
-                                    <?php if (!empty($report['evidence_files_parsed'])): ?>
-                                        <span class="text-blue-600 flex items-center">
-                                            <i class="fas fa-paperclip mr-1"></i>
-                                            <?php echo count($report['evidence_files_parsed']); ?> file<?php echo count($report['evidence_files_parsed']) > 1 ? 's' : ''; ?>
+                                <div class="flex justify-between items-center">
+                                    <!-- Report Date -->
+                                    <div class="text-xs text-gray-500">
+                                        <i class="far fa-clock mr-1"></i>
+                                        Submitted: <?php echo $created_date; ?>
+                                    </div>
+                                    
+                                    <!-- Priority Badge -->
+                                    <?php if (!empty($report['priority']) && $report['priority'] != 'normal'): ?>
+                                        <?php
+                                        $priority_colors = [
+                                            'low' => 'bg-gray-100 text-gray-800',
+                                            'normal' => 'bg-blue-100 text-blue-800',
+                                            'high' => 'bg-orange-100 text-orange-800',
+                                            'urgent' => 'bg-red-100 text-red-800'
+                                        ];
+                                        $priority_color = $priority_colors[$report['priority']] ?? 'bg-gray-100 text-gray-800';
+                                        ?>
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium <?php echo $priority_color; ?>">
+                                            <i class="fas fa-flag mr-1 text-xs"></i>
+                                            <?php echo ucfirst($report['priority']); ?>
                                         </span>
                                     <?php endif; ?>
                                 </div>
@@ -779,13 +854,77 @@ document.addEventListener('touchend', function(event) {
     lastTouchEnd = now;
 }, false);
 
-// View Report Details
-function viewReportDetails(reportId) {
-    // Haptic feedback for mobile
-    if (isTouchDevice && navigator.vibrate) {
-        navigator.vibrate(20);
+// Mobile-specific view function with better touch feedback
+function mobileViewReportDetails(reportId) {
+    // Add haptic feedback if available
+    if (navigator.vibrate) {
+        navigator.vibrate(30);
     }
     
+    // Add visual feedback to the button
+    const button = event?.target?.closest('button') || event?.target;
+    if (button) {
+        button.classList.add('active', 'scale-95');
+        setTimeout(() => {
+            button.classList.remove('active', 'scale-95');
+        }, 200);
+    }
+    
+    // Show loading toast
+    showToast('Loading report details...', 'info');
+    
+    // Call the main view function
+    viewReportDetails(reportId);
+}
+
+// Mobile-specific timeline function
+function mobileViewReportTimeline(reportId) {
+    // Add haptic feedback if available
+    if (navigator.vibrate) {
+        navigator.vibrate(30);
+    }
+    
+    // Add visual feedback to the button
+    const button = event?.target?.closest('button') || event?.target;
+    if (button) {
+        button.classList.add('active', 'scale-95');
+        setTimeout(() => {
+            button.classList.remove('active', 'scale-95');
+        }, 200);
+    }
+    
+    // Show loading toast
+    showToast('Loading timeline...', 'info');
+    
+    // Call the main timeline function
+    viewReportTimeline(reportId);
+}
+
+// Mobile-specific print function
+function mobilePrintReport(reportId) {
+    // Add haptic feedback if available
+    if (navigator.vibrate) {
+        navigator.vibrate(30);
+    }
+    
+    // Add visual feedback to the button
+    const button = event?.target?.closest('button') || event?.target;
+    if (button) {
+        button.classList.add('active', 'scale-95');
+        setTimeout(() => {
+            button.classList.remove('active', 'scale-95');
+        }, 200);
+    }
+    
+    // Show confirmation toast
+    showToast('Preparing to print report...', 'info');
+    
+    // Call the main print function
+    printReport(reportId);
+}
+
+// View Report Details
+function viewReportDetails(reportId) {
     // Show loading
     document.getElementById('modalContent').innerHTML = `
         <div class="flex justify-center items-center h-48">
@@ -830,11 +969,6 @@ function viewReportDetails(reportId) {
 
 // View Report Timeline
 function viewReportTimeline(reportId) {
-    // Haptic feedback for mobile
-    if (isTouchDevice && navigator.vibrate) {
-        navigator.vibrate(20);
-    }
-    
     document.getElementById('modalContent').innerHTML = `
         <div class="flex justify-center items-center h-48">
             <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600"></div>
@@ -1283,186 +1417,95 @@ function validateDateRange() {
     return true;
 }
 
-// Mobile touch event handlers
-function setupMobileTouchEvents() {
+// Enhanced mobile touch setup
+function setupMobileTouchSupport() {
     if (!isTouchDevice) return;
     
-    console.log('Setting up mobile touch events');
+    console.log('Setting up enhanced mobile touch support');
     
-    // Add touch feedback for buttons
-    const buttons = document.querySelectorAll('.touch-button');
-    buttons.forEach(button => {
-        button.addEventListener('touchstart', function(e) {
-            e.preventDefault();
+    // Add touch events to all interactive elements
+    document.querySelectorAll('.touch-button, button, a.button-like').forEach(element => {
+        // Prevent text selection on touch devices
+        element.style.webkitUserSelect = 'none';
+        element.style.userSelect = 'none';
+        element.style.webkitTapHighlightColor = 'transparent';
+        
+        // Add touch start/end events
+        element.addEventListener('touchstart', function(e) {
+            if (!this.classList.contains('touch-button')) return;
             this.classList.add('active', 'scale-95');
-        });
-        
-        button.addEventListener('touchend', function(e) {
-            e.preventDefault();
-            this.classList.remove('active', 'scale-95');
-        });
-        
-        button.addEventListener('touchcancel', function(e) {
-            e.preventDefault();
-            this.classList.remove('active', 'scale-95');
-        });
-    });
-    
-    // Add swipe detection for report cards (optional feature)
-    const reportCards = document.querySelectorAll('.mobile-report-card');
-    reportCards.forEach(card => {
-        let startX, startY, isScrolling;
-        
-        card.addEventListener('touchstart', function(e) {
-            startX = e.touches[0].clientX;
-            startY = e.touches[0].clientY;
-            isScrolling = undefined;
         }, { passive: true });
         
-        card.addEventListener('touchmove', function(e) {
-            if (!startX || !startY) return;
-            
-            const currentX = e.touches[0].clientX;
-            const currentY = e.touches[0].clientY;
-            
-            const diffX = startX - currentX;
-            const diffY = startY - currentY;
-            
-            if (isScrolling === undefined) {
-                isScrolling = Math.abs(diffY) > Math.abs(diffX);
-            }
-            
-            // If vertical scrolling, don't prevent default
-            if (isScrolling) return;
-            
-            // Horizontal swipe - prevent vertical scroll
-            e.preventDefault();
-        }, { passive: false });
+        element.addEventListener('touchend', function(e) {
+            if (!this.classList.contains('touch-button')) return;
+            this.classList.remove('active', 'scale-95');
+        }, { passive: true });
         
-        card.addEventListener('touchend', function(e) {
-            if (!startX || !startY) return;
-            
-            const endX = e.changedTouches[0].clientX;
-            const endY = e.changedTouches[0].clientY;
-            
-            const diffX = startX - endX;
-            const diffY = startY - endY;
-            
-            // Only trigger swipe if it's mostly horizontal and significant
-            if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 50) {
-                const reportId = this.dataset.reportId;
-                if (reportId) {
-                    // Right swipe (negative diffX) - show quick actions
-                    if (diffX < 0) {
-                        showMobileQuickActions(reportId);
-                    }
-                }
-            }
-            
-            startX = null;
-            startY = null;
+        element.addEventListener('touchcancel', function(e) {
+            if (!this.classList.contains('touch-button')) return;
+            this.classList.remove('active', 'scale-95');
         }, { passive: true });
     });
+    
+    // Add swipe to refresh functionality
+    let touchStartY = 0;
+    let touchEndY = 0;
+    
+    document.addEventListener('touchstart', function(e) {
+        touchStartY = e.touches[0].clientY;
+    }, { passive: true });
+    
+    document.addEventListener('touchend', function(e) {
+        touchEndY = e.changedTouches[0].clientY;
+        const swipeDistance = touchStartY - touchEndY;
+        
+        // If swiped down from top (pull to refresh)
+        if (swipeDistance < -100 && touchStartY < 100) {
+            showToast('Refreshing reports...', 'info');
+            setTimeout(() => {
+                location.reload();
+            }, 500);
+        }
+    }, { passive: true });
 }
 
-// Show mobile quick actions on swipe
-function showMobileQuickActions(reportId) {
-    // Remove existing quick actions
-    const existingActions = document.querySelector('.mobile-quick-actions');
-    if (existingActions) existingActions.remove();
+// Fix for iOS Safari 100vh issue
+function fixMobileViewport() {
+    // First we get the viewport height and we multiply it by 1% to get a value for a vh unit
+    let vh = window.innerHeight * 0.01;
+    // Then we set the value in the --vh custom property to the root of the document
+    document.documentElement.style.setProperty('--vh', `${vh}px`);
     
-    const quickActions = document.createElement('div');
-    quickActions.className = 'mobile-quick-actions fixed inset-x-0 bottom-0 bg-white border-t p-4 shadow-lg z-50 animate-slide-up';
-    quickActions.innerHTML = `
-        <div class="flex justify-between items-center mb-3">
-            <h4 class="font-medium text-gray-800 text-base">Quick Actions</h4>
-            <button onclick="closeMobileQuickActions()" class="text-gray-500 min-h-[44px] min-w-[44px] flex items-center justify-center">
-                <i class="fas fa-times text-xl"></i>
-            </button>
-        </div>
-        <div class="grid grid-cols-2 gap-3">
-            <button onclick="viewReportDetails(${reportId}); closeMobileQuickActions();" 
-                    class="p-3 bg-blue-50 text-blue-700 rounded-lg text-sm font-medium active:bg-blue-100 active:scale-95 transition-transform min-h-[44px] flex items-center justify-center">
-                <i class="fas fa-eye mr-2"></i> View Details
-            </button>
-            <button onclick="viewReportTimeline(${reportId}); closeMobileQuickActions();" 
-                    class="p-3 bg-gray-50 text-gray-700 rounded-lg text-sm font-medium active:bg-gray-100 active:scale-95 transition-transform min-h-[44px] flex items-center justify-center">
-                <i class="fas fa-history mr-2"></i> Timeline
-            </button>
-            <button onclick="printReport(${reportId}); closeMobileQuickActions();" 
-                    class="p-3 bg-green-500 text-white rounded-lg text-sm font-medium active:bg-green-600 active:scale-95 transition-transform min-h-[44px] flex items-center justify-center">
-                <i class="fas fa-print mr-2"></i> Print
-            </button>
-            <button onclick="shareReport(${reportId}); closeMobileQuickActions();" 
-                    class="p-3 bg-purple-500 text-white rounded-lg text-sm font-medium active:bg-purple-600 active:scale-95 transition-transform min-h-[44px] flex items-center justify-center">
-                <i class="fas fa-share-alt mr-2"></i> Share
-            </button>
-        </div>
-    `;
-    
-    document.body.appendChild(quickActions);
-    
-    // Add overlay
-    const overlay = document.createElement('div');
-    overlay.className = 'fixed inset-0 bg-black bg-opacity-25 z-40';
-    overlay.onclick = closeMobileQuickActions;
-    document.body.appendChild(overlay);
-}
-
-function closeMobileQuickActions() {
-    const actions = document.querySelector('.mobile-quick-actions');
-    const overlay = document.querySelector('.fixed.inset-0.bg-black.bg-opacity-25');
-    
-    if (actions) {
-        actions.classList.remove('animate-slide-up');
-        actions.classList.add('animate-slide-down');
-        setTimeout(() => actions.remove(), 300);
-    }
-    
-    if (overlay) {
-        overlay.remove();
-    }
-}
-
-// Share report function
-function shareReport(reportId) {
-    if (navigator.share) {
-        // Use Web Share API if available
-        navigator.share({
-            title: 'Report Details',
-            text: 'Check out this report',
-            url: `${BASE_URL}/?module=my-reports&view=${reportId}`
-        })
-        .then(() => showToast('Report shared successfully', 'success'))
-        .catch(error => {
-            console.log('Sharing cancelled or failed:', error);
-            showToast('Sharing cancelled', 'info');
-        });
-    } else {
-        // Fallback: copy to clipboard
-        const url = `${BASE_URL}/?module=my-reports&view=${reportId}`;
-        navigator.clipboard.writeText(url)
-            .then(() => showToast('Report link copied to clipboard', 'success'))
-            .catch(() => showToast('Failed to copy link', 'error'));
-    }
+    // We listen to the resize event
+    window.addEventListener('resize', () => {
+        let vh = window.innerHeight * 0.01;
+        document.documentElement.style.setProperty('--vh', `${vh}px`);
+    });
 }
 
 // Initialize
 document.addEventListener('DOMContentLoaded', function() {
     console.log('My Reports module loaded');
     
-    // Add touch device class to HTML if detected
     if (isTouchDevice) {
+        console.log('Touch device detected, enhancing mobile experience');
+        
+        // Add touch device class to HTML
         document.documentElement.classList.add('touch-device');
-        setupMobileTouchEvents();
-    }
-    
-    // Add viewport meta tag for mobile if not present
-    if (!document.querySelector('meta[name="viewport"]') && isTouchDevice) {
-        const meta = document.createElement('meta');
-        meta.name = 'viewport';
-        meta.content = 'width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes';
-        document.head.appendChild(meta);
+        
+        // Setup mobile touch support
+        setupMobileTouchSupport();
+        
+        // Fix viewport for mobile
+        fixMobileViewport();
+        
+        // Add viewport meta tag for mobile if not present
+        if (!document.querySelector('meta[name="viewport"]')) {
+            const meta = document.createElement('meta');
+            meta.name = 'viewport';
+            meta.content = 'width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes';
+            document.head.appendChild(meta);
+        }
     }
     
     // Add event listener for filter form
@@ -1507,9 +1550,24 @@ document.addEventListener('DOMContentLoaded', function() {
         if (e.key === 'Escape') {
             closeModal();
             closeAttachmentViewer();
-            closeMobileQuickActions();
         }
     });
+    
+    // Initialize all interactive elements
+    setTimeout(() => {
+        if (isTouchDevice) {
+            // Ensure all buttons are properly sized for touch
+            document.querySelectorAll('button').forEach(btn => {
+                const rect = btn.getBoundingClientRect();
+                if (rect.height < 44 || rect.width < 44) {
+                    btn.classList.add('min-h-[44px]');
+                    if (rect.width < 44) {
+                        btn.classList.add('min-w-[44px]');
+                    }
+                }
+            });
+        }
+    }, 100);
 });
 </script>
 
@@ -1551,37 +1609,6 @@ document.addEventListener('DOMContentLoaded', function() {
         transform: translateX(0);
         opacity: 1;
     }
-}
-
-/* Mobile quick actions animations */
-@keyframes slideUp {
-    from {
-        transform: translateY(100%);
-        opacity: 0;
-    }
-    to {
-        transform: translateY(0);
-        opacity: 1;
-    }
-}
-
-@keyframes slideDown {
-    from {
-        transform: translateY(0);
-        opacity: 1;
-    }
-    to {
-        transform: translateY(100%);
-        opacity: 0;
-    }
-}
-
-.animate-slide-up {
-    animation: slideUp 0.3s ease-out;
-}
-
-.animate-slide-down {
-    animation: slideDown 0.3s ease-out;
 }
 
 /* Responsive table */
@@ -1633,137 +1660,84 @@ img {
     }
 }
 
-/* Mobile touch enhancements */
+/* Mobile-specific fixes */
 @media (max-width: 768px) {
-    /* Minimum touch target size (44px x 44px recommended by Apple) */
-    .touch-target,
-    .touch-button,
-    button:not(.touch-none),
-    a.button-like,
-    input[type="submit"],
-    input[type="button"] {
-        min-height: 44px;
-        min-width: 44px;
+    /* Ensure buttons are large enough for touch */
+    button, .touch-button {
+        min-height: 44px !important;
+        min-width: 44px !important;
+        padding: 12px 16px !important;
+        font-size: 14px !important;
     }
     
-    /* Better spacing for touch */
-    .space-touch > * + * {
-        margin-top: 12px;
+    /* Better touch feedback */
+    .touch-button:active {
+        transform: scale(0.95) !important;
+        transition: transform 0.1s !important;
     }
     
-    /* Larger font sizes for readability */
-    body {
-        font-size: 16px;
+    /* Improve report card spacing */
+    .mobile-report-card {
+        padding: 16px !important;
+        margin-bottom: 8px !important;
     }
     
-    /* Prevent unwanted text selection */
-    .touch-manipulation {
-        -webkit-user-select: none;
-        user-select: none;
-        -webkit-touch-callout: none;
+    /* Ensure text is readable */
+    body, .text-sm, .text-xs {
+        font-size: 14px !important;
     }
     
-    /* Better feedback for touch interactions */
-    .touch-button:active,
-    button:active:not(:disabled) {
-        transform: scale(0.95);
-        transition: transform 0.1s;
+    /* Fix for iOS Safari */
+    @supports (-webkit-touch-callout: none) {
+        .min-h-\[44px\] {
+            min-height: 44px !important;
+        }
+        
+        input, select, textarea {
+            font-size: 16px !important;
+        }
     }
     
-    /* Improve form inputs on mobile */
-    select,
-    input[type="date"],
-    input[type="text"],
-    input[type="email"],
-    input[type="password"] {
-        font-size: 16px !important; /* Prevents iOS zoom on focus */
-        height: 44px;
+    /* Prevent zoom on iOS */
+    input, select, textarea {
+        font-size: 16px !important;
     }
     
-    /* Better scroll experience */
+    /* Fix 100vh issue on mobile */
+    .h-screen {
+        height: 100vh;
+        height: calc(var(--vh, 1vh) * 100);
+    }
+    
+    /* Better scrolling */
     .overflow-y-auto {
         -webkit-overflow-scrolling: touch;
     }
     
-    /* Remove hover effects on touch devices */
-    .touch-device .hover\:bg-blue-100:hover,
-    .touch-device .hover\:bg-blue-600:hover,
-    .touch-device .hover\:bg-gray-100:hover,
-    .touch-device .hover\:bg-green-600:hover {
+    /* Remove hover effects on mobile */
+    .touch-device .hover\\:bg-blue-100:hover,
+    .touch-device .hover\\:bg-blue-600:hover,
+    .touch-device .hover\\:bg-gray-100:hover,
+    .touch-device .hover\\:bg-green-600:hover {
         background-color: inherit !important;
-    }
-    
-    /* Add active states for touch */
-    .active\:bg-blue-50:active {
-        background-color: #eff6ff !important;
-    }
-    
-    .active\:bg-blue-200:active {
-        background-color: #bfdbfe !important;
-    }
-    
-    .active\:scale-95:active {
-        transform: scale(0.95) !important;
-    }
-    
-    /* Larger hit areas for mobile */
-    .mobile-hit-area {
-        padding: 12px;
-        margin: -12px;
-    }
-    
-    /* Mobile report card improvements */
-    .mobile-report-card {
-        position: relative;
-        transition: transform 0.2s ease;
-    }
-    
-    .mobile-report-card:active:not(.swiping) {
-        background-color: #f9fafb;
-    }
-    
-    /* Swipe indicators */
-    .mobile-report-card::after {
-        content: '';
-        position: absolute;
-        right: 10px;
-        top: 50%;
-        transform: translateY(-50%);
-        width: 20px;
-        height: 20px;
-        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%236b7280'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M9 5l7 7-7 7'%3E%3C/path%3E%3C/svg%3E");
-        background-repeat: no-repeat;
-        background-position: center;
-        opacity: 0.5;
-        transition: opacity 0.2s;
-    }
-    
-    .mobile-report-card:hover::after {
-        opacity: 0.8;
     }
 }
 
-/* Desktop hover effects (only apply on non-touch) */
-@media (hover: hover) and (pointer: fine) {
-    .hover\:bg-blue-100:hover {
-        background-color: #dbeafe !important;
+/* iOS specific fixes */
+@supports (-webkit-touch-callout: none) {
+    input, select, textarea {
+        font-size: 16px !important;
     }
     
-    .hover\:bg-blue-600:hover {
-        background-color: #2563eb !important;
+    .touch-button {
+        cursor: pointer;
     }
-    
-    .hover\:bg-gray-100:hover {
-        background-color: #f3f4f6 !important;
-    }
-    
-    .hover\:bg-green-600:hover {
-        background-color: #16a34a !important;
-    }
-    
-    /* Remove mobile swipe indicators on desktop */
-    .mobile-report-card::after {
-        display: none;
+}
+
+/* Android specific fixes */
+@supports not (-webkit-touch-callout: none) {
+    .touch-button:active {
+        background-color: rgba(0, 0, 0, 0.1) !important;
     }
 }
 
@@ -1848,32 +1822,6 @@ button:not(:disabled):hover {
 select:focus {
     outline: 2px solid #3b82f6;
     outline-offset: 2px;
-}
-
-/* iOS specific fixes */
-@supports (-webkit-touch-callout: none) {
-    /* Safari specific styles */
-    select,
-    input[type="date"] {
-        height: 44px;
-    }
-    
-    /* Prevent zoom on iOS */
-    @media screen and (max-width: 768px) {
-        input,
-        select,
-        textarea {
-            font-size: 16px !important;
-        }
-    }
-}
-
-/* Android specific fixes */
-@supports not (-webkit-touch-callout: none) {
-    /* Android specific styles */
-    .touch-button:active {
-        background-color: rgba(0, 0, 0, 0.1);
-    }
 }
 
 /* Dark mode support (optional) */
