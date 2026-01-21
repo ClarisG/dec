@@ -548,12 +548,6 @@ function getModuleTitle($module) {
         <header class="bg-white shadow-sm sticky top-0 z-30">
             <div class="px-4 sm:px-6 lg:px-8">
                 <div class="flex justify-between items-center py-4">
-                    <!-- Left: Mobile Menu Button -->
-                    <div class="md:hidden">
-                        <button id="mobileMenuButton" class="text-gray-600 hover:text-gray-900 focus:outline-none">
-                            <i class="fas fa-bars text-2xl"></i>
-                        </button>
-                    </div>
                     
                     <!-- Center: Page Title -->
                     <div class="flex-1 text-center md:text-left">
@@ -582,38 +576,7 @@ function getModuleTitle($module) {
                                 <span class="hidden md:inline text-gray-700 font-medium"><?php echo htmlspecialchars($_SESSION['first_name']); ?></span>
                                 <i class="fas fa-chevron-down text-gray-400"></i>
                             </button>
-                            
-                            <!-- User Dropdown -->
-                            <div id="userDropdown" class="hidden absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-xl border z-40">
-                                <div class="p-4 border-b">
-                                    <div class="flex items-center space-x-3 mb-2">
-                                        <?php 
-                                        if (!empty($_SESSION['profile_picture'] ?? $profile_picture) && file_exists($full_path)): 
-                                        ?>
-                                            <img id="dropdownProfileImage" src="<?php echo $profile_pic_path . '?t=' . $timestamp; ?>" 
-                                                 alt="Profile" class="w-10 h-10 rounded-full object-cover">
-                                        <?php else: ?>
-                                            <div id="dropdownProfileDefault" class="w-10 h-10 rounded-full bg-gradient-to-r from-blue-600 to-blue-500 flex items-center justify-center text-white font-bold">
-                                                <?php echo strtoupper(substr($full_name, 0, 1)); ?>
-                                            </div>
-                                        <?php endif; ?>
-                                        <div>
-                                            <p class="text-sm font-medium text-gray-900"><?php echo htmlspecialchars($full_name); ?></p>
-                                            <p class="text-xs text-gray-500">Citizen</p>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="p-2">
-                                    <a href="?module=profile" class="flex items-center px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded">
-                                        <i class="fas fa-user mr-2"></i>
-                                        Profile Settings
-                                    </a>
-                                    <a href="logout.php" class="flex items-center px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded">
-                                        <i class="fas fa-sign-out-alt mr-2"></i>
-                                        Logout
-                                    </a>
-                                </div>
-                            </div>
+                                  
                         </div>
                     </div>
                 </div>
