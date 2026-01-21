@@ -1450,7 +1450,6 @@ button:hover {
 /* Records per page selector */
 select:focus {
     outline: none;
-    ring: 2px;
-    ring-color: #3b82f6;
+    box-shadow: 0 0 0 2px #3b82f6; /* Equivalent to ring-2 and ring-blue-500 */
 }
 </style>
