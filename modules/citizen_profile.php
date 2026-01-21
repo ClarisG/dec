@@ -42,14 +42,15 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $new_image_uploaded = false;
             $image_url = '';
             
-            if (!empty($_FILES['profile_picture']['name'])) {
+            if (!empty($_FILES['profile_picture']['name']) && $_FILES['profile_picture']['error'] == 0) {
                 $upload_dir = __DIR__ . "/../uploads/profile_pictures/";
                 if (!file_exists($upload_dir)) {
                     mkdir($upload_dir, 0777, true);
                 }
                 
                 // Generate unique filename
-                $file_name = time() . '_' . uniqid() . '_' . preg_replace('/[^a-zA-Z0-9\.\_\-]/', '', basename($_FILES['profile_picture']['name']));
+                $file_name = time() . '_' . uniqid() . '_' . basename($_FILES['profile_picture']['name']);
+                $file_name = preg_replace('/[^a-zA-Z0-9\.\_\-]/', '', $file_name);
                 $file_path = $upload_dir . $file_name;
                 
                 // Check if image file
@@ -64,7 +65,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                         if (move_uploaded_file($_FILES['profile_picture']['tmp_name'], $file_path)) {
                             // Delete old profile picture if exists
                             if (!empty($profile_picture) && file_exists($upload_dir . $profile_picture)) {
-                                unlink($upload_dir . $profile_picture);
+                                @unlink($upload_dir . $profile_picture);
                             }
                             
                             $profile_picture = $file_name;
@@ -162,194 +163,199 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 }
 ?>
 
-<div class="max-w-4xl mx-auto">
+<div class="max-w-6xl mx-auto px-4">
+    <!-- Page Header -->
+    <div class="mb-8">
+        <h1 class="text-2xl font-bold text-gray-800">Profile Settings</h1>
+        <p class="text-gray-600">Manage your account information and security settings</p>
+    </div>
+    
     <!-- Error/Success Messages -->
     <?php if ($error): ?>
-        <div class="bg-red-50 border-l-4 border-red-500 p-4 mb-6 rounded-lg animate-fade-in">
+        <div class="mb-6 bg-red-50 border border-red-200 rounded-lg p-4 animate-fade-in">
             <div class="flex items-center">
-                <i class="fas fa-exclamation-circle text-red-500 mr-3"></i>
-                <p class="text-red-700"><?php echo $error; ?></p>
+                <div class="flex-shrink-0">
+                    <i class="fas fa-exclamation-circle text-red-500 text-lg"></i>
+                </div>
+                <div class="ml-3">
+                    <p class="text-sm text-red-700"><?php echo $error; ?></p>
+                </div>
             </div>
         </div>
     <?php endif; ?>
     
     <?php if ($success): ?>
-        <div class="bg-green-50 border-l-4 border-green-500 p-4 mb-6 rounded-lg animate-fade-in">
+        <div class="mb-6 bg-green-50 border border-green-200 rounded-lg p-4 animate-fade-in">
             <div class="flex items-center">
-                <i class="fas fa-check-circle text-green-500 mr-3"></i>
-                <p class="text-green-700"><?php echo $success; ?></p>
+                <div class="flex-shrink-0">
+                    <i class="fas fa-check-circle text-green-500 text-lg"></i>
+                </div>
+                <div class="ml-3">
+                    <p class="text-sm text-green-700"><?php echo $success; ?></p>
+                </div>
             </div>
         </div>
     <?php endif; ?>
     
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <!-- Left Column - Profile Info -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Left Column - Profile Summary -->
         <div class="lg:col-span-1">
-            <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 transform transition-all duration-300 hover:shadow-xl">
-                <div class="text-center mb-6">
-                    <!-- Profile Picture -->
-                    <div class="relative w-40 h-40 mx-auto mb-4 group">
-                        <div id="profileImagePreview" class="w-full h-full rounded-full overflow-hidden bg-gradient-to-br from-blue-50 to-indigo-50 border-4 border-white shadow-xl">
-                            <?php 
-                            $current_profile_pic = $_SESSION['profile_picture'] ?? $user['profile_picture'] ?? '';
-                            $profile_pic_path = "uploads/profile_pictures/" . $current_profile_pic;
-                            $full_path = __DIR__ . "/../" . $profile_pic_path;
-                            
-                            if (!empty($current_profile_pic) && file_exists($full_path)): 
-                                $timestamp = filemtime($full_path);
-                            ?>
-                                <img src="<?php echo $profile_pic_path . '?t=' . $timestamp; ?>" 
-                                     alt="Profile Picture" 
-                                     class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-                                     id="currentProfileImage">
-                            <?php else: ?>
-                                <div class="w-full h-full flex items-center justify-center bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-5xl font-bold transition-all duration-300 group-hover:from-blue-700 group-hover:to-indigo-700"
-                                     id="defaultProfileImage">
-                                    <?php 
-                                    $firstName = $_SESSION['first_name'] ?? $user['first_name'] ?? 'U';
-                                    echo strtoupper(substr($firstName, 0, 1)); 
-                                    ?>
-                                </div>
-                            <?php endif; ?>
+            <div class="bg-white rounded-xl shadow-sm border border-gray-200">
+                <!-- Profile Header -->
+                <div class="p-6 border-b border-gray-100">
+                    <div class="flex items-center">
+                        <!-- Profile Picture -->
+                        <div class="relative">
+                            <div class="w-20 h-20 rounded-full overflow-hidden border-4 border-white shadow-md bg-gradient-to-br from-blue-50 to-indigo-50">
+                                <?php 
+                                $current_profile_pic = $_SESSION['profile_picture'] ?? $user['profile_picture'] ?? '';
+                                $profile_pic_path = "uploads/profile_pictures/" . $current_profile_pic;
+                                $full_path = __DIR__ . "/../" . $profile_pic_path;
+                                
+                                if (!empty($current_profile_pic) && file_exists($full_path)): 
+                                    $timestamp = filemtime($full_path);
+                                ?>
+                                    <img src="<?php echo $profile_pic_path . '?t=' . $timestamp; ?>" 
+                                         alt="Profile Picture" 
+                                         class="w-full h-full object-cover"
+                                         id="currentProfileImage">
+                                <?php else: ?>
+                                    <div class="w-full h-full flex items-center justify-center bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-2xl font-bold"
+                                         id="defaultProfileImage">
+                                        <?php 
+                                        $firstName = $_SESSION['first_name'] ?? $user['first_name'] ?? 'U';
+                                        echo strtoupper(substr($firstName, 0, 1)); 
+                                        ?>
+                                    </div>
+                                <?php endif; ?>
+                            </div>
+                            <label for="profile_picture" class="absolute -bottom-1 -right-1 w-8 h-8 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-full flex items-center justify-center cursor-pointer hover:from-blue-700 hover:to-indigo-700 shadow-lg transition-all duration-200">
+                                <i class="fas fa-camera text-white text-sm"></i>
+                                <input type="file" id="profile_picture" name="profile_picture" class="hidden" accept="image/*" onchange="previewProfileImage(this)">
+                            </label>
                         </div>
-                        <label for="profile_picture" class="absolute bottom-4 right-4 w-12 h-12 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-full flex items-center justify-center cursor-pointer hover:from-blue-700 hover:to-indigo-700 shadow-xl transition-all duration-300 transform hover:scale-110 group">
-                            <i class="fas fa-camera text-white text-lg"></i>
-                            <input type="file" id="profile_picture" name="profile_picture" class="hidden" accept="image/*" onchange="previewProfileImage(this)">
-                        </label>
-                        <div class="absolute -bottom-2 left-1/2 transform -translate-x-1/2 bg-white px-3 py-1 rounded-full shadow-md text-xs text-gray-600 font-medium opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                            Click to change
+                        
+                        <div class="ml-4">
+                            <h3 class="text-lg font-semibold text-gray-800"><?php echo htmlspecialchars($user['first_name'] . ' ' . $user['last_name']); ?></h3>
+                            <div class="flex items-center mt-1">
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                    <i class="fas fa-user-circle mr-1 text-xs"></i>
+                                    Citizen
+                                </span>
+                                <span class="ml-2 text-xs text-gray-500">
+                                    <i class="far fa-calendar mr-1"></i>
+                                    Joined <?php echo date('M Y', strtotime($user['created_at'])); ?>
+                                </span>
+                            </div>
                         </div>
                     </div>
-                    
-                    <h3 class="text-2xl font-bold text-gray-800 mb-1"><?php echo htmlspecialchars($user['first_name'] . ' ' . $user['last_name']); ?></h3>
-                    <div class="inline-flex items-center px-3 py-1 rounded-full bg-gradient-to-r from-blue-100 to-indigo-100 text-blue-600 text-sm font-medium mb-2">
-                        <i class="fas fa-user-circle mr-2"></i> Citizen
-                    </div>
-                    <p class="text-sm text-gray-500 mt-2">
-                        <i class="far fa-calendar-alt mr-1"></i>
-                        Member since <?php echo date('F Y', strtotime($user['created_at'])); ?>
-                    </p>
                 </div>
                 
-                <div class="space-y-4">
-                    <div class="bg-gradient-to-r from-blue-50 to-indigo-50 p-4 rounded-xl border border-blue-100">
-                        <div class="flex items-start mb-2">
-                            <div class="w-10 h-10 rounded-full bg-gradient-to-r from-blue-500 to-indigo-500 flex items-center justify-center mr-3">
-                                <i class="fas fa-user text-white"></i>
+                <!-- Profile Details -->
+                <div class="p-4">
+                    <div class="space-y-4">
+                        <div class="flex items-start">
+                            <div class="flex-shrink-0 w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center">
+                                <i class="fas fa-envelope text-blue-600 text-sm"></i>
                             </div>
-                            <div>
-                                <p class="text-sm text-gray-500">Full Name</p>
-                                <p class="font-semibold text-gray-800"><?php echo htmlspecialchars($user['first_name'] . ' ' . $user['last_name']); ?></p>
+                            <div class="ml-3">
+                                <p class="text-xs text-gray-500">Email</p>
+                                <p class="text-sm font-medium text-gray-900 truncate"><?php echo htmlspecialchars($_SESSION['email'] ?? $user['email']); ?></p>
                             </div>
                         </div>
-                        <p class="text-xs text-gray-400 pl-13 mt-2">
-                            <i class="fas fa-info-circle mr-1"></i>
-                            Name cannot be changed for security reasons
+                        
+                        <div class="flex items-start">
+                            <div class="flex-shrink-0 w-8 h-8 rounded-lg bg-green-50 flex items-center justify-center">
+                                <i class="fas fa-phone text-green-600 text-sm"></i>
+                            </div>
+                            <div class="ml-3">
+                                <p class="text-xs text-gray-500">Phone</p>
+                                <p class="text-sm font-medium text-gray-900"><?php echo htmlspecialchars($_SESSION['contact_number'] ?? $user['contact_number']); ?></p>
+                            </div>
+                        </div>
+                        
+                        <div class="flex items-start">
+                            <div class="flex-shrink-0 w-8 h-8 rounded-lg bg-orange-50 flex items-center justify-center">
+                                <i class="fas fa-map-marker-alt text-orange-600 text-sm"></i>
+                            </div>
+                            <div class="ml-3">
+                                <p class="text-xs text-gray-500">Address</p>
+                                <p class="text-sm font-medium text-gray-900"><?php echo htmlspecialchars($_SESSION['permanent_address'] ?? $user['permanent_address']); ?></p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mt-6 pt-4 border-t border-gray-100">
+                        <p class="text-xs text-gray-500">
+                            <i class="fas fa-info-circle mr-1 text-gray-400"></i>
+                            Your full name cannot be changed for security purposes.
                         </p>
-                    </div>
-                    
-                    <div class="flex items-start p-3 rounded-lg hover:bg-gray-50 transition-colors duration-200">
-                        <div class="w-10 h-10 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 flex items-center justify-center mr-3 flex-shrink-0">
-                            <i class="fas fa-envelope text-white"></i>
-                        </div>
-                        <div class="flex-1 min-w-0">
-                            <p class="text-sm text-gray-500">Email Address</p>
-                            <p class="font-medium text-gray-800 truncate"><?php echo htmlspecialchars($_SESSION['email'] ?? $user['email']); ?></p>
-                        </div>
-                    </div>
-                    
-                    <div class="flex items-start p-3 rounded-lg hover:bg-gray-50 transition-colors duration-200">
-                        <div class="w-10 h-10 rounded-full bg-gradient-to-r from-green-500 to-emerald-500 flex items-center justify-center mr-3 flex-shrink-0">
-                            <i class="fas fa-phone text-white"></i>
-                        </div>
-                        <div class="flex-1 min-w-0">
-                            <p class="text-sm text-gray-500">Phone Number</p>
-                            <p class="font-medium text-gray-800"><?php echo htmlspecialchars($_SESSION['contact_number'] ?? $user['contact_number']); ?></p>
-                        </div>
-                    </div>
-                    
-                    <div class="flex items-start p-3 rounded-lg hover:bg-gray-50 transition-colors duration-200">
-                        <div class="w-10 h-10 rounded-full bg-gradient-to-r from-orange-500 to-red-500 flex items-center justify-center mr-3 flex-shrink-0">
-                            <i class="fas fa-map-marker-alt text-white"></i>
-                        </div>
-                        <div class="flex-1 min-w-0">
-                            <p class="text-sm text-gray-500">Residential Address</p>
-                            <p class="font-medium text-gray-800"><?php echo htmlspecialchars($_SESSION['permanent_address'] ?? $user['permanent_address']); ?></p>
-                        </div>
                     </div>
                 </div>
             </div>
         </div>
         
         <!-- Right Column - Forms -->
-        <div class="lg:col-span-2 space-y-8">
+        <div class="lg:col-span-2 space-y-6">
             <!-- Update Profile Form -->
-            <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 transform transition-all duration-300 hover:shadow-xl">
-                <div class="flex items-center mb-6 pb-4 border-b border-gray-100">
-                    <div class="w-12 h-12 rounded-xl bg-gradient-to-r from-blue-500 to-indigo-500 flex items-center justify-center mr-4">
-                        <i class="fas fa-user-edit text-white text-lg"></i>
-                    </div>
-                    <div>
-                        <h3 class="text-xl font-bold text-gray-800">Update Contact Information</h3>
-                        <p class="text-sm text-gray-500">Manage your account details and contact information</p>
+            <div class="bg-white rounded-xl shadow-sm border border-gray-200">
+                <div class="p-6 border-b border-gray-100">
+                    <div class="flex items-center">
+                        <div class="w-10 h-10 rounded-lg bg-gradient-to-r from-blue-500 to-indigo-500 flex items-center justify-center mr-3">
+                            <i class="fas fa-user-edit text-white text-sm"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-lg font-semibold text-gray-800">Personal Information</h3>
+                            <p class="text-sm text-gray-500">Update your contact details</p>
+                        </div>
                     </div>
                 </div>
                 
-                <form method="POST" enctype="multipart/form-data" id="profileForm" class="space-y-6">
-                    <div class="space-y-2">
-                        <label class="block text-sm font-semibold text-gray-700">
-                            <span class="flex items-center">
-                                <i class="fas fa-envelope mr-2 text-blue-500"></i>
-                                Email Address
-                            </span>
-                        </label>
-                        <input type="email" name="email" required
-                               class="w-full px-4 py-3.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 bg-gray-50/50"
-                               value="<?php echo htmlspecialchars($_SESSION['email'] ?? $user['email']); ?>"
-                               placeholder="your.email@example.com">
-                        <p class="text-xs text-gray-500 flex items-center mt-1">
-                            <i class="fas fa-info-circle mr-1 text-blue-400"></i>
-                            This email will be used for account notifications and recovery
-                        </p>
+                <form method="POST" enctype="multipart/form-data" id="profileForm" class="p-6">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">
+                                <span class="flex items-center">
+                                    <i class="fas fa-envelope mr-2 text-blue-500 text-xs"></i>
+                                    Email Address
+                                </span>
+                            </label>
+                            <input type="email" name="email" required
+                                   class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm transition-colors"
+                                   value="<?php echo htmlspecialchars($_SESSION['email'] ?? $user['email']); ?>"
+                                   placeholder="your.email@example.com">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">
+                                <span class="flex items-center">
+                                    <i class="fas fa-phone mr-2 text-green-500 text-xs"></i>
+                                    Contact Number
+                                </span>
+                            </label>
+                            <input type="tel" name="contact_number" required
+                                   class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 text-sm transition-colors"
+                                   value="<?php echo htmlspecialchars($_SESSION['contact_number'] ?? $user['contact_number']); ?>"
+                                   placeholder="+63 XXX XXX XXXX">
+                        </div>
                     </div>
                     
-                    <div class="space-y-2">
-                        <label class="block text-sm font-semibold text-gray-700">
+                    <div class="mt-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">
                             <span class="flex items-center">
-                                <i class="fas fa-phone mr-2 text-green-500"></i>
-                                Contact Number
-                            </span>
-                        </label>
-                        <input type="tel" name="contact_number" required
-                               class="w-full px-4 py-3.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all duration-200 bg-gray-50/50"
-                               value="<?php echo htmlspecialchars($_SESSION['contact_number'] ?? $user['contact_number']); ?>"
-                               placeholder="+63 XXX XXX XXXX">
-                        <p class="text-xs text-gray-500 flex items-center mt-1">
-                            <i class="fas fa-info-circle mr-1 text-green-400"></i>
-                            Your mobile number for emergency contact and verification
-                        </p>
-                    </div>
-                    
-                    <div class="space-y-2">
-                        <label class="block text-sm font-semibold text-gray-700">
-                            <span class="flex items-center">
-                                <i class="fas fa-home mr-2 text-orange-500"></i>
+                                <i class="fas fa-home mr-2 text-orange-500 text-xs"></i>
                                 Residential Address
                             </span>
                         </label>
-                        <textarea name="permanent_address" rows="4"
-                                  class="w-full px-4 py-3.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all duration-200 bg-gray-50/50 resize-none"
+                        <textarea name="permanent_address" rows="3"
+                                  class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-sm transition-colors resize-none"
                                   placeholder="House No., Street, Barangay, City, Province"><?php echo htmlspecialchars($_SESSION['permanent_address'] ?? $user['permanent_address']); ?></textarea>
-                        <p class="text-xs text-gray-500 flex items-center mt-1">
-                            <i class="fas fa-info-circle mr-1 text-orange-400"></i>
-                            Complete address including barangay for accurate service delivery
-                        </p>
                     </div>
                     
-                    <div class="pt-6 border-t border-gray-100 flex justify-end">
+                    <div class="mt-6 pt-4 border-t border-gray-100 flex justify-end">
                         <button type="submit" name="update_profile" id="saveProfileBtn"
-                                class="px-8 py-3.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:from-blue-700 hover:to-indigo-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-300 font-semibold shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 flex items-center">
-                            <i class="fas fa-save mr-2"></i>
+                                class="px-5 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:from-blue-700 hover:to-indigo-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 text-sm font-medium transition-all duration-200 flex items-center">
+                            <i class="fas fa-save mr-2 text-xs"></i>
                             Save Changes
                         </button>
                     </div>
@@ -357,89 +363,93 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             </div>
             
             <!-- Change Password Form -->
-            <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 transform transition-all duration-300 hover:shadow-xl">
-                <div class="flex items-center mb-6 pb-4 border-b border-gray-100">
-                    <div class="w-12 h-12 rounded-xl bg-gradient-to-r from-green-500 to-emerald-500 flex items-center justify-center mr-4">
-                        <i class="fas fa-key text-white text-lg"></i>
-                    </div>
-                    <div>
-                        <h3 class="text-xl font-bold text-gray-800">Change Password</h3>
-                        <p class="text-sm text-gray-500">Update your password for enhanced security</p>
+            <div class="bg-white rounded-xl shadow-sm border border-gray-200">
+                <div class="p-6 border-b border-gray-100">
+                    <div class="flex items-center">
+                        <div class="w-10 h-10 rounded-lg bg-gradient-to-r from-green-500 to-emerald-500 flex items-center justify-center mr-3">
+                            <i class="fas fa-key text-white text-sm"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-lg font-semibold text-gray-800">Security Settings</h3>
+                            <p class="text-sm text-gray-500">Change your password for enhanced security</p>
+                        </div>
                     </div>
                 </div>
                 
-                <form method="POST" class="space-y-6">
-                    <div class="space-y-2">
-                        <label class="block text-sm font-semibold text-gray-700">
-                            <span class="flex items-center">
-                                <i class="fas fa-lock mr-2 text-gray-500"></i>
-                                Current Password
-                            </span>
-                        </label>
-                        <div class="relative">
-                            <input type="password" name="current_password" required
-                                   class="w-full px-4 py-3.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-gray-500 focus:border-gray-500 transition-all duration-200 bg-gray-50/50 pr-12"
-                                   placeholder="Enter your current password"
-                                   id="currentPassword">
-                            <button type="button" class="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                                    onclick="togglePassword('currentPassword', this)">
-                                <i class="fas fa-eye"></i>
-                            </button>
+                <form method="POST" class="p-6">
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">
+                                <span class="flex items-center">
+                                    <i class="fas fa-lock mr-2 text-gray-500 text-xs"></i>
+                                    Current Password
+                                </span>
+                            </label>
+                            <div class="relative">
+                                <input type="password" name="current_password" required
+                                       class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-gray-500 text-sm transition-colors pr-10"
+                                       placeholder="Enter your current password"
+                                       id="currentPassword">
+                                <button type="button" class="absolute right-3 top-2.5 text-gray-400 hover:text-gray-600"
+                                        onclick="togglePassword('currentPassword', this)">
+                                    <i class="fas fa-eye text-xs"></i>
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">
+                                <span class="flex items-center">
+                                    <i class="fas fa-lock mr-2 text-blue-500 text-xs"></i>
+                                    New Password
+                                </span>
+                            </label>
+                            <div class="relative">
+                                <input type="password" name="new_password" required
+                                       class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm transition-colors pr-10"
+                                       placeholder="Enter new password (min. 8 characters)"
+                                       id="newPassword">
+                                <button type="button" class="absolute right-3 top-2.5 text-gray-400 hover:text-gray-600"
+                                        onclick="togglePassword('newPassword', this)">
+                                    <i class="fas fa-eye text-xs"></i>
+                                </button>
+                            </div>
+                            <div class="flex items-center mt-2 space-x-1">
+                                <div class="h-1.5 flex-1 rounded-full bg-gray-200" id="passwordStrength1"></div>
+                                <div class="h-1.5 flex-1 rounded-full bg-gray-200" id="passwordStrength2"></div>
+                                <div class="h-1.5 flex-1 rounded-full bg-gray-200" id="passwordStrength3"></div>
+                                <div class="h-1.5 flex-1 rounded-full bg-gray-200" id="passwordStrength4"></div>
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">
+                                <span class="flex items-center">
+                                    <i class="fas fa-lock mr-2 text-green-500 text-xs"></i>
+                                    Confirm New Password
+                                </span>
+                            </label>
+                            <div class="relative">
+                                <input type="password" name="confirm_password" required
+                                       class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 text-sm transition-colors pr-10"
+                                       placeholder="Re-enter new password"
+                                       id="confirmPassword">
+                                <button type="button" class="absolute right-3 top-2.5 text-gray-400 hover:text-gray-600"
+                                        onclick="togglePassword('confirmPassword', this)">
+                                    <i class="fas fa-eye text-xs"></i>
+                                </button>
+                            </div>
+                            <p class="text-xs mt-1 text-gray-500" id="passwordMatch">
+                                <i class="fas fa-info-circle mr-1"></i>
+                                Passwords must match
+                            </p>
                         </div>
                     </div>
                     
-                    <div class="space-y-2">
-                        <label class="block text-sm font-semibold text-gray-700">
-                            <span class="flex items-center">
-                                <i class="fas fa-lock mr-2 text-blue-500"></i>
-                                New Password
-                            </span>
-                        </label>
-                        <div class="relative">
-                            <input type="password" name="new_password" required
-                                   class="w-full px-4 py-3.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 bg-gray-50/50 pr-12"
-                                   placeholder="Enter new password (min. 8 characters)"
-                                   id="newPassword">
-                            <button type="button" class="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                                    onclick="togglePassword('newPassword', this)">
-                                <i class="fas fa-eye"></i>
-                            </button>
-                        </div>
-                        <div class="grid grid-cols-4 gap-2 mt-2">
-                            <div class="h-1 rounded bg-gray-200" id="passwordStrength1"></div>
-                            <div class="h-1 rounded bg-gray-200" id="passwordStrength2"></div>
-                            <div class="h-1 rounded bg-gray-200" id="passwordStrength3"></div>
-                            <div class="h-1 rounded bg-gray-200" id="passwordStrength4"></div>
-                        </div>
-                    </div>
-                    
-                    <div class="space-y-2">
-                        <label class="block text-sm font-semibold text-gray-700">
-                            <span class="flex items-center">
-                                <i class="fas fa-lock mr-2 text-green-500"></i>
-                                Confirm New Password
-                            </span>
-                        </label>
-                        <div class="relative">
-                            <input type="password" name="confirm_password" required
-                                   class="w-full px-4 py-3.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all duration-200 bg-gray-50/50 pr-12"
-                                   placeholder="Re-enter new password"
-                                   id="confirmPassword">
-                            <button type="button" class="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                                    onclick="togglePassword('confirmPassword', this)">
-                                <i class="fas fa-eye"></i>
-                            </button>
-                        </div>
-                        <p class="text-xs text-gray-500 flex items-center mt-1" id="passwordMatch">
-                            <i class="fas fa-info-circle mr-1 text-gray-400"></i>
-                            Passwords must match
-                        </p>
-                    </div>
-                    
-                    <div class="pt-6 border-t border-gray-100 flex justify-end">
+                    <div class="mt-6 pt-4 border-t border-gray-100 flex justify-end">
                         <button type="submit" name="change_password" id="changePasswordBtn"
-                                class="px-8 py-3.5 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-xl hover:from-green-700 hover:to-emerald-700 focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition-all duration-300 font-semibold shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 flex items-center">
-                            <i class="fas fa-key mr-2"></i>
+                                class="px-5 py-2.5 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg hover:from-green-700 hover:to-emerald-700 focus:ring-2 focus:ring-green-500 focus:ring-offset-1 text-sm font-medium transition-all duration-200 flex items-center">
+                            <i class="fas fa-key mr-2 text-xs"></i>
                             Change Password
                         </button>
                     </div>
@@ -459,22 +469,13 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     animation: fadeIn 0.3s ease-out;
 }
 
-.animate-pulse {
-    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-}
-
-@keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.5; }
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
 }
 
 .animate-spin {
     animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-    from { transform: rotate(0deg); }
-    to { transform: rotate(360deg); }
 }
 </style>
 
@@ -483,23 +484,33 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 function previewProfileImage(input) {
     if (input.files && input.files[0]) {
         const reader = new FileReader();
-        const preview = document.getElementById('profileImagePreview');
+        const preview = document.getElementById('currentProfileImage');
+        const defaultImage = document.getElementById('defaultProfileImage');
         const button = document.getElementById('saveProfileBtn');
         
         reader.onload = function(e) {
-            // Update the preview immediately with animation
-            preview.innerHTML = `<img src="${e.target.result}" alt="Profile Preview" class="w-full h-full object-cover transition-transform duration-300 hover:scale-105 animate-fade-in" id="currentProfileImage">`;
-            
-            // Show the uploaded image and hide default
-            const defaultImage = document.getElementById('defaultProfileImage');
-            if (defaultImage) {
+            // Update preview immediately
+            if (preview) {
+                preview.src = e.target.result;
+                preview.style.display = 'block';
+                if (defaultImage) defaultImage.style.display = 'none';
+            } else if (defaultImage) {
+                // Create new image element
+                const newImage = document.createElement('img');
+                newImage.src = e.target.result;
+                newImage.alt = "Profile Preview";
+                newImage.className = "w-full h-full object-cover";
+                newImage.id = "currentProfileImage";
+                
+                defaultImage.parentNode.appendChild(newImage);
                 defaultImage.style.display = 'none';
             }
             
-            // Change button color to indicate pending changes
-            button.innerHTML = '<i class="fas fa-camera mr-2"></i>Upload & Save Changes';
-            button.classList.remove('from-blue-600', 'to-indigo-600');
-            button.classList.add('from-purple-600', 'to-pink-600', 'hover:from-purple-700', 'hover:to-pink-700');
+            // Change button to indicate pending changes
+            if (button) {
+                button.innerHTML = '<i class="fas fa-camera mr-2 text-xs"></i>Upload & Save';
+                button.classList.add('from-purple-600', 'to-pink-600');
+            }
         }
         
         reader.readAsDataURL(input.files[0]);
@@ -563,27 +574,23 @@ function checkPasswordMatch() {
     const newPassword = document.getElementById('newPassword').value;
     const confirmPassword = document.getElementById('confirmPassword').value;
     const matchText = document.getElementById('passwordMatch');
-    const icon = matchText.querySelector('i');
     
     if (!newPassword || !confirmPassword) {
-        matchText.innerHTML = '<i class="fas fa-info-circle mr-1 text-gray-400"></i>Passwords must match';
-        matchText.className = 'text-xs text-gray-500 flex items-center mt-1';
-        icon.className = 'fas fa-info-circle mr-1 text-gray-400';
+        matchText.innerHTML = '<i class="fas fa-info-circle mr-1"></i>Passwords must match';
+        matchText.className = 'text-xs mt-1 text-gray-500';
         return;
     }
     
     if (newPassword === confirmPassword) {
         matchText.innerHTML = '<i class="fas fa-check-circle mr-1 text-green-500"></i>Passwords match';
-        matchText.className = 'text-xs text-green-600 flex items-center mt-1';
-        icon.className = 'fas fa-check-circle mr-1 text-green-500';
+        matchText.className = 'text-xs mt-1 text-green-600';
     } else {
         matchText.innerHTML = '<i class="fas fa-times-circle mr-1 text-red-500"></i>Passwords do not match';
-        matchText.className = 'text-xs text-red-600 flex items-center mt-1';
-        icon.className = 'fas fa-times-circle mr-1 text-red-500';
+        matchText.className = 'text-xs mt-1 text-red-600';
     }
 }
 
-// When form is submitted, handle immediate profile picture update
+// Initialize when page loads
 document.addEventListener('DOMContentLoaded', function() {
     const profileForm = document.getElementById('profileForm');
     const profilePictureInput = document.getElementById('profile_picture');
@@ -595,13 +602,14 @@ document.addEventListener('DOMContentLoaded', function() {
     // Password strength and match listeners
     if (newPasswordInput) {
         newPasswordInput.addEventListener('input', checkPasswordStrength);
+        newPasswordInput.addEventListener('input', checkPasswordMatch);
     }
     
-    if (newPasswordInput && confirmPasswordInput) {
-        newPasswordInput.addEventListener('input', checkPasswordMatch);
+    if (confirmPasswordInput) {
         confirmPasswordInput.addEventListener('input', checkPasswordMatch);
     }
     
+    // Form submission handlers
     if (profileForm) {
         profileForm.addEventListener('submit', function(e) {
             // Check if profile picture is being uploaded
@@ -611,16 +619,14 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Show loading state
                 if (saveProfileBtn) {
                     const originalText = saveProfileBtn.innerHTML;
-                    saveProfileBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Saving Changes...';
+                    saveProfileBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Saving...';
                     saveProfileBtn.disabled = true;
-                    saveProfileBtn.classList.remove('hover:-translate-y-0.5', 'hover:shadow-xl');
                     
                     // Reset button after 5 seconds if still disabled (fallback)
                     setTimeout(() => {
                         if (saveProfileBtn.disabled) {
                             saveProfileBtn.innerHTML = originalText;
                             saveProfileBtn.disabled = false;
-                            saveProfileBtn.classList.add('hover:-translate-y-0.5', 'hover:shadow-xl');
                         }
                     }, 5000);
                 }
@@ -634,23 +640,21 @@ document.addEventListener('DOMContentLoaded', function() {
             if (form && form.checkValidity()) {
                 // Show loading state
                 const originalText = this.innerHTML;
-                this.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Changing Password...';
+                this.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Updating...';
                 this.disabled = true;
-                this.classList.remove('hover:-translate-y-0.5', 'hover:shadow-xl');
                 
                 // Reset button after 5 seconds if still disabled (fallback)
                 setTimeout(() => {
                     if (this.disabled) {
                         this.innerHTML = originalText;
                         this.disabled = false;
-                        this.classList.add('hover:-translate-y-0.5', 'hover:shadow-xl');
                     }
                 }, 5000);
             }
         });
     }
     
-    // Listen for profile picture update events
+    // Listen for profile picture update events from PHP
     document.addEventListener('profilePictureUpdated', function(e) {
         if (e.detail && e.detail.imageUrl) {
             // Update timestamp to prevent caching
@@ -666,10 +670,14 @@ document.addEventListener('DOMContentLoaded', function() {
                 preview.style.display = 'block';
             } else if (defaultImage) {
                 // Replace default image with uploaded image
-                const previewDiv = document.getElementById('profileImagePreview');
-                if (previewDiv) {
-                    previewDiv.innerHTML = `<img src="${imageUrl}" alt="Profile Picture" class="w-full h-full object-cover transition-transform duration-300 hover:scale-105 animate-fade-in" id="currentProfileImage">`;
-                }
+                const parent = defaultImage.parentNode;
+                const newImg = document.createElement('img');
+                newImg.src = imageUrl;
+                newImg.alt = "Profile Picture";
+                newImg.className = "w-full h-full object-cover";
+                newImg.id = "currentProfileImage";
+                parent.appendChild(newImg);
+                defaultImage.style.display = 'none';
             }
             
             // Dispatch event to parent (dashboard) to update all images
@@ -678,10 +686,18 @@ document.addEventListener('DOMContentLoaded', function() {
                     detail: { imageUrl: e.detail.imageUrl }
                 }));
             }
+            
+            // Also send message via postMessage for cross-domain compatibility
+            if (window.parent) {
+                window.parent.postMessage({
+                    type: 'profilePictureUpdated',
+                    imageUrl: e.detail.imageUrl
+                }, '*');
+            }
         }
     });
     
-    // Also listen to events from parent
+    // Listen to events from parent
     window.addEventListener('message', function(event) {
         if (event.data.type === 'profilePictureUpdated' && event.data.imageUrl) {
             document.dispatchEvent(new CustomEvent('profilePictureUpdated', {
