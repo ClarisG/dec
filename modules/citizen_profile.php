@@ -39,6 +39,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             
             // Handle profile picture upload
             $profile_picture = $user['profile_picture'];
+            $new_image_uploaded = false;
             
             if (!empty($_FILES['profile_picture']['name'])) {
                 $upload_dir = "../uploads/profile_pictures/";
@@ -65,12 +66,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                             }
                             
                             $profile_picture = $file_name;
+                            $new_image_uploaded = true;
                             
                             // Update session immediately
                             $_SESSION['profile_picture'] = $profile_picture;
-                            
-                            // Set flag for immediate refresh
-                            $_SESSION['profile_updated'] = time();
                         }
                     }
                 } else {
@@ -123,8 +122,15 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 $user['permanent_address'] = $permanent_address;
                 $user['profile_picture'] = $profile_picture;
                 
-                // Set flag for JavaScript
-                echo '<script>sessionStorage.setItem("profileUpdated", "' . time() . '");</script>';
+                // If new image was uploaded, output JavaScript to update images immediately
+                if ($new_image_uploaded) {
+                    $image_url = '../uploads/profile_pictures/' . $profile_picture;
+                    echo '<script>';
+                    echo 'const event = new CustomEvent("profilePictureUpdated", { detail: { imageUrl: "' . $image_url . '" } });';
+                    echo 'document.dispatchEvent(event);';
+                    echo 'window.parent.document.dispatchEvent(event);';
+                    echo '</script>';
+                }
             }
             
         } catch(PDOException $e) {
@@ -293,18 +299,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                         <p class="text-xs text-gray-500 mt-1">Complete address including barangay</p>
                     </div>
                     
-                    <div class="mb-6">
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Profile Picture</label>
-                        <div class="flex items-center space-x-4">
-                            <div class="flex-1">
-                                <p class="text-sm text-gray-600 mb-2">Upload a new profile picture (max 2MB)</p>
-                                <input type="file" name="profile_picture" 
-                                       class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
-                                       accept="image/*" onchange="previewProfileImage(this)">
-                            </div>
-                        </div>
-                    </div>
-                    
                     <div class="flex justify-end pt-4 border-t">
                         <button type="submit" name="update_profile"
                                 class="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all font-medium">
@@ -364,8 +358,14 @@ function previewProfileImage(input) {
         const preview = document.getElementById('profileImagePreview');
         
         reader.onload = function(e) {
-            // Update the preview
-            preview.innerHTML = `<img src="${e.target.result}" alt="Profile Preview" class="w-full h-full object-cover">`;
+            // Update the preview immediately
+            preview.innerHTML = `<img src="${e.target.result}" alt="Profile Preview" class="w-full h-full object-cover" id="currentProfileImage">`;
+            
+            // Show the uploaded image and hide default
+            const defaultImage = document.getElementById('defaultProfileImage');
+            if (defaultImage) {
+                defaultImage.style.display = 'none';
+            }
         }
         
         reader.readAsDataURL(input.files[0]);
@@ -375,17 +375,14 @@ function previewProfileImage(input) {
 // When form is submitted, handle immediate profile picture update
 document.addEventListener('DOMContentLoaded', function() {
     const profileForm = document.getElementById('profileForm');
+    const profilePictureInput = document.getElementById('profile_picture');
     
     if (profileForm) {
         profileForm.addEventListener('submit', function(e) {
             // Check if profile picture is being uploaded
-            const fileInput = document.querySelector('input[name="profile_picture"]');
-            const hasFile = fileInput && fileInput.files.length > 0;
+            const hasFile = profilePictureInput && profilePictureInput.files.length > 0;
             
             if (hasFile) {
-                // Set flag for immediate refresh
-                sessionStorage.setItem('profileUpdated', Date.now());
-                
                 // Show loading state
                 const submitBtn = this.querySelector('button[type="submit"]');
                 if (submitBtn) {
@@ -401,28 +398,30 @@ document.addEventListener('DOMContentLoaded', function() {
                         }
                     }, 3000);
                 }
-                
-                // Dispatch custom event to notify parent window
-                if (window.parent) {
-                    window.parent.dispatchEvent(new CustomEvent('profilePictureChanged'));
-                }
-                
-                // Dispatch event to same window
-                window.dispatchEvent(new CustomEvent('profilePictureChanged'));
             }
         });
     }
     
     // Listen for profile picture change events
-    window.addEventListener('profilePictureChanged', function() {
-        // Refresh the preview image
-        const currentProfilePic = '<?php echo $_SESSION["profile_picture"] ?? ""; ?>';
-        if (currentProfilePic) {
-            const profilePicPath = '../uploads/profile_pictures/' + currentProfilePic;
-            const preview = document.getElementById('profileImagePreview');
+    document.addEventListener('profilePictureUpdated', function(e) {
+        if (e.detail && e.detail.imageUrl) {
+            const timestamp = new Date().getTime();
+            const preview = document.getElementById('currentProfileImage');
+            const defaultImage = document.getElementById('defaultProfileImage');
+            
             if (preview) {
-                const timestamp = Date.now();
-                preview.innerHTML = `<img src="${profilePicPath}?t=${timestamp}" alt="Profile Picture" class="w-full h-full object-cover">`;
+                preview.src = e.detail.imageUrl + '?t=' + timestamp;
+                preview.style.display = 'block';
+            }
+            
+            if (defaultImage) {
+                defaultImage.style.display = 'none';
+            }
+            
+            // Also update the image in the profile module
+            const profilePreview = document.getElementById('profileImagePreview');
+            if (profilePreview && !preview) {
+                profilePreview.innerHTML = `<img src="${e.detail.imageUrl}?t=${timestamp}" alt="Profile Picture" class="w-full h-full object-cover" id="currentProfileImage">`;
             }
         }
     });

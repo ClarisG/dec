@@ -48,6 +48,9 @@ try {
         $_SESSION['barangay'] = $user_data['barangay_display'];
         $user_address = $user_data['user_address'];
         $profile_picture = $user_data['profile_picture'];
+        
+        // Store profile picture in session for immediate access
+        $_SESSION['profile_picture'] = $profile_picture;
     } else {
         $error = "User not found.";
         $is_active = 1;
@@ -415,13 +418,14 @@ function getModuleTitle($module) {
             <div class="flex items-center space-x-4">
                 <div class="relative">
                     <?php 
-                    $profile_pic_path = "../uploads/profile_pictures/" . ($profile_picture ?? '');
-                    if (!empty($profile_picture) && file_exists($profile_pic_path)): 
+                    $profile_pic_path = "../uploads/profile_pictures/" . ($_SESSION['profile_picture'] ?? $profile_picture ?? '');
+                    $timestamp = file_exists($profile_pic_path) ? filemtime($profile_pic_path) : time();
+                    if (!empty($_SESSION['profile_picture'] ?? $profile_picture) && file_exists($profile_pic_path)): 
                     ?>
-                        <img src="<?php echo $profile_pic_path; ?>" 
+                        <img id="sidebarProfileImage" src="<?php echo $profile_pic_path . '?t=' . $timestamp; ?>" 
                              alt="Profile" class="w-12 h-12 rounded-full object-cover border-2 border-white shadow-sm">
                     <?php else: ?>
-                        <div class="w-12 h-12 rounded-full bg-gradient-to-r from-blue-600 to-blue-500 flex items-center justify-center text-white font-bold text-lg">
+                        <div id="sidebarProfileDefault" class="w-12 h-12 rounded-full bg-gradient-to-r from-blue-600 to-blue-500 flex items-center justify-center text-white font-bold text-lg">
                             <?php echo strtoupper(substr($full_name, 0, 1)); ?>
                         </div>
                     <?php endif; ?>
@@ -543,13 +547,14 @@ function getModuleTitle($module) {
                         <div class="relative">
                             <button id="userMenuButton" class="flex items-center space-x-2 focus:outline-none">
                                 <?php 
-                                $profile_pic_path = "../uploads/profile_pictures/" . ($profile_picture ?? '');
-                                if (!empty($profile_picture) && file_exists($profile_pic_path)): 
+                                $profile_pic_path = "../uploads/profile_pictures/" . ($_SESSION['profile_picture'] ?? $profile_picture ?? '');
+                                $timestamp = file_exists($profile_pic_path) ? filemtime($profile_pic_path) : time();
+                                if (!empty($_SESSION['profile_picture'] ?? $profile_picture) && file_exists($profile_pic_path)): 
                                 ?>
-                                    <img src="<?php echo $profile_pic_path; ?>" 
+                                    <img id="headerProfileImage" src="<?php echo $profile_pic_path . '?t=' . $timestamp; ?>" 
                                          alt="Profile" class="w-10 h-10 rounded-full object-cover border-2 border-white shadow-sm">
                                 <?php else: ?>
-                                    <div class="w-10 h-10 rounded-full bg-gradient-to-r from-blue-600 to-blue-500 flex items-center justify-center text-white font-semibold">
+                                    <div id="headerProfileDefault" class="w-10 h-10 rounded-full bg-gradient-to-r from-blue-600 to-blue-500 flex items-center justify-center text-white font-semibold">
                                         <?php echo strtoupper(substr($full_name, 0, 1)); ?>
                                     </div>
                                 <?php endif; ?>
@@ -561,11 +566,13 @@ function getModuleTitle($module) {
                             <div id="userDropdown" class="hidden absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-xl border z-40">
                                 <div class="p-4 border-b">
                                     <div class="flex items-center space-x-3 mb-2">
-                                        <?php if (!empty($profile_picture) && file_exists($profile_pic_path)): ?>
-                                            <img src="<?php echo $profile_pic_path; ?>" 
+                                        <?php 
+                                        if (!empty($_SESSION['profile_picture'] ?? $profile_picture) && file_exists($profile_pic_path)): 
+                                        ?>
+                                            <img id="dropdownProfileImage" src="<?php echo $profile_pic_path . '?t=' . $timestamp; ?>" 
                                                  alt="Profile" class="w-10 h-10 rounded-full object-cover">
                                         <?php else: ?>
-                                            <div class="w-10 h-10 rounded-full bg-gradient-to-r from-blue-600 to-blue-500 flex items-center justify-center text-white font-bold">
+                                            <div id="dropdownProfileDefault" class="w-10 h-10 rounded-full bg-gradient-to-r from-blue-600 to-blue-500 flex items-center justify-center text-white font-bold">
                                                 <?php echo strtoupper(substr($full_name, 0, 1)); ?>
                                             </div>
                                         <?php endif; ?>
@@ -970,6 +977,62 @@ function getModuleTitle($module) {
         if (window.history.replaceState) {
             window.history.replaceState(null, null, window.location.href);
         }
+        
+        // Function to update profile images across the dashboard
+        function updateProfileImages(imageUrl) {
+            const timestamp = new Date().getTime();
+            
+            // Update sidebar image
+            const sidebarImg = document.getElementById('sidebarProfileImage');
+            const sidebarDefault = document.getElementById('sidebarProfileDefault');
+            if (sidebarImg) {
+                sidebarImg.src = imageUrl + '?t=' + timestamp;
+                sidebarImg.style.display = 'block';
+            }
+            if (sidebarDefault) {
+                sidebarDefault.style.display = 'none';
+            }
+            
+            // Update header image
+            const headerImg = document.getElementById('headerProfileImage');
+            const headerDefault = document.getElementById('headerProfileDefault');
+            if (headerImg) {
+                headerImg.src = imageUrl + '?t=' + timestamp;
+                headerImg.style.display = 'block';
+            }
+            if (headerDefault) {
+                headerDefault.style.display = 'none';
+            }
+            
+            // Update dropdown image
+            const dropdownImg = document.getElementById('dropdownProfileImage');
+            const dropdownDefault = document.getElementById('dropdownProfileDefault');
+            if (dropdownImg) {
+                dropdownImg.src = imageUrl + '?t=' + timestamp;
+                dropdownImg.style.display = 'block';
+            }
+            if (dropdownDefault) {
+                dropdownDefault.style.display = 'none';
+            }
+            
+            // Also update the image in profile module if it exists
+            const profileModuleImg = document.getElementById('currentProfileImage');
+            if (profileModuleImg) {
+                profileModuleImg.src = imageUrl + '?t=' + timestamp;
+                profileModuleImg.style.display = 'block';
+            }
+            const profileModuleDefault = document.getElementById('defaultProfileImage');
+            if (profileModuleDefault) {
+                profileModuleDefault.style.display = 'none';
+            }
+        }
+        
+        // Listen for profile picture updates from the profile module
+        document.addEventListener('profilePictureUpdated', function(e) {
+            if (e.detail && e.detail.imageUrl) {
+                updateProfileImages(e.detail.imageUrl);
+            }
+        });
     </script>
 </body>
 </html>
