@@ -418,7 +418,7 @@ function getModuleTitle($module) {
             <div class="flex items-center space-x-4">
                 <div class="relative">
                     <?php 
-                    $profile_pic_path = "../uploads/profile_pictures/" . ($_SESSION['profile_picture'] ?? $profile_picture ?? '');
+                    $profile_pic_path = "uploads/profile_pictures/" . ($_SESSION['profile_picture'] ?? $profile_picture ?? '');
                     $timestamp = file_exists($profile_pic_path) ? filemtime($profile_pic_path) : time();
                     if (!empty($_SESSION['profile_picture'] ?? $profile_picture) && file_exists($profile_pic_path)): 
                     ?>
