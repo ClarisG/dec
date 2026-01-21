@@ -337,6 +337,11 @@ try {
                 <button type="submit" class="px-4 py-3 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 active:bg-blue-800 focus:outline-none focus:ring-1 focus:ring-blue-500 min-h-[44px] flex items-center justify-center">
                     <i class="fas fa-filter mr-2"></i> Apply
                 </button>
+                <!-- Debug button for mobile overlay issue -->
+                <button type="button" onclick="forceCloseAllModals()" 
+                        class="px-4 py-3 text-sm border border-red-300 text-red-700 rounded-lg hover:bg-red-50 active:bg-red-100 min-h-[44px] flex items-center justify-center">
+                    <i class="fas fa-times-circle mr-2"></i> Clear Overlay
+                </button>
             </div>
         </form>
     </div>
@@ -803,8 +808,12 @@ try {
     <?php endif; ?>
 </div>
 
-<!-- Report Details Modal -->
-<div id="reportDetailsModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 hidden">
+<!-- Report Details Modal - Fixed structure for mobile -->
+<div id="reportDetailsModal" class="fixed inset-0 z-50 hidden">
+    <!-- Backdrop -->
+    <div class="fixed inset-0 bg-gray-600 bg-opacity-50" onclick="closeModal()"></div>
+    
+    <!-- Modal Content -->
     <div class="relative top-4 mx-auto p-4 border w-full max-w-4xl shadow-lg rounded-lg bg-white max-h-[90vh] overflow-hidden">
         <!-- Modal Header -->
         <div class="flex justify-between items-center mb-4 pb-3 border-b sticky top-0 bg-white z-10">
@@ -821,8 +830,12 @@ try {
     </div>
 </div>
 
-<!-- Attachment Viewer Modal -->
-<div id="attachmentViewerModal" class="fixed inset-0 bg-gray-900 bg-opacity-90 overflow-y-auto h-full w-full z-[60] hidden">
+<!-- Attachment Viewer Modal - Fixed structure for mobile -->
+<div id="attachmentViewerModal" class="fixed inset-0 z-[60] hidden">
+    <!-- Backdrop -->
+    <div class="fixed inset-0 bg-gray-900 bg-opacity-90" onclick="closeAttachmentViewer()"></div>
+    
+    <!-- Modal Content -->
     <div class="relative top-4 mx-auto p-4 border w-full max-w-6xl shadow-lg rounded-lg bg-white max-h-[90vh] overflow-hidden">
         <div class="flex justify-between items-center mb-4 pb-3 border-b sticky top-0 bg-white z-10">
             <h3 class="text-lg font-bold text-gray-800" id="attachmentTitle">Attachment Viewer</h3>
@@ -853,6 +866,48 @@ document.addEventListener('touchend', function(event) {
     }
     lastTouchEnd = now;
 }, false);
+
+// Force close all modals and backdrops - FIX FOR MOBILE OVERLAY ISSUE
+function forceCloseAllModals() {
+    console.log('Force closing all modals...');
+    
+    // Close main modals
+    closeModal();
+    closeAttachmentViewer();
+    
+    // Remove any Bootstrap modal backdrops that might be lingering
+    document.querySelectorAll('.modal-backdrop').forEach(el => {
+        console.log('Removing modal backdrop:', el);
+        el.remove();
+    });
+    
+    // Remove any fixed overlays
+    document.querySelectorAll('.fixed.inset-0').forEach(el => {
+        if (el.id !== 'reportDetailsModal' && el.id !== 'attachmentViewerModal') {
+            console.log('Removing fixed overlay:', el);
+            el.remove();
+        }
+    });
+    
+    // Enable body scrolling
+    document.body.style.overflow = '';
+    document.body.style.position = '';
+    document.body.style.height = '';
+    document.body.style.width = '';
+    
+    // Remove any inline styles from body
+    document.body.removeAttribute('style');
+    
+    // Show toast notification
+    showToast('Cleared all modal overlays', 'success');
+    
+    // Haptic feedback for mobile
+    if (isTouchDevice && navigator.vibrate) {
+        navigator.vibrate(100);
+    }
+    
+    return true;
+}
 
 // Mobile-specific view function with better touch feedback
 function mobileViewReportDetails(reportId) {
@@ -903,8 +958,8 @@ function mobileViewReportTimeline(reportId) {
 // Mobile-specific print function
 function mobilePrintReport(reportId) {
     // Add haptic feedback if available
-    if (navigator.vibrate) {
-        navigator.vibrate(30);
+    if (isTouchDevice && navigator.vibrate) {
+        navigator.vibrate(50);
     }
     
     // Add visual feedback to the button
@@ -925,6 +980,9 @@ function mobilePrintReport(reportId) {
 
 // View Report Details
 function viewReportDetails(reportId) {
+    // Ensure no other modals are open
+    closeAttachmentViewer();
+    
     // Show loading
     document.getElementById('modalContent').innerHTML = `
         <div class="flex justify-center items-center h-48">
@@ -936,6 +994,11 @@ function viewReportDetails(reportId) {
     // Show modal
     document.getElementById('reportDetailsModal').classList.remove('hidden');
     document.getElementById('modalTitle').textContent = 'Report Details';
+    
+    // Disable body scroll on mobile
+    if (isTouchDevice) {
+        document.body.style.overflow = 'hidden';
+    }
     
     // Load report details via AJAX
     const url = `${AJAX_URL}get_report_details.php?id=${reportId}`;
@@ -969,6 +1032,9 @@ function viewReportDetails(reportId) {
 
 // View Report Timeline
 function viewReportTimeline(reportId) {
+    // Ensure no other modals are open
+    closeAttachmentViewer();
+    
     document.getElementById('modalContent').innerHTML = `
         <div class="flex justify-center items-center h-48">
             <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600"></div>
@@ -978,6 +1044,11 @@ function viewReportTimeline(reportId) {
     
     document.getElementById('reportDetailsModal').classList.remove('hidden');
     document.getElementById('modalTitle').textContent = 'Report Timeline';
+    
+    // Disable body scroll on mobile
+    if (isTouchDevice) {
+        document.body.style.overflow = 'hidden';
+    }
     
     const url = `${AJAX_URL}get_report_timeline.php?id=${reportId}`;
     
@@ -1032,6 +1103,9 @@ function initializeAttachmentViewers() {
 
 // View Attachment
 function viewAttachment(filePath, fileName, fileType) {
+    // Close any other modals first
+    closeModal();
+    
     const viewerContent = document.getElementById('attachmentViewerContent');
     const viewerTitle = document.getElementById('attachmentTitle');
     
@@ -1047,6 +1121,11 @@ function viewAttachment(filePath, fileName, fileType) {
     
     // Show modal
     document.getElementById('attachmentViewerModal').classList.remove('hidden');
+    
+    // Disable body scroll on mobile
+    if (isTouchDevice) {
+        document.body.style.overflow = 'hidden';
+    }
     
     // Determine file type and render accordingly
     const imageTypes = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'];
@@ -1217,8 +1296,13 @@ function downloadAttachment(filePath, fileName) {
 
 // Close Attachment Viewer
 function closeAttachmentViewer() {
+    console.log('Closing attachment viewer...');
     document.getElementById('attachmentViewerModal').classList.add('hidden');
     document.getElementById('attachmentViewerContent').innerHTML = '';
+    
+    // Enable body scrolling
+    document.body.style.overflow = '';
+    document.body.style.position = '';
 }
 
 // Print Report
@@ -1359,8 +1443,13 @@ function printAllReports() {
 
 // Close Modal
 function closeModal() {
+    console.log('Closing modal...');
     document.getElementById('reportDetailsModal').classList.add('hidden');
     document.getElementById('modalContent').innerHTML = '';
+    
+    // Enable body scrolling
+    document.body.style.overflow = '';
+    document.body.style.position = '';
 }
 
 // Change records per page
@@ -1487,6 +1576,10 @@ function fixMobileViewport() {
 document.addEventListener('DOMContentLoaded', function() {
     console.log('My Reports module loaded');
     
+    // FORCE CLOSE ANY OPEN MODALS ON PAGE LOAD - CRITICAL FIX
+    console.log('Force closing any open modals on page load...');
+    forceCloseAllModals();
+    
     if (isTouchDevice) {
         console.log('Touch device detected, enhancing mobile experience');
         
@@ -1526,23 +1619,53 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    // Close modals when clicking outside
+    // Close modals when clicking outside - FIXED FOR MOBILE
     const reportDetailsModal = document.getElementById('reportDetailsModal');
     if (reportDetailsModal) {
-        reportDetailsModal.addEventListener('click', function(e) {
-            if (e.target === this) {
-                closeModal();
+        // Use event delegation for both click and touch
+        document.addEventListener('click', function(e) {
+            if (reportDetailsModal.contains(e.target) && !reportDetailsModal.classList.contains('hidden')) {
+                // Check if click is on backdrop (the first child div)
+                const backdrop = reportDetailsModal.firstElementChild;
+                if (e.target === backdrop || e.target === reportDetailsModal) {
+                    closeModal();
+                }
             }
         });
+        
+        // Add touch event for mobile
+        document.addEventListener('touchstart', function(e) {
+            if (reportDetailsModal.contains(e.target) && !reportDetailsModal.classList.contains('hidden')) {
+                const backdrop = reportDetailsModal.firstElementChild;
+                if (e.target === backdrop || e.target === reportDetailsModal) {
+                    closeModal();
+                }
+            }
+        }, { passive: true });
     }
     
     const attachmentViewerModal = document.getElementById('attachmentViewerModal');
     if (attachmentViewerModal) {
-        attachmentViewerModal.addEventListener('click', function(e) {
-            if (e.target === this) {
-                closeAttachmentViewer();
+        // Use event delegation for both click and touch
+        document.addEventListener('click', function(e) {
+            if (attachmentViewerModal.contains(e.target) && !attachmentViewerModal.classList.contains('hidden')) {
+                // Check if click is on backdrop (the first child div)
+                const backdrop = attachmentViewerModal.firstElementChild;
+                if (e.target === backdrop || e.target === attachmentViewerModal) {
+                    closeAttachmentViewer();
+                }
             }
         });
+        
+        // Add touch event for mobile
+        document.addEventListener('touchstart', function(e) {
+            if (attachmentViewerModal.contains(e.target) && !attachmentViewerModal.classList.contains('hidden')) {
+                const backdrop = attachmentViewerModal.firstElementChild;
+                if (e.target === backdrop || e.target === attachmentViewerModal) {
+                    closeAttachmentViewer();
+                }
+            }
+        }, { passive: true });
     }
     
     // Handle Escape key to close modals
@@ -1567,7 +1690,18 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             });
         }
+        
+        // Final check to ensure no modals are open
+        forceCloseAllModals();
     }, 100);
+    
+    // Add a safety check on page visibility change
+    document.addEventListener('visibilitychange', function() {
+        if (document.visibilityState === 'visible') {
+            // Force close modals when page becomes visible again
+            forceCloseAllModals();
+        }
+    });
 });
 </script>
 
@@ -1625,6 +1759,42 @@ document.addEventListener('DOMContentLoaded', function() {
     .hidden.md\:block {
         display: none;
     }
+    
+    /* CRITICAL FIX: Modal fixes for mobile */
+    #reportDetailsModal > div:not(:first-child),
+    #attachmentViewerModal > div:not(:first-child) {
+        margin: 0.5rem;
+        width: calc(100% - 1rem);
+        max-height: 95vh;
+        border-radius: 0.5rem;
+    }
+    
+    #modalContent,
+    #attachmentViewerContent {
+        max-height: calc(95vh - 60px) !important;
+    }
+    
+    /* Ensure modals are properly hidden on mobile */
+    .hidden {
+        display: none !important;
+        visibility: hidden !important;
+        opacity: 0 !important;
+        pointer-events: none !important;
+    }
+    
+    /* Fix modal backdrop for mobile */
+    #reportDetailsModal:not(.hidden),
+    #attachmentViewerModal:not(.hidden) {
+        display: flex !important;
+        align-items: center;
+        justify-content: center;
+    }
+    
+    /* Fix z-index issues on mobile */
+    #reportDetailsModal,
+    #attachmentViewerModal {
+        z-index: 10000 !important;
+    }
 }
 
 /* Print styles */
@@ -1635,7 +1805,7 @@ document.addEventListener('DOMContentLoaded', function() {
 }
 
 /* Modal backdrop */
-.bg-opacity-50 {
+.bg-opacity-50, .bg-opacity-90 {
     backdrop-filter: blur(4px);
 }
 
@@ -1645,19 +1815,21 @@ img {
     height: auto;
 }
 
-/* Fix for modal scrolling on mobile */
-@media (max-width: 640px) {
-    #reportDetailsModal > div,
-    #attachmentViewerModal > div {
-        margin: 0.5rem;
-        width: calc(100% - 1rem);
-        max-height: 95vh;
-    }
-    
-    #modalContent,
-    #attachmentViewerContent {
-        max-height: calc(95vh - 60px);
-    }
+/* CRITICAL FIX: Emergency fix for overlay blocking touch */
+#reportDetailsModal.hidden,
+#attachmentViewerModal.hidden {
+    display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+}
+
+/* Ensure body is scrollable when modal is hidden */
+body:not(.modal-open) {
+    overflow: auto !important;
+    position: static !important;
+    height: auto !important;
+    width: auto !important;
 }
 
 /* Mobile-specific fixes */
@@ -1696,17 +1868,17 @@ img {
         input, select, textarea {
             font-size: 16px !important;
         }
+        
+        /* Fix 100vh issue on iOS */
+        .h-screen {
+            height: 100vh;
+            height: calc(var(--vh, 1vh) * 100);
+        }
     }
     
     /* Prevent zoom on iOS */
     input, select, textarea {
         font-size: 16px !important;
-    }
-    
-    /* Fix 100vh issue on mobile */
-    .h-screen {
-        height: 100vh;
-        height: calc(var(--vh, 1vh) * 100);
     }
     
     /* Better scrolling */
@@ -1731,6 +1903,15 @@ img {
     
     .touch-button {
         cursor: pointer;
+    }
+    
+    /* Fix for safe areas */
+    .safe-area-top {
+        padding-top: env(safe-area-inset-top);
+    }
+    
+    .safe-area-bottom {
+        padding-bottom: env(safe-area-inset-bottom);
     }
 }
 
@@ -1868,5 +2049,22 @@ select:focus-visible {
     .status-resolved { border: 2px solid #065f46; }
     .status-referred { border: 2px solid #9a3412; }
     .status-closed { border: 2px solid #374151; }
+}
+
+/* Debug overlay - visible only when debugging */
+.debug-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(255, 0, 0, 0.1);
+    z-index: 99999;
+    pointer-events: none;
+    display: none;
+}
+
+.debug-overlay.active {
+    display: block;
 }
 </style>
