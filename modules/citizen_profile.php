@@ -68,6 +68,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                             
                             // Update session immediately
                             $_SESSION['profile_picture'] = $profile_picture;
+                            
+                            // Set flag for immediate refresh
+                            $_SESSION['profile_updated'] = time();
                         }
                     }
                 } else {
@@ -120,8 +123,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 $user['permanent_address'] = $permanent_address;
                 $user['profile_picture'] = $profile_picture;
                 
-                // Set session flag for JavaScript to detect
-                echo '<script>sessionStorage.setItem("profileUpdated", "true");</script>';
+                // Set flag for JavaScript
+                echo '<script>sessionStorage.setItem("profileUpdated", "' . time() . '");</script>';
             }
             
         } catch(PDOException $e) {
@@ -193,8 +196,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                             $profile_pic_path = "../uploads/profile_pictures/" . $current_profile_pic;
                             
                             if (!empty($current_profile_pic) && file_exists($profile_pic_path)): 
+                                // Add cache-busting timestamp
+                                $timestamp = filemtime($profile_pic_path);
                             ?>
-                                <img src="<?php echo $profile_pic_path . '?t=' . time(); ?>" 
+                                <img src="<?php echo $profile_pic_path . '?t=' . $timestamp; ?>" 
                                      alt="Profile Picture" 
                                      class="w-full h-full object-cover"
                                      id="currentProfileImage">
@@ -352,6 +357,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 </div>
 
 <script>
+// Function to preview profile image
 function previewProfileImage(input) {
     if (input.files && input.files[0]) {
         const reader = new FileReader();
@@ -366,31 +372,59 @@ function previewProfileImage(input) {
     }
 }
 
-// When form is submitted, set a flag so dashboard knows to refresh images
+// When form is submitted, handle immediate profile picture update
 document.addEventListener('DOMContentLoaded', function() {
     const profileForm = document.getElementById('profileForm');
     
     if (profileForm) {
         profileForm.addEventListener('submit', function(e) {
-            // Set flag in sessionStorage
-            sessionStorage.setItem('profileUpdated', 'true');
+            // Check if profile picture is being uploaded
+            const fileInput = document.querySelector('input[name="profile_picture"]');
+            const hasFile = fileInput && fileInput.files.length > 0;
             
-            // Show loading state
-            const submitBtn = this.querySelector('button[type="submit"]');
-            if (submitBtn) {
-                const originalText = submitBtn.innerHTML;
-                submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Saving...';
-                submitBtn.disabled = true;
+            if (hasFile) {
+                // Set flag for immediate refresh
+                sessionStorage.setItem('profileUpdated', Date.now());
                 
-                // Reset button after 3 seconds if still disabled (fallback)
-                setTimeout(() => {
-                    if (submitBtn.disabled) {
-                        submitBtn.innerHTML = originalText;
-                        submitBtn.disabled = false;
-                    }
-                }, 3000);
+                // Show loading state
+                const submitBtn = this.querySelector('button[type="submit"]');
+                if (submitBtn) {
+                    const originalText = submitBtn.innerHTML;
+                    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Saving...';
+                    submitBtn.disabled = true;
+                    
+                    // Reset button after 3 seconds if still disabled (fallback)
+                    setTimeout(() => {
+                        if (submitBtn.disabled) {
+                            submitBtn.innerHTML = originalText;
+                            submitBtn.disabled = false;
+                        }
+                    }, 3000);
+                }
+                
+                // Dispatch custom event to notify parent window
+                if (window.parent) {
+                    window.parent.dispatchEvent(new CustomEvent('profilePictureChanged'));
+                }
+                
+                // Dispatch event to same window
+                window.dispatchEvent(new CustomEvent('profilePictureChanged'));
             }
         });
     }
+    
+    // Listen for profile picture change events
+    window.addEventListener('profilePictureChanged', function() {
+        // Refresh the preview image
+        const currentProfilePic = '<?php echo $_SESSION["profile_picture"] ?? ""; ?>';
+        if (currentProfilePic) {
+            const profilePicPath = '../uploads/profile_pictures/' + currentProfilePic;
+            const preview = document.getElementById('profileImagePreview');
+            if (preview) {
+                const timestamp = Date.now();
+                preview.innerHTML = `<img src="${profilePicPath}?t=${timestamp}" alt="Profile Picture" class="w-full h-full object-cover">`;
+            }
+        }
+    });
 });
 </script>

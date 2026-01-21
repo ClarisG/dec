@@ -16,6 +16,8 @@ require_once 'config/database.php';
 require_once 'config/rate_limit.php';
 require_once 'config/base_url.php';
 
+// Check if profile was recently updated
+$profile_updated = isset($_SESSION['profile_updated']) ? $_SESSION['profile_updated'] : 0;
 
 // Get user data
 $user_id = $_SESSION['user_id'];
@@ -131,6 +133,25 @@ function getModuleTitle($module) {
         'profile' => 'Profile Settings'
     ];
     return $titles[$module] ?? 'Dashboard';
+}
+
+// Prepare profile picture URLs with cache busting
+$profile_pic_path = "../uploads/profile_pictures/" . ($profile_picture ?? '');
+$profile_pic_url = $profile_pic_path;
+$profile_pic_timestamp = '';
+
+if (!empty($profile_picture) && file_exists($profile_pic_path)) {
+    $timestamp = filemtime($profile_pic_path);
+    $profile_pic_url .= '?t=' . $timestamp;
+    $profile_pic_timestamp = $timestamp;
+} elseif (isset($_SESSION['profile_updated'])) {
+    // If profile was recently updated, use session timestamp
+    $profile_pic_url .= '?t=' . $_SESSION['profile_updated'];
+    $profile_pic_timestamp = $_SESSION['profile_updated'];
+} else {
+    // Default to current time
+    $profile_pic_url .= '?t=' . time();
+    $profile_pic_timestamp = time();
 }
 ?>
 <!DOCTYPE html>
@@ -393,9 +414,18 @@ function getModuleTitle($module) {
         .animate-pulse {
             animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
         }
+        
+        .profile-pic {
+            transition: opacity 0.3s ease;
+        }
+        
+        .profile-pic-updating {
+            opacity: 0.7;
+            filter: blur(2px);
+        }
     </style>
 </head>
-<body class="bg-gray-50">
+<body class="bg-gray-50" data-profile-updated="<?php echo $profile_updated; ?>">
     <!-- Desktop Sidebar -->
     <div class="sidebar hidden md:flex md:flex-col md:w-64 h-screen fixed">
         <!-- Logo -->
@@ -414,12 +444,12 @@ function getModuleTitle($module) {
         <div class="p-6 border-b border-blue-400/30">
             <div class="flex items-center space-x-4">
                 <div class="relative">
-                    <?php 
-                    $profile_pic_path = "../uploads/profile_pictures/" . ($profile_picture ?? '');
-                    if (!empty($profile_picture) && file_exists($profile_pic_path)): 
-                    ?>
-                        <img src="<?php echo $profile_pic_path; ?>" 
-                             alt="Profile" class="w-12 h-12 rounded-full object-cover border-2 border-white shadow-sm">
+                    <?php if (!empty($profile_picture) && file_exists($profile_pic_path)): ?>
+                        <img src="<?php echo $profile_pic_url; ?>" 
+                             alt="Profile" 
+                             class="w-12 h-12 rounded-full object-cover border-2 border-white shadow-sm profile-pic"
+                             id="sidebarProfilePic"
+                             data-timestamp="<?php echo $profile_pic_timestamp; ?>">
                     <?php else: ?>
                         <div class="w-12 h-12 rounded-full bg-gradient-to-r from-blue-600 to-blue-500 flex items-center justify-center text-white font-bold text-lg">
                             <?php echo strtoupper(substr($full_name, 0, 1)); ?>
@@ -542,12 +572,12 @@ function getModuleTitle($module) {
                         <!-- User Menu -->
                         <div class="relative">
                             <button id="userMenuButton" class="flex items-center space-x-2 focus:outline-none">
-                                <?php 
-                                $profile_pic_path = "../uploads/profile_pictures/" . ($profile_picture ?? '');
-                                if (!empty($profile_picture) && file_exists($profile_pic_path)): 
-                                ?>
-                                    <img src="<?php echo $profile_pic_path; ?>" 
-                                         alt="Profile" class="w-10 h-10 rounded-full object-cover border-2 border-white shadow-sm">
+                                <?php if (!empty($profile_picture) && file_exists($profile_pic_path)): ?>
+                                    <img src="<?php echo $profile_pic_url; ?>" 
+                                         alt="Profile" 
+                                         class="w-10 h-10 rounded-full object-cover border-2 border-white shadow-sm profile-pic"
+                                         id="headerProfilePic"
+                                         data-timestamp="<?php echo $profile_pic_timestamp; ?>">
                                 <?php else: ?>
                                     <div class="w-10 h-10 rounded-full bg-gradient-to-r from-blue-600 to-blue-500 flex items-center justify-center text-white font-semibold">
                                         <?php echo strtoupper(substr($full_name, 0, 1)); ?>
@@ -562,8 +592,11 @@ function getModuleTitle($module) {
                                 <div class="p-4 border-b">
                                     <div class="flex items-center space-x-3 mb-2">
                                         <?php if (!empty($profile_picture) && file_exists($profile_pic_path)): ?>
-                                            <img src="<?php echo $profile_pic_path; ?>" 
-                                                 alt="Profile" class="w-10 h-10 rounded-full object-cover">
+                                            <img src="<?php echo $profile_pic_url; ?>" 
+                                                 alt="Profile" 
+                                                 class="w-10 h-10 rounded-full object-cover profile-pic"
+                                                 id="dropdownProfilePic"
+                                                 data-timestamp="<?php echo $profile_pic_timestamp; ?>">
                                         <?php else: ?>
                                             <div class="w-10 h-10 rounded-full bg-gradient-to-r from-blue-600 to-blue-500 flex items-center justify-center text-white font-bold">
                                                 <?php echo strtoupper(substr($full_name, 0, 1)); ?>
@@ -970,6 +1003,81 @@ function getModuleTitle($module) {
         if (window.history.replaceState) {
             window.history.replaceState(null, null, window.location.href);
         }
+        
+        // Function to refresh profile images with new timestamp
+        function refreshProfileImages() {
+            const timestamp = Date.now();
+            const profilePics = document.querySelectorAll('.profile-pic');
+            
+            profilePics.forEach(pic => {
+                const currentSrc = pic.src.split('?')[0];
+                if (currentSrc.includes('profile_pictures')) {
+                    pic.src = currentSrc + '?t=' + timestamp;
+                    pic.classList.add('profile-pic-updating');
+                    
+                    // Remove updating class after image loads
+                    pic.onload = function() {
+                        this.classList.remove('profile-pic-updating');
+                    };
+                }
+            });
+        }
+        
+        // Check if profile was recently updated
+        document.addEventListener('DOMContentLoaded', function() {
+            const body = document.querySelector('body');
+            const profileUpdated = body.getAttribute('data-profile-updated');
+            const sessionProfileUpdated = sessionStorage.getItem('profileUpdated');
+            
+            // Clear session flag
+            if (sessionProfileUpdated) {
+                sessionStorage.removeItem('profileUpdated');
+            }
+            
+            // If profile was updated (either from session or sessionStorage), refresh images
+            if (profileUpdated > 0 || sessionProfileUpdated) {
+                // Clear session update flag
+                <?php unset($_SESSION['profile_updated']); ?>
+                
+                // Refresh images immediately
+                setTimeout(refreshProfileImages, 100);
+                
+                // Refresh again after a short delay to ensure image is loaded
+                setTimeout(refreshProfileImages, 500);
+            }
+            
+            // Listen for custom events from profile module
+            window.addEventListener('profilePictureChanged', function() {
+                refreshProfileImages();
+                
+                // Also refresh after a delay
+                setTimeout(refreshProfileImages, 300);
+                setTimeout(refreshProfileImages, 1000);
+            });
+            
+            // Periodically check for profile updates (every 30 seconds)
+            setInterval(function() {
+                // Check if profile module is active
+                if (window.location.href.includes('module=profile')) {
+                    // Profile module handles its own updates
+                    return;
+                }
+                
+                // Make a lightweight check for profile updates
+                fetch('?check_profile=1', {
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.profile_updated) {
+                        refreshProfileImages();
+                    }
+                })
+                .catch(error => console.error('Profile check error:', error));
+            }, 30000);
+        });
     </script>
 </body>
 </html>
