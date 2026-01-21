@@ -42,7 +42,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $new_image_uploaded = false;
             
             if (!empty($_FILES['profile_picture']['name'])) {
-                $upload_dir = "../uploads/profile_pictures/";
+                $upload_dir = "dec/uploads/profile_pictures/";
                 if (!file_exists($upload_dir)) {
                     mkdir($upload_dir, 0777, true);
                 }
@@ -124,7 +124,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 
                 // If new image was uploaded, output JavaScript to update images immediately
                 if ($new_image_uploaded) {
-                    $image_url = '../uploads/profile_pictures/' . $profile_picture;
+                    $image_url = 'dec/uploads/profile_pictures/' . $profile_picture;
                     echo '<script>';
                     echo 'const event = new CustomEvent("profilePictureUpdated", { detail: { imageUrl: "' . $image_url . '" } });';
                     echo 'document.dispatchEvent(event);';
@@ -199,7 +199,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                             <?php 
                             // Use session variable first, then database
                             $current_profile_pic = $_SESSION['profile_picture'] ?? $user['profile_picture'] ?? '';
-                            $profile_pic_path = "../uploads/profile_pictures/" . $current_profile_pic;
+                            $profile_pic_path = "dec/uploads/profile_pictures/" . $current_profile_pic;
                             
                             if (!empty($current_profile_pic) && file_exists($profile_pic_path)): 
                                 // Add cache-busting timestamp
