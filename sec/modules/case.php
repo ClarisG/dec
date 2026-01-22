@@ -29,7 +29,7 @@
                                 $blotter_count = $blotter_stmt->fetch(PDO::FETCH_ASSOC);
                                 echo 'BLT-' . date('Y') . '-001 to ' . ($blotter_count ? '0' . $blotter_count['last_blotter'] : '045');
                             } catch (Exception $e) {
-                                echo 'BLT-2024-001 to 045';
+                                echo 'BLT-' . date('Y') . '-001 to 045';
                             }
                             ?>
                         </p>
@@ -92,17 +92,25 @@
         <div class="flex justify-between items-center mb-4">
             <h3 class="text-xl font-bold text-gray-800">Filter Reports</h3>
             <div class="flex space-x-2">
-                <button id="filterAll" class="px-4 py-2 bg-blue-600 text-white rounded-lg">All</button>
-                <button id="filterBarangay" class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg">Barangay Matters</button>
-                <button id="filterCriminal" class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg">Criminal</button>
-                <button id="filterCivil" class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg">Civil</button>
+                <button id="filterAll" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+                    All
+                </button>
+                <button id="filterBarangay" class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors">
+                    Barangay Matters
+                </button>
+                <button id="filterCriminal" class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors">
+                    Criminal
+                </button>
+                <button id="filterCivil" class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors">
+                    Civil
+                </button>
             </div>
         </div>
         
         <form id="filterForm" method="GET" class="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">Status</label>
-                <select name="status" class="w-full p-2 border border-gray-300 rounded-lg">
+                <select name="status" class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                     <option value="">All Status</option>
                     <option value="pending">Pending</option>
                     <option value="assigned">Assigned</option>
@@ -113,26 +121,31 @@
             </div>
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">Category</label>
-                <select name="category" class="w-full p-2 border border-gray-300 rounded-lg">
+                <select name="category" class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                     <option value="">All Categories</option>
                     <option value="Barangay Matter">Barangay Matter</option>
                     <option value="Criminal">Criminal</option>
                     <option value="Civil">Civil</option>
                     <option value="VAWC">VAWC</option>
                     <option value="Minor">Minor</option>
+                    <option value="Other">Other</option>
                 </select>
             </div>
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">From Date</label>
-                <input type="date" name="from_date" class="w-full p-2 border border-gray-300 rounded-lg">
+                <input type="date" name="from_date" class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
             </div>
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">To Date</label>
-                <input type="date" name="to_date" class="w-full p-2 border border-gray-300 rounded-lg">
+                <input type="date" name="to_date" class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
             </div>
             <div class="flex items-end space-x-2">
-                <button type="button" id="clearFilter" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Clear</button>
-                <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Apply</button>
+                <button type="button" id="clearFilter" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors">
+                    Clear
+                </button>
+                <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+                    Apply
+                </button>
             </div>
         </form>
     </div>
@@ -164,7 +177,6 @@
                     </tr>
                 </thead>
                 <tbody id="casesTableBody">
-                    <!-- Content loaded via AJAX -->
                     <tr>
                         <td colspan="7" class="py-8 text-center text-gray-500">
                             <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mb-4"></div>
@@ -198,11 +210,11 @@
         
         <div class="p-6 border-t bg-gray-50 flex justify-end space-x-3">
             <button onclick="closeCaseDetailsModal()" 
-                    class="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50">
+                    class="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors">
                 Close
             </button>
             <button onclick="printCaseDetails()" 
-                    class="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                    class="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
                 <i class="fas fa-print mr-2"></i> Print Report
             </button>
         </div>
@@ -225,7 +237,7 @@
         
         <div class="p-6 border-t bg-gray-50 flex justify-end">
             <button onclick="closeAttachmentsModal()" 
-                    class="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50">
+                    class="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors">
                 Close
             </button>
         </div>
@@ -244,7 +256,80 @@
         
         <div class="p-6 overflow-y-auto max-h-[70vh]">
             <form id="newBlotterForm" method="POST" action="../../handlers/create_blotter.php" enctype="multipart/form-data">
-                <!-- Form content remains the same -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Complainant Name</label>
+                        <input type="text" name="complainant_name" required
+                               class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Complainant Contact</label>
+                        <input type="text" name="complainant_contact" required
+                               class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Case Category</label>
+                        <select name="category" required
+                                class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                            <option value="">Select Category</option>
+                            <option value="Barangay Matter">Barangay Matter</option>
+                            <option value="Criminal">Criminal Case</option>
+                            <option value="Civil">Civil Case</option>
+                            <option value="VAWC">VAWC</option>
+                            <option value="Minor">Minor Case</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Incident Date</label>
+                        <input type="date" name="incident_date" required
+                               class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+                </div>
+                
+                <div class="mb-6">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Case Description</label>
+                    <textarea name="description" rows="4" required
+                              class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                              placeholder="Provide detailed description of the incident..."></textarea>
+                </div>
+                
+                <div class="mb-6">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Attachments (Optional)</label>
+                    <div class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+                        <div class="flex flex-col items-center justify-center">
+                            <i class="fas fa-cloud-upload-alt text-4xl text-gray-400 mb-3"></i>
+                            <p class="text-gray-600 mb-2">Drag & drop files or click to browse</p>
+                            <p class="text-sm text-gray-500 mb-4">Supports images, PDF, DOCX, and videos (Max 10MB each)</p>
+                            <input type="file" name="attachments[]" multiple 
+                                   accept=".jpg,.jpeg,.png,.gif,.pdf,.doc,.docx,.mp4,.avi,.mov"
+                                   class="hidden" id="fileInput">
+                            <button type="button" onclick="document.getElementById('fileInput').click()" 
+                                    class="px-4 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors">
+                                <i class="fas fa-plus mr-2"></i> Add Files
+                            </button>
+                        </div>
+                        <div id="fileList" class="mt-4 text-left"></div>
+                    </div>
+                </div>
+                
+                <div class="mb-6">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Initial Action</label>
+                    <textarea name="initial_action" rows="2"
+                              class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                              placeholder="Initial action taken or recommended..."></textarea>
+                </div>
+                
+                <div class="flex justify-end space-x-3">
+                    <button type="button" onclick="closeNewBlotterModal()" 
+                            class="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors">
+                        Cancel
+                    </button>
+                    <button type="submit" 
+                            class="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+                        <i class="fas fa-save mr-2"></i> Save Blotter Entry
+                    </button>
+                </div>
             </form>
         </div>
     </div>
@@ -263,16 +348,20 @@
         <div class="p-6 overflow-y-auto max-h-[70vh]">
             <div id="assignmentModalContent">
                 <!-- Content will be loaded via AJAX -->
+                <div class="text-center py-8">
+                    <div class="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
+                    <p class="text-gray-600">Loading assignment options...</p>
+                </div>
             </div>
         </div>
         
         <div class="p-6 border-t bg-gray-50 flex justify-end space-x-3">
             <button onclick="closeAssignmentModal()" 
-                    class="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50">
+                    class="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors">
                 Cancel
             </button>
             <button onclick="submitAssignment()" 
-                    class="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                    class="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
                 <i class="fas fa-check mr-2"></i> Assign Case
             </button>
         </div>
@@ -387,49 +476,49 @@
         color: #1e40af;
     }
     
-    .badge.badge-pending {
-        padding: 0.25rem 0.5rem;
+    .badge-pending {
         background-color: #fef3c7;
         color: #92400e;
         border-radius: 9999px;
         font-size: 0.75rem;
         font-weight: 500;
+        padding: 0.25rem 0.75rem;
     }
     
-    .badge.badge-assigned {
-        padding: 0.25rem 0.5rem;
+    .badge-assigned {
         background-color: #dbeafe;
         color: #1e40af;
         border-radius: 9999px;
         font-size: 0.75rem;
         font-weight: 500;
+        padding: 0.25rem 0.75rem;
     }
     
-    .badge.badge-in-progress {
-        padding: 0.25rem 0.5rem;
-        background-color: #fef3c7;
-        color: #92400e;
+    .badge-in-progress {
+        background-color: #f3e8ff;
+        color: #7c3aed;
         border-radius: 9999px;
         font-size: 0.75rem;
         font-weight: 500;
+        padding: 0.25rem 0.75rem;
     }
     
-    .badge.badge-resolved {
-        padding: 0.25rem 0.5rem;
+    .badge-resolved {
         background-color: #d1fae5;
         color: #065f46;
         border-radius: 9999px;
         font-size: 0.75rem;
         font-weight: 500;
+        padding: 0.25rem 0.75rem;
     }
     
-    .badge.badge-closed {
-        padding: 0.25rem 0.5rem;
+    .badge-closed {
         background-color: #e5e7eb;
         color: #374151;
         border-radius: 9999px;
         font-size: 0.75rem;
         font-weight: 500;
+        padding: 0.25rem 0.75rem;
     }
     
     .pagination-btn {
@@ -456,6 +545,43 @@
         opacity: 0.5;
         cursor: not-allowed;
     }
+    
+    .category-badge {
+        padding: 0.25rem 0.75rem;
+        border-radius: 9999px;
+        font-size: 0.75rem;
+        font-weight: 500;
+    }
+    
+    .category-barangay {
+        background-color: #d1fae5;
+        color: #065f46;
+    }
+    
+    .category-criminal {
+        background-color: #fee2e2;
+        color: #dc2626;
+    }
+    
+    .category-civil {
+        background-color: #dbeafe;
+        color: #1e40af;
+    }
+    
+    .category-vawc {
+        background-color: #f3e8ff;
+        color: #7c3aed;
+    }
+    
+    .category-minor {
+        background-color: #fef3c7;
+        color: #92400e;
+    }
+    
+    .category-other {
+        background-color: #e5e7eb;
+        color: #374151;
+    }
 </style>
 
 <script>
@@ -463,42 +589,33 @@
 let currentPage = 1;
 let totalPages = 1;
 let currentFilter = {
-    status: '',
+    status: 'pending',
     category: '',
     from_date: '',
     to_date: ''
 };
 
-// Load cases on page load
+// Initialize when page loads
 document.addEventListener('DOMContentLoaded', function() {
     loadCases();
     setupFilterListeners();
+    setupFileUpload();
 });
 
 // Setup filter listeners
 function setupFilterListeners() {
     // Quick filter buttons
     document.getElementById('filterAll').addEventListener('click', function() {
-        document.querySelectorAll('#filterForm select, #filterForm input').forEach(el => {
-            if (el.tagName === 'SELECT') el.value = '';
-            if (el.tagName === 'INPUT' && el.type === 'date') el.value = '';
-        });
-        currentFilter = {
-            status: '',
-            category: '',
-            from_date: '',
-            to_date: ''
-        };
+        resetFilters();
+        currentFilter.status = '';
         currentPage = 1;
         loadCases();
         updateFilterButtons('all');
     });
 
     document.getElementById('filterBarangay').addEventListener('click', function() {
-        currentFilter = {
-            ...currentFilter,
-            category: 'Barangay Matter'
-        };
+        resetFilters();
+        currentFilter.category = 'Barangay Matter';
         document.querySelector('select[name="category"]').value = 'Barangay Matter';
         currentPage = 1;
         loadCases();
@@ -506,10 +623,8 @@ function setupFilterListeners() {
     });
 
     document.getElementById('filterCriminal').addEventListener('click', function() {
-        currentFilter = {
-            ...currentFilter,
-            category: 'Criminal'
-        };
+        resetFilters();
+        currentFilter.category = 'Criminal';
         document.querySelector('select[name="category"]').value = 'Criminal';
         currentPage = 1;
         loadCases();
@@ -517,10 +632,8 @@ function setupFilterListeners() {
     });
 
     document.getElementById('filterCivil').addEventListener('click', function() {
-        currentFilter = {
-            ...currentFilter,
-            category: 'Civil'
-        };
+        resetFilters();
+        currentFilter.category = 'Civil';
         document.querySelector('select[name="category"]').value = 'Civil';
         currentPage = 1;
         loadCases();
@@ -531,10 +644,10 @@ function setupFilterListeners() {
     document.getElementById('filterForm').addEventListener('submit', function(e) {
         e.preventDefault();
         currentFilter = {
-            status: document.querySelector('select[name="status"]').value,
-            category: document.querySelector('select[name="category"]').value,
-            from_date: document.querySelector('input[name="from_date"]').value,
-            to_date: document.querySelector('input[name="to_date"]').value
+            status: document.querySelector('select[name="status"]').value || '',
+            category: document.querySelector('select[name="category"]').value || '',
+            from_date: document.querySelector('input[name="from_date"]').value || '',
+            to_date: document.querySelector('input[name="to_date"]').value || ''
         };
         currentPage = 1;
         loadCases();
@@ -543,9 +656,9 @@ function setupFilterListeners() {
 
     // Clear filter button
     document.getElementById('clearFilter').addEventListener('click', function() {
-        document.getElementById('filterForm').reset();
+        resetFilters();
         currentFilter = {
-            status: '',
+            status: 'pending',
             category: '',
             from_date: '',
             to_date: ''
@@ -554,6 +667,13 @@ function setupFilterListeners() {
         loadCases();
         updateFilterButtons('all');
     });
+}
+
+function resetFilters() {
+    document.querySelector('select[name="status"]').value = '';
+    document.querySelector('select[name="category"]').value = '';
+    document.querySelector('input[name="from_date"]').value = '';
+    document.querySelector('input[name="to_date"]').value = '';
 }
 
 function updateFilterButtons(activeFilter) {
@@ -566,8 +686,10 @@ function updateFilterButtons(activeFilter) {
 
     // Reset all buttons
     Object.values(buttons).forEach(btn => {
-        btn.classList.remove('bg-blue-600', 'text-white');
-        btn.classList.add('bg-gray-100', 'text-gray-700');
+        if (btn) {
+            btn.classList.remove('bg-blue-600', 'text-white');
+            btn.classList.add('bg-gray-100', 'text-gray-700');
+        }
     });
 
     // Set active button
@@ -597,8 +719,20 @@ function loadCases() {
         ...currentFilter
     });
     
+    // Remove empty values
+    queryParams.forEach((value, key) => {
+        if (!value) queryParams.delete(key);
+    });
+    
     fetch(`../../handlers/load_cases.php?${queryParams}`)
-        .then(response => response.json())
+        .then(response => {
+            // Check content type
+            const contentType = response.headers.get('content-type');
+            if (!contentType || !contentType.includes('application/json')) {
+                throw new Error('Expected JSON response but got: ' + contentType);
+            }
+            return response.json();
+        })
         .then(data => {
             if (data.success) {
                 renderCasesTable(data.cases);
@@ -606,32 +740,50 @@ function loadCases() {
                 document.getElementById('currentPage').textContent = data.currentPage;
                 document.getElementById('totalPages').textContent = data.totalPages;
             } else {
-                tableBody.innerHTML = `
-                    <tr>
-                        <td colspan="7" class="py-8 text-center text-red-500">
-                            <i class="fas fa-exclamation-triangle mr-2"></i>
-                            ${data.message}
-                        </td>
-                    </tr>
-                `;
+                showError(data.message || 'Failed to load cases');
             }
         })
         .catch(error => {
-            tableBody.innerHTML = `
-                <tr>
-                    <td colspan="7" class="py-8 text-center text-red-500">
-                        <i class="fas fa-exclamation-triangle mr-2"></i>
-                        Error loading cases: ${error.message}
-                    </td>
-                </tr>
-            `;
+            console.error('Fetch error:', error);
+            showError('Error loading cases. Please try again.');
+            // Try fallback
+            setTimeout(() => {
+                loadFallbackCases();
+            }, 1000);
         });
+}
+
+function loadFallbackCases() {
+    const tableBody = document.getElementById('casesTableBody');
+    
+    // Simple fallback - show static message
+    tableBody.innerHTML = `
+        <tr>
+            <td colspan="7" class="py-8 text-center text-gray-500">
+                <i class="fas fa-database text-4xl mb-4 text-gray-300"></i>
+                <p>Unable to load cases at the moment.</p>
+                <p class="text-sm text-gray-400 mt-2">Please check your connection and try again.</p>
+            </td>
+        </tr>
+    `;
+}
+
+function showError(message) {
+    const tableBody = document.getElementById('casesTableBody');
+    tableBody.innerHTML = `
+        <tr>
+            <td colspan="7" class="py-8 text-center text-red-500">
+                <i class="fas fa-exclamation-triangle mr-2"></i>
+                ${message}
+            </td>
+        </tr>
+    `;
 }
 
 function renderCasesTable(cases) {
     const tableBody = document.getElementById('casesTableBody');
     
-    if (cases.length === 0) {
+    if (!cases || cases.length === 0) {
         tableBody.innerHTML = `
             <tr>
                 <td colspan="7" class="py-8 text-center text-gray-500">
@@ -646,24 +798,33 @@ function renderCasesTable(cases) {
     let html = '';
     cases.forEach(caseItem => {
         const statusClass = getStatusClass(caseItem.status);
-        const statusText = caseItem.status.replace('_', ' ').toUpperCase();
+        const statusText = formatStatusText(caseItem.status);
+        const categoryClass = getCategoryClass(caseItem.category);
+        const formattedDate = formatDate(caseItem.created_at);
+        const complainantName = escapeHtml(caseItem.complainant_name || 'Unknown');
+        const category = escapeHtml(caseItem.category || 'Uncategorized');
         
         html += `
-            <tr data-case-id="${caseItem.id}">
+            <tr data-case-id="${caseItem.id}" class="hover:bg-gray-50 transition-colors">
                 <td class="py-3 px-4">
                     <span class="font-medium text-blue-600">#${caseItem.id}</span>
-                    ${caseItem.blotter_number ? `<p class="text-xs text-green-600">${caseItem.blotter_number}</p>` : '<p class="text-xs text-gray-500">Needs blotter number</p>'}
+                    ${caseItem.blotter_number ? 
+                        `<p class="text-xs text-green-600 mt-1">${escapeHtml(caseItem.blotter_number)}</p>` : 
+                        '<p class="text-xs text-gray-500 mt-1">Needs blotter number</p>'
+                    }
                 </td>
-                <td class="py-3 px-4">${formatDate(caseItem.created_at)}</td>
-                <td class="py-3 px-4">${escapeHtml(caseItem.complainant_name)}</td>
+                <td class="py-3 px-4">${formattedDate}</td>
+                <td class="py-3 px-4">${complainantName}</td>
                 <td class="py-3 px-4">
-                    <span class="badge ${getCategoryClass(caseItem.category)}">${escapeHtml(caseItem.category)}</span>
+                    <span class="category-badge ${categoryClass}">
+                        ${category}
+                    </span>
                 </td>
                 <td class="py-3 px-4">
                     ${caseItem.attachment_count > 0 ? 
                         `<div class="flex items-center">
                             <span class="mr-2 text-sm text-gray-600">${caseItem.attachment_count} file(s)</span>
-                            <button onclick="viewAttachments(${caseItem.id})" class="text-blue-600 hover:text-blue-800" title="View attachments">
+                            <button onclick="viewAttachments(${caseItem.id})" class="text-blue-600 hover:text-blue-800 transition-colors" title="View attachments">
                                 <i class="fas fa-paperclip"></i>
                             </button>
                         </div>` : 
@@ -671,18 +832,25 @@ function renderCasesTable(cases) {
                     }
                 </td>
                 <td class="py-3 px-4">
-                    <span class="px-3 py-1 rounded-full text-xs font-medium ${statusClass}">${statusText}</span>
+                    <span class="${statusClass}">
+                        ${statusText}
+                    </span>
                 </td>
                 <td class="py-3 px-4">
                     <div class="flex space-x-2">
-                        <button onclick="viewCaseDetails(${caseItem.id})" class="px-3 py-1 bg-gray-100 text-gray-700 rounded-lg text-sm hover:bg-gray-200" title="View full report">
+                        <button onclick="viewCaseDetails(${caseItem.id})" 
+                                class="px-3 py-1 bg-gray-100 text-gray-700 rounded-lg text-sm hover:bg-gray-200 transition-colors" 
+                                title="View full report">
                             <i class="fas fa-eye mr-1"></i> View
                         </button>
                         ${caseItem.status === 'pending' ? 
-                            `<button onclick="openAssignmentModal(${caseItem.id})" class="px-3 py-1 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700" title="Assign to officer">
+                            `<button onclick="openAssignmentModal(${caseItem.id})" 
+                                    class="px-3 py-1 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 transition-colors" 
+                                    title="Assign to officer">
                                 <i class="fas fa-user-check mr-1"></i> Assign
                             </button>` : 
-                            `<button class="px-3 py-1 bg-gray-300 text-gray-600 rounded-lg text-sm cursor-not-allowed" title="Already assigned">
+                            `<button class="px-3 py-1 bg-gray-300 text-gray-600 rounded-lg text-sm cursor-not-allowed" 
+                                    title="Already assigned">
                                 <i class="fas fa-user-check mr-1"></i> Assigned
                             </button>`
                         }
@@ -748,47 +916,74 @@ function changePage(page) {
     if (page < 1 || page > totalPages) return;
     currentPage = page;
     loadCases();
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    // Smooth scroll to top of table
+    document.querySelector('.case-table').scrollIntoView({ behavior: 'smooth' });
 }
 
 // Utility functions
 function formatDate(dateString) {
+    if (!dateString) return 'N/A';
     const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' });
+    if (isNaN(date.getTime())) return 'Invalid Date';
+    return date.toLocaleDateString('en-US', { 
+        month: 'short', 
+        day: '2-digit', 
+        year: 'numeric' 
+    });
+}
+
+function formatStatusText(status) {
+    if (!status) return 'UNKNOWN';
+    return status.replace('_', ' ').toUpperCase();
 }
 
 function getStatusClass(status) {
     switch(status) {
-        case 'pending': return 'bg-yellow-100 text-yellow-800';
-        case 'assigned': return 'bg-blue-100 text-blue-800';
-        case 'in_progress': return 'bg-purple-100 text-purple-800';
-        case 'resolved': return 'bg-green-100 text-green-800';
-        case 'closed': return 'bg-gray-100 text-gray-800';
-        default: return 'bg-gray-100 text-gray-800';
+        case 'pending': return 'badge-pending';
+        case 'assigned': return 'badge-assigned';
+        case 'in_progress': return 'badge-in-progress';
+        case 'resolved': return 'badge-resolved';
+        case 'closed': return 'badge-closed';
+        default: return 'badge-pending';
     }
 }
 
 function getCategoryClass(category) {
     switch(category) {
-        case 'Barangay Matter': return 'badge-pending';
-        case 'Criminal': return 'badge-bg-red-100 text-red-800';
-        case 'Civil': return 'badge-bg-blue-100 text-blue-800';
-        default: return 'badge-pending';
+        case 'Barangay Matter': return 'category-barangay';
+        case 'Criminal': return 'category-criminal';
+        case 'Civil': return 'category-civil';
+        case 'VAWC': return 'category-vawc';
+        case 'Minor': return 'category-minor';
+        default: return 'category-other';
     }
 }
 
 function escapeHtml(text) {
+    if (!text) return '';
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
 }
 
-// File preview handling (keep existing code)
-document.getElementById('fileInput')?.addEventListener('change', function(e) {
+// File upload handling
+function setupFileUpload() {
+    const fileInput = document.getElementById('fileInput');
+    if (fileInput) {
+        fileInput.addEventListener('change', handleFileSelect);
+    }
+}
+
+function handleFileSelect(e) {
     const fileList = document.getElementById('fileList');
     fileList.innerHTML = '';
     
     Array.from(e.target.files).forEach(file => {
+        if (file.size > 10 * 1024 * 1024) { // 10MB limit
+            alert(`File ${file.name} exceeds 10MB limit. Skipping.`);
+            return;
+        }
+        
         const fileItem = document.createElement('div');
         fileItem.className = 'file-item';
         
@@ -811,18 +1006,18 @@ document.getElementById('fileInput')?.addEventListener('change', function(e) {
         
         fileList.appendChild(fileItem);
     });
-});
+}
 
 function getFileIcon(filename) {
     const ext = filename.split('.').pop().toLowerCase();
     
-    if (['jpg', 'jpeg', 'png', 'gif', 'bmp'].includes(ext)) {
+    if (['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'].includes(ext)) {
         return { class: 'file-icon-image', icon: 'fas fa-image' };
     } else if (['pdf'].includes(ext)) {
         return { class: 'file-icon-pdf', icon: 'fas fa-file-pdf' };
-    } else if (['doc', 'docx'].includes(ext)) {
+    } else if (['doc', 'docx', 'txt', 'rtf'].includes(ext)) {
         return { class: 'file-icon-doc', icon: 'fas fa-file-word' };
-    } else if (['mp4', 'avi', 'mov', 'mkv', 'wmv'].includes(ext)) {
+    } else if (['mp4', 'avi', 'mov', 'mkv', 'wmv', 'flv'].includes(ext)) {
         return { class: 'file-icon-video', icon: 'fas fa-video' };
     } else {
         return { class: 'bg-gray-100 text-gray-600', icon: 'fas fa-file' };
@@ -862,10 +1057,12 @@ function viewCaseDetails(caseId) {
             content.innerHTML = data;
         })
         .catch(error => {
+            console.error('Error loading case details:', error);
             content.innerHTML = `
                 <div class="text-center py-8">
                     <i class="fas fa-exclamation-triangle text-red-500 text-4xl mb-4"></i>
                     <p class="text-red-600">Error loading case details</p>
+                    <p class="text-sm text-gray-500 mt-2">${error.message}</p>
                 </div>
             `;
         });
@@ -892,6 +1089,7 @@ function viewAttachments(caseId) {
             content.innerHTML = data;
         })
         .catch(error => {
+            console.error('Error loading attachments:', error);
             content.innerHTML = `
                 <div class="text-center py-8">
                     <i class="fas fa-exclamation-triangle text-red-500 text-4xl mb-4"></i>
@@ -933,6 +1131,7 @@ function openAssignmentModal(caseId) {
             attachAssignmentListeners();
         })
         .catch(error => {
+            console.error('Error loading assignment options:', error);
             content.innerHTML = `
                 <div class="text-center py-8">
                     <i class="fas fa-exclamation-triangle text-red-500 text-4xl mb-4"></i>
@@ -999,8 +1198,11 @@ function loadOfficersForType(type) {
                     updateSelectionInfo();
                 });
             });
+            
+            updateSelectionInfo();
         })
         .catch(error => {
+            console.error('Error loading officers:', error);
             officerList.innerHTML = `
                 <div class="text-center py-4">
                     <i class="fas fa-exclamation-triangle text-red-500 text-2xl mb-2"></i>
@@ -1018,7 +1220,9 @@ function updateSelectionInfo() {
         const officerItem = document.querySelector(`.officer-item[data-officer-id="${selectedOfficerId}"]`);
         if (officerItem) {
             const officerName = officerItem.querySelector('.officer-name')?.textContent || 'Selected Officer';
-            const displayTitle = selectedAssignmentTitle || (selectedOfficerType === 'lupon' ? 'Lupon Member' : 'Tanod');
+            const displayTitle = selectedAssignmentTitle || 
+                               (selectedOfficerType === 'lupon' ? 'Lupon Member' : 
+                               selectedOfficerType === 'lupon_chairman' ? 'Lupon Chairman' : 'Tanod');
             
             selectionInfo.innerHTML = `
                 <div class="bg-green-50 p-4 rounded-lg mb-4">
@@ -1026,7 +1230,7 @@ function updateSelectionInfo() {
                         <i class="fas fa-check-circle text-green-600 mr-2"></i>
                         <span class="font-medium">Selected:</span>
                         <span class="ml-2">${officerName}</span>
-                        <span class="ml-2 px-2 py-1 rounded-full text-xs font-medium ${selectedOfficerType === 'lupon' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'}">
+                        <span class="ml-2 px-2 py-1 rounded-full text-xs font-medium ${selectedOfficerType.includes('lupon') ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'}">
                             ${displayTitle}
                         </span>
                     </div>
@@ -1049,6 +1253,9 @@ function submitAssignment() {
         return;
     }
     
+    const confirmMessage = `Are you sure you want to assign Case #${selectedCaseId} to the selected officer?`;
+    if (!confirm(confirmMessage)) return;
+    
     const formData = new FormData();
     formData.append('case_id', selectedCaseId);
     formData.append('officer_id', selectedOfficerId);
@@ -1063,6 +1270,7 @@ function submitAssignment() {
         if (data.success) {
             alert('Case assigned successfully!');
             closeAssignmentModal();
+            // Reload cases to update status
             loadCases();
         } else {
             alert('Error assigning case: ' + (data.message || 'Unknown error'));
@@ -1092,8 +1300,10 @@ function openNewBlotterModal() {
 function closeNewBlotterModal() {
     document.getElementById('newBlotterModal').classList.add('hidden');
     document.getElementById('newBlotterModal').classList.remove('flex');
-    document.getElementById('newBlotterForm').reset();
-    document.getElementById('fileList').innerHTML = '';
+    const form = document.getElementById('newBlotterForm');
+    if (form) form.reset();
+    const fileList = document.getElementById('fileList');
+    if (fileList) fileList.innerHTML = '';
 }
 
 // Print case details
@@ -1101,38 +1311,93 @@ function printCaseDetails() {
     const content = document.getElementById('caseDetailsContent').innerHTML;
     const printWindow = window.open('', '_blank');
     printWindow.document.write(`
+        <!DOCTYPE html>
         <html>
             <head>
                 <title>Case Report - Print</title>
                 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
                 <style>
-                    body { font-family: Arial, sans-serif; padding: 20px; }
-                    .header { text-align: center; border-bottom: 2px solid #333; padding-bottom: 20px; margin-bottom: 20px; }
-                    .section { margin-bottom: 20px; }
-                    .label { font-weight: bold; color: #555; }
-                    .value { margin-bottom: 10px; }
-                    .attachments { margin-top: 20px; }
-                    .file-item { margin-bottom: 10px; padding: 10px; border: 1px solid #ddd; border-radius: 5px; }
+                    body { 
+                        font-family: Arial, sans-serif; 
+                        padding: 20px;
+                        color: #333;
+                    }
+                    .header { 
+                        text-align: center; 
+                        border-bottom: 2px solid #333; 
+                        padding-bottom: 20px; 
+                        margin-bottom: 30px; 
+                    }
+                    .header h1 {
+                        color: #2c3e50;
+                        margin-bottom: 10px;
+                    }
+                    .section { 
+                        margin-bottom: 25px; 
+                        padding: 15px;
+                        border: 1px solid #ddd;
+                        border-radius: 5px;
+                    }
+                    .section-title {
+                        color: #2c3e50;
+                        border-bottom: 1px solid #eee;
+                        padding-bottom: 10px;
+                        margin-bottom: 15px;
+                        font-weight: bold;
+                    }
+                    .info-grid {
+                        display: grid;
+                        grid-template-columns: 1fr 2fr;
+                        gap: 10px;
+                        margin-bottom: 10px;
+                    }
+                    .label { 
+                        font-weight: bold; 
+                        color: #555; 
+                    }
+                    .value { 
+                        color: #333;
+                    }
+                    .attachments { 
+                        margin-top: 20px; 
+                    }
+                    .file-item { 
+                        margin-bottom: 10px; 
+                        padding: 10px; 
+                        border: 1px solid #ddd; 
+                        border-radius: 5px;
+                        background: #f9f9f9;
+                    }
                     @media print {
-                        button { display: none; }
-                        .no-print { display: none; }
+                        button { display: none !important; }
+                        .no-print { display: none !important; }
+                        body { padding: 0; }
+                    }
+                    @page {
+                        margin: 0.5in;
                     }
                 </style>
             </head>
             <body>
                 <div class="header">
                     <h1>Barangay Case Report</h1>
-                    <p>Printed on ${new Date().toLocaleDateString()}</p>
+                    <p>Printed on ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}</p>
                 </div>
                 ${content}
                 <div class="no-print" style="margin-top: 30px; text-align: center;">
-                    <button onclick="window.print()" style="padding: 10px 20px; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer;">
-                        <i class="fas fa-print"></i> Print
+                    <button onclick="window.print()" style="padding: 10px 20px; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; margin-right: 10px;">
+                        <i class="fas fa-print"></i> Print Report
                     </button>
-                    <button onclick="window.close()" style="padding: 10px 20px; background: #6c757d; color: white; border: none; border-radius: 5px; cursor: pointer; margin-left: 10px;">
-                        Close
+                    <button onclick="window.close()" style="padding: 10px 20px; background: #6c757d; color: white; border: none; border-radius: 5px; cursor: pointer;">
+                        Close Window
                     </button>
                 </div>
+                <script>
+                    // Auto-print after loading
+                    setTimeout(function() {
+                        window.print();
+                    }, 500);
+                <\/script>
             </body>
         </html>
     `);
@@ -1141,14 +1406,17 @@ function printCaseDetails() {
 
 // Close modals when clicking outside
 window.onclick = function(event) {
-    const modals = ['caseDetailsModal', 'attachmentsModal', 'newBlotterModal', 'assignmentModal'];
-    modals.forEach(modalId => {
-        const modal = document.getElementById(modalId);
-        if (event.target == modal) {
-            if (modalId === 'caseDetailsModal') closeCaseDetailsModal();
-            if (modalId === 'attachmentsModal') closeAttachmentsModal();
-            if (modalId === 'newBlotterModal') closeNewBlotterModal();
-            if (modalId === 'assignmentModal') closeAssignmentModal();
+    const modals = [
+        { id: 'caseDetailsModal', close: closeCaseDetailsModal },
+        { id: 'attachmentsModal', close: closeAttachmentsModal },
+        { id: 'newBlotterModal', close: closeNewBlotterModal },
+        { id: 'assignmentModal', close: closeAssignmentModal }
+    ];
+    
+    modals.forEach(modal => {
+        const modalElement = document.getElementById(modal.id);
+        if (event.target === modalElement) {
+            modal.close();
         }
     });
 }
@@ -1157,4 +1425,14 @@ window.onclick = function(event) {
 if (window.history.replaceState) {
     window.history.replaceState(null, null, window.location.href);
 }
+
+// Keyboard shortcuts
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        closeCaseDetailsModal();
+        closeAttachmentsModal();
+        closeNewBlotterModal();
+        closeAssignmentModal();
+    }
+});
 </script>
