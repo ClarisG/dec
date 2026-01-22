@@ -1,3 +1,12 @@
+<?php
+// Temporary direct connection for testing
+try {
+    $conn = new PDO("mysql:host=localhost;dbname=leir_db;charset=utf8mb4", "root", "");
+    $conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+} catch(PDOException $e) {
+    die("Database connection failed: " . $e->getMessage());
+}
+?>
 <!-- Case-Blotter Management Module -->
 <div class="space-y-8">
     <!-- Header Section -->

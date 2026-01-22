@@ -1,19 +1,43 @@
 <?php
-// Start output buffering to prevent any stray output
-ob_start();
+// handlers/load_cases.php
 
-require_once '../config/database.php';
+// Start session and include database
 session_start();
 
-// Check if user is authorized
-if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'secretary') {
-    http_response_code(403);
-    echo json_encode(['success' => false, 'message' => 'Unauthorized access']);
+// First, try to include database.php with error handling
+$database_file = __DIR__ . '/../config/database.php';
+
+if (!file_exists($database_file)) {
+    echo json_encode([
+        'success' => false,
+        'message' => 'Database configuration file not found at: ' . $database_file
+    ]);
     exit;
 }
 
+// Include database configuration
+require_once $database_file;
+
 // Set header to JSON
 header('Content-Type: application/json');
+
+// Check if database connection is established
+if (!isset($conn)) {
+    echo json_encode([
+        'success' => false,
+        'message' => 'Database connection not established. Please run setup_database.php first.'
+    ]);
+    exit;
+}
+
+// Check if user is logged in (optional, depending on your requirements)
+if (!isset($_SESSION['user_id'])) {
+    echo json_encode([
+        'success' => false,
+        'message' => 'Session expired. Please login again.'
+    ]);
+    exit;
+}
 
 // Get filter parameters
 $page = isset($_GET['page']) ? max(1, intval($_GET['page'])) : 1;
@@ -22,85 +46,67 @@ $category = $_GET['category'] ?? '';
 $from_date = $_GET['from_date'] ?? '';
 $to_date = $_GET['to_date'] ?? '';
 
-// Default to pending cases if no status filter
-if (empty($status)) {
-    $status = 'pending';
-}
-
 $records_per_page = 10;
 $offset = ($page - 1) * $records_per_page;
 
 try {
-    // Initialize connection
-    if (!isset($conn)) {
-        throw new Exception('Database connection failed');
-    }
-    
-    // Build the base query
-    $query = "SELECT r.*, 
-             CONCAT(u.first_name, ' ', u.last_name) as complainant_name,
-             u.contact_number,
-             u.email,
-             (SELECT COUNT(*) FROM report_attachments WHERE report_id = r.id) as attachment_count
-             FROM reports r 
-             LEFT JOIN users u ON r.user_id = u.id 
-             WHERE 1=1";
-    
-    $count_query = "SELECT COUNT(*) as total FROM reports r WHERE 1=1";
-    
+    // Build query with filters
+    $where_clauses = [];
     $params = [];
     
-    // Add filters
-    if (!empty($status) && $status !== 'all') {
-        $query .= " AND r.status = :status";
-        $count_query .= " AND r.status = :status";
-        $params[':status'] = $status;
+    if (!empty($status)) {
+        $where_clauses[] = "r.status = ?";
+        $params[] = $status;
     }
     
-    if (!empty($category) && $category !== 'all') {
-        $query .= " AND r.category = :category";
-        $count_query .= " AND r.category = :category";
-        $params[':category'] = $category;
+    if (!empty($category)) {
+        $where_clauses[] = "r.category = ?";
+        $params[] = $category;
     }
     
     if (!empty($from_date)) {
-        $query .= " AND DATE(r.created_at) >= :from_date";
-        $count_query .= " AND DATE(r.created_at) >= :from_date";
-        $params[':from_date'] = $from_date;
+        $where_clauses[] = "DATE(r.created_at) >= ?";
+        $params[] = $from_date;
     }
     
     if (!empty($to_date)) {
-        $query .= " AND DATE(r.created_at) <= :to_date";
-        $count_query .= " AND DATE(r.created_at) <= :to_date";
-        $params[':to_date'] = $to_date;
+        $where_clauses[] = "DATE(r.created_at) <= ?";
+        $params[] = $to_date;
     }
     
-    // First, get total count
-    $count_stmt = $conn->prepare($count_query);
-    foreach ($params as $key => $value) {
-        $count_stmt->bindValue($key, $value);
+    // Default: show pending cases
+    if (empty($where_clauses)) {
+        $where_clauses[] = "r.status = 'pending'";
     }
-    $count_stmt->execute();
+    
+    $where_sql = !empty($where_clauses) ? "WHERE " . implode(" AND ", $where_clauses) : "";
+    
+    // Count total records
+    $count_sql = "SELECT COUNT(*) as total FROM reports r $where_sql";
+    $count_stmt = $conn->prepare($count_sql);
+    $count_stmt->execute($params);
     $total_records = $count_stmt->fetch(PDO::FETCH_ASSOC)['total'];
     $total_pages = ceil($total_records / $records_per_page);
     
-    // Add ordering and pagination to main query
-    $query .= " ORDER BY r.created_at ASC LIMIT :limit OFFSET :offset";
+    // Get cases with pagination
+    $cases_sql = "SELECT r.*, 
+                 CONCAT(u.first_name, ' ', u.last_name) as complainant_name,
+                 u.contact_number,
+                 u.email,
+                 (SELECT COUNT(*) FROM report_attachments ra WHERE ra.report_id = r.id) as attachment_count
+                 FROM reports r 
+                 LEFT JOIN users u ON r.user_id = u.id 
+                 $where_sql
+                 ORDER BY r.created_at ASC 
+                 LIMIT ? OFFSET ?";
     
-    // Fetch cases
-    $cases_stmt = $conn->prepare($query);
+    // Add pagination parameters
+    $params[] = $records_per_page;
+    $params[] = $offset;
     
-    // Bind all parameters including limit and offset
-    foreach ($params as $key => $value) {
-        $cases_stmt->bindValue($key, $value);
-    }
-    $cases_stmt->bindValue(':limit', $records_per_page, PDO::PARAM_INT);
-    $cases_stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
-    $cases_stmt->execute();
+    $cases_stmt = $conn->prepare($cases_sql);
+    $cases_stmt->execute($params);
     $cases = $cases_stmt->fetchAll(PDO::FETCH_ASSOC);
-    
-    // Clean output buffer
-    ob_clean();
     
     echo json_encode([
         'success' => true,
@@ -109,24 +115,21 @@ try {
         'totalPages' => $total_pages,
         'totalRecords' => $total_records,
         'recordsPerPage' => $records_per_page
-    ], JSON_PRETTY_PRINT);
+    ]);
     
 } catch (PDOException $e) {
-    // Clean output buffer
-    ob_clean();
+    // Log error for debugging
+    error_log("Database error in load_cases.php: " . $e->getMessage());
+    
     echo json_encode([
         'success' => false,
-        'message' => 'Database error: ' . $e->getMessage()
-    ], JSON_PRETTY_PRINT);
+        'message' => 'Database error. Please check your database setup.',
+        'debug_info' => (ini_get('display_errors') == '1') ? $e->getMessage() : null
+    ]);
 } catch (Exception $e) {
-    // Clean output buffer
-    ob_clean();
     echo json_encode([
         'success' => false,
         'message' => 'Error: ' . $e->getMessage()
-    ], JSON_PRETTY_PRINT);
+    ]);
 }
-
-// End output buffering
-ob_end_flush();
 ?>
