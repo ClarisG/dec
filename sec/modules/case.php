@@ -229,7 +229,7 @@
         </div>
         
         <div class="p-6 overflow-y-auto max-h-[70vh]">
-            <form id="newBlotterForm" method="POST" action="../handlers/create_blotter.php" enctype="multipart/form-data">
+            <form id="newBlotterForm" method="POST" action="../../handlers/create_blotter.php" enctype="multipart/form-data">
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-2">Complainant Name</label>
@@ -535,8 +535,8 @@ function viewCaseDetails(caseId) {
     modal.classList.remove('hidden');
     modal.classList.add('flex');
     
-    // Fetch case details via AJAX
-    fetch(`dec/handlers/get_case_details.php?id=${caseId}`)
+    // Fetch case details via AJAX - FIXED PATH
+    fetch(`../../handlers/get_case_details.php?id=${caseId}`)
         .then(response => response.text())
         .then(data => {
             content.innerHTML = data;
@@ -567,8 +567,8 @@ function viewAttachments(caseId) {
     modal.classList.remove('hidden');
     modal.classList.add('flex');
     
-    // Fetch attachments via AJAX
-    fetch(`dec/handlers/get_attachments.php?report_id=${caseId}`)
+    // Fetch attachments via AJAX - FIXED PATH
+    fetch(`../../handlers/get_attachments.php?report_id=${caseId}`)
         .then(response => response.text())
         .then(data => {
             content.innerHTML = data;
@@ -607,8 +607,8 @@ function openAssignmentModal(caseId) {
     modal.classList.remove('hidden');
     modal.classList.add('flex');
     
-    // Fetch assignment options via AJAX
-    fetch(`dec/handlers/get_assignment_options.php?case_id=${caseId}`)
+    // Fetch assignment options via AJAX - FIXED PATH
+    fetch(`../../handlers/get_assignment_options.php?case_id=${caseId}`)
         .then(response => response.text())
         .then(data => {
             content.innerHTML = data;
@@ -686,8 +686,8 @@ function loadOfficersForType(type) {
         </div>
     `;
     
-    // Fetch officers for the selected type
-    fetch(`dec/handlers/get_officers.php?type=${type}&case_id=${selectedCaseId}`)
+    // Fetch officers for the selected type - FIXED PATH
+    fetch(`../../handlers/get_officers.php?type=${type}&case_id=${selectedCaseId}`)
         .then(response => response.text())
         .then(data => {
             officerList.innerHTML = data;
@@ -798,12 +798,12 @@ function submitAssignment() {
             return;
         }
         
-        // Submit unassignment via AJAX
+        // Submit unassignment via AJAX - FIXED PATH
         const formData = new FormData();
         formData.append('case_id', selectedCaseId);
         formData.append('action', 'keep_pending');
         
-        fetch('../handlers/assign_case.php', {
+        fetch('../../handlers/assign_case.php', {
             method: 'POST',
             body: formData
         })
@@ -834,13 +834,13 @@ function submitAssignment() {
         return;
     }
     
-    // Submit assignment via AJAX
+    // Submit assignment via AJAX - FIXED PATH
     const formData = new FormData();
     formData.append('case_id', selectedCaseId);
     formData.append('officer_id', selectedOfficerId);
     formData.append('officer_type', selectedOfficerType);
     
-    fetch('../handlers/assign_case.php', {
+    fetch('../../handlers/assign_case.php', {
         method: 'POST',
         body: formData
     })
