@@ -1,13 +1,13 @@
 <?php
-// evidence_handover.php - COMPLETE UPDATED VERSION
-// This is a standalone evidence handover system for all user roles
+// Fixed path: from modules folder to config folder
+require_once __DIR__ . '/../../config/database.php';
 
-// Start session at the very beginning
-session_start();
+// Don't call session_start() here - it's already started in the main file
+// session_start(); // Remove this line
 
-// Check if user is logged in
-if (!isset($_SESSION['user_id'])) {
-    header('Location: ../login.php');
+// Check if user is logged in and is a tanod
+if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'tanod') {
+    header('Location: ../../index.php');
     exit();
 }
 
