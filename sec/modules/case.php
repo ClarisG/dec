@@ -1,54 +1,106 @@
 <?php
-// Start session and connect to remote database
-session_start();
+// Check if session is already started
+if (session_status() == PHP_SESSION_NONE) {
+    session_start();
+}
 
-// Direct remote database connection
+// Direct database connection - fix the connection error
+$host = "153.92.15.81";
+$dbname = "u514031374_leir";
+$username = "u514031374_leir";
+$password = "leirP@55w0rd";
+$port = 3306;
+
+$conn = null;
+$db_error = null;
+
 try {
-    $host = "153.92.15.81";
-    $dbname = "u514031374_leir";
-    $username = "u514031374_leir";
-    $password = "leirP@55w0rd";
-    $port = 3306;
+    // Try without SSL first
+    $dsn = "mysql:host=$host;port=$port;dbname=$dbname;charset=utf8mb4";
     
-    $conn = new PDO(
-        "mysql:host=$host;port=$port;dbname=$dbname;charset=utf8mb4",
-        $username,
-        $password,
-        [
-            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-            PDO::ATTR_EMULATE_PREPARES => false,
-            PDO::MYSQL_ATTR_INIT_COMMAND => "SET NAMES utf8mb4",
-            PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT => false
-        ]
-    );
+    // Add connection options for better error handling
+    $options = [
+        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+        PDO::ATTR_EMULATE_PREPARES => false,
+        PDO::MYSQL_ATTR_INIT_COMMAND => "SET NAMES utf8mb4",
+        // Try without SSL verification
+        PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT => false,
+    ];
+    
+    $conn = new PDO($dsn, $username, $password, $options);
     
 } catch (PDOException $e) {
-    // Store error for display
     $db_error = $e->getMessage();
     $conn = null;
+    
+    // Try alternative connection without SSL options
+    try {
+        $options = [
+            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+            PDO::ATTR_EMULATE_PREPARES => false
+        ];
+        
+        $conn = new PDO($dsn, $username, $password, $options);
+        $db_error = null; // Reset error if successful
+    } catch (PDOException $e2) {
+        $db_error = $e2->getMessage();
+        $conn = null;
+    }
+}
+
+// Test connection by running a simple query
+if ($conn) {
+    try {
+        $test_query = "SELECT 1 as test";
+        $test_stmt = $conn->query($test_query);
+        $test_result = $test_stmt->fetch();
+        
+        if (!$test_result || $test_result['test'] != 1) {
+            throw new Exception("Database test query failed");
+        }
+        
+        // Check if required tables exist
+        $tables = ['reports', 'users'];
+        foreach ($tables as $table) {
+            $check_stmt = $conn->query("SHOW TABLES LIKE '$table'");
+            if ($check_stmt->rowCount() == 0) {
+                throw new Exception("Required table '$table' not found in database");
+            }
+        }
+        
+    } catch (Exception $e) {
+        $db_error = $e->getMessage();
+        $conn = null;
+    }
 }
 ?>
 
 <!-- Case-Blotter Management Module -->
 <div class="space-y-8">
-    <!-- Connection Status Alert -->
-    <?php if (!isset($conn) || $conn === null): ?>
-    <div class="bg-red-50 border border-red-200 rounded-xl p-4 mb-6">
+    <?php if ($db_error): ?>
+    <div class="bg-red-50 border border-red-200 rounded-xl p-6">
         <div class="flex items-center">
             <div class="flex-shrink-0">
-                <i class="fas fa-database text-red-400 text-xl"></i>
+                <i class="fas fa-exclamation-triangle text-red-400 text-2xl"></i>
             </div>
-            <div class="ml-3">
-                <h3 class="text-sm font-medium text-red-800">Database Connection Error</h3>
+            <div class="ml-4">
+                <h3 class="text-lg font-medium text-red-800">Database Connection Issue</h3>
                 <div class="mt-2 text-sm text-red-700">
-                    <p>Unable to connect to database. Some features may be limited.</p>
-                    <p class="mt-1 text-xs">Error: <?php echo htmlspecialchars($db_error ?? 'Unknown error'); ?></p>
+                    <p>Unable to connect to the database. Please check:</p>
+                    <ul class="list-disc ml-5 mt-2 space-y-1">
+                        <li>Database credentials are correct</li>
+                        <li>Remote MySQL is enabled on your hosting</li>
+                        <li>IP address <code class="bg-red-100 px-1">153.92.15.81</code> allows connections</li>
+                        <li>Database <code class="bg-red-100 px-1">u514031374_leir</code> exists</li>
+                    </ul>
+                    <p class="mt-3 text-red-600 font-medium">Error: <?php echo htmlspecialchars($db_error); ?></p>
                 </div>
-                <div class="mt-3">
+                <div class="mt-4">
                     <button onclick="retryConnection()" 
-                            class="inline-flex items-center px-3 py-1 border border-transparent text-xs font-medium rounded text-red-700 bg-red-100 hover:bg-red-200">
-                        <i class="fas fa-redo mr-1"></i> Retry Connection
+                            class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-red-700 bg-red-100 hover:bg-red-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500">
+                        <i class="fas fa-redo mr-2"></i> Retry Connection
                     </button>
                 </div>
             </div>
@@ -75,21 +127,21 @@ try {
                         <i class="fas fa-hashtag text-blue-600 text-xl"></i>
                     </div>
                     <div>
-                        <p class="text-sm text-gray-600">Official Blotter Numbers</p>
+                        <p class="text-sm text-gray-600">Active Cases</p>
                         <p class="text-xl font-bold text-gray-800">
                             <?php
-                            if (isset($conn)) {
+                            if ($conn) {
                                 try {
-                                    $blotter_query = "SELECT CONCAT('BLT-', YEAR(NOW()), '-', LPAD(COUNT(*), 3, '0')) as last_blotter FROM blotter_records WHERE YEAR(created_at) = YEAR(NOW())";
-                                    $blotter_stmt = $conn->prepare($blotter_query);
-                                    $blotter_stmt->execute();
-                                    $blotter_count = $blotter_stmt->fetch(PDO::FETCH_ASSOC);
-                                    echo 'BLT-' . date('Y') . '-001 to ' . ($blotter_count ? '0' . $blotter_count['last_blotter'] : '045');
+                                    $query = "SELECT COUNT(*) as count FROM reports WHERE status != 'closed'";
+                                    $stmt = $conn->prepare($query);
+                                    $stmt->execute();
+                                    $result = $stmt->fetch(PDO::FETCH_ASSOC);
+                                    echo ($result['count'] ?? 0) . ' Cases';
                                 } catch (Exception $e) {
-                                    echo 'BLT-' . date('Y') . '-001 to 045';
+                                    echo 'Loading...';
                                 }
                             } else {
-                                echo 'BLT-' . date('Y') . '-001 to 045';
+                                echo 'Loading...';
                             }
                             ?>
                         </p>
@@ -103,21 +155,21 @@ try {
                         <i class="fas fa-users text-green-600 text-xl"></i>
                     </div>
                     <div>
-                        <p class="text-sm text-gray-600">Active Officers</p>
+                        <p class="text-sm text-gray-600">Pending Cases</p>
                         <p class="text-xl font-bold text-gray-800">
                             <?php
-                            if (isset($conn)) {
+                            if ($conn) {
                                 try {
-                                    $lupon_query = "SELECT COUNT(*) as count FROM users WHERE role IN ('lupon', 'lupon_chairman', 'tanod') AND status = 'active'";
-                                    $lupon_stmt = $conn->prepare($lupon_query);
-                                    $lupon_stmt->execute();
-                                    $lupon_count = $lupon_stmt->fetch(PDO::FETCH_ASSOC);
-                                    echo ($lupon_count['count'] ?? 0) . ' Active';
+                                    $query = "SELECT COUNT(*) as count FROM reports WHERE status = 'pending'";
+                                    $stmt = $conn->prepare($query);
+                                    $stmt->execute();
+                                    $result = $stmt->fetch(PDO::FETCH_ASSOC);
+                                    echo ($result['count'] ?? 0) . ' Pending';
                                 } catch (Exception $e) {
-                                    echo '12 Active';
+                                    echo 'Loading...';
                                 }
                             } else {
-                                echo '12 Active';
+                                echo 'Loading...';
                             }
                             ?>
                         </p>
@@ -131,21 +183,21 @@ try {
                         <i class="fas fa-sticky-note text-purple-600 text-xl"></i>
                     </div>
                     <div>
-                        <p class="text-sm text-gray-600">Active Cases</p>
+                        <p class="text-sm text-gray-600">Assigned Cases</p>
                         <p class="text-xl font-bold text-gray-800">
                             <?php
-                            if (isset($conn)) {
+                            if ($conn) {
                                 try {
-                                    $cases_query = "SELECT COUNT(*) as count FROM reports WHERE status != 'closed'";
-                                    $cases_stmt = $conn->prepare($cases_query);
-                                    $cases_stmt->execute();
-                                    $cases_count = $cases_stmt->fetch(PDO::FETCH_ASSOC);
-                                    echo ($cases_count['count'] ?? 0) . ' Active';
+                                    $query = "SELECT COUNT(*) as count FROM reports WHERE status = 'assigned'";
+                                    $stmt = $conn->prepare($query);
+                                    $stmt->execute();
+                                    $result = $stmt->fetch(PDO::FETCH_ASSOC);
+                                    echo ($result['count'] ?? 0) . ' Assigned';
                                 } catch (Exception $e) {
-                                    echo '156 Active';
+                                    echo 'Loading...';
                                 }
                             } else {
-                                echo '156 Active';
+                                echo 'Loading...';
                             }
                             ?>
                         </p>
@@ -245,19 +297,204 @@ try {
                     </tr>
                 </thead>
                 <tbody id="casesTableBody">
+                    <?php if ($conn): ?>
+                    <!-- Show real data from PHP if connection is available -->
+                    <?php
+                    try {
+                        // Get filter parameters from URL
+                        $page = isset($_GET['page']) ? max(1, intval($_GET['page'])) : 1;
+                        $status = $_GET['status'] ?? '';
+                        $category = $_GET['category'] ?? '';
+                        $from_date = $_GET['from_date'] ?? '';
+                        $to_date = $_GET['to_date'] ?? '';
+                        
+                        $records_per_page = 10;
+                        $offset = ($page - 1) * $records_per_page;
+                        
+                        // Build the query with filters
+                        $where_clauses = [];
+                        $params = [];
+                        
+                        if (!empty($status)) {
+                            $where_clauses[] = "r.status = :status";
+                            $params[':status'] = $status;
+                        }
+                        
+                        if (!empty($category)) {
+                            $where_clauses[] = "r.category = :category";
+                            $params[':category'] = $category;
+                        }
+                        
+                        if (!empty($from_date)) {
+                            $where_clauses[] = "DATE(r.created_at) >= :from_date";
+                            $params[':from_date'] = $from_date;
+                        }
+                        
+                        if (!empty($to_date)) {
+                            $where_clauses[] = "DATE(r.created_at) <= :to_date";
+                            $params[':to_date'] = $to_date;
+                        }
+                        
+                        // Default: show pending cases
+                        if (empty($where_clauses)) {
+                            $where_clauses[] = "r.status = 'pending'";
+                        }
+                        
+                        $where_sql = !empty($where_clauses) ? "WHERE " . implode(" AND ", $where_clauses) : "";
+                        
+                        // Get total count
+                        $count_sql = "SELECT COUNT(*) as total FROM reports r $where_sql";
+                        $count_stmt = $conn->prepare($count_sql);
+                        foreach ($params as $key => $value) {
+                            $count_stmt->bindValue($key, $value);
+                        }
+                        $count_stmt->execute();
+                        $total_records = $count_stmt->fetch(PDO::FETCH_ASSOC)['total'];
+                        $total_pages = ceil($total_records / $records_per_page);
+                        
+                        // Get cases with pagination
+                        $cases_sql = "SELECT r.*, 
+                                     CONCAT(u.first_name, ' ', u.last_name) as complainant_name,
+                                     (SELECT COUNT(*) FROM report_attachments ra WHERE ra.report_id = r.id) as attachment_count
+                                     FROM reports r 
+                                     LEFT JOIN users u ON r.user_id = u.id 
+                                     $where_sql
+                                     ORDER BY r.created_at ASC 
+                                     LIMIT :limit OFFSET :offset";
+                        
+                        $cases_stmt = $conn->prepare($cases_sql);
+                        
+                        // Bind all parameters
+                        foreach ($params as $key => $value) {
+                            $cases_stmt->bindValue($key, $value);
+                        }
+                        $cases_stmt->bindValue(':limit', $records_per_page, PDO::PARAM_INT);
+                        $cases_stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+                        $cases_stmt->execute();
+                        $cases = $cases_stmt->fetchAll(PDO::FETCH_ASSOC);
+                        
+                        if (count($cases) > 0) {
+                            foreach ($cases as $case) {
+                                $status_class = getStatusClass($case['status']);
+                                $status_text = strtoupper(str_replace('_', ' ', $case['status']));
+                                $category_class = getCategoryClass($case['category']);
+                                
+                                echo '<tr class="hover:bg-gray-50 transition-colors">';
+                                echo '<td class="py-3 px-4">';
+                                echo '<span class="font-medium text-blue-600">#' . $case['id'] . '</span>';
+                                if (!empty($case['blotter_number'])) {
+                                    echo '<p class="text-xs text-green-600 mt-1">' . htmlspecialchars($case['blotter_number']) . '</p>';
+                                } else {
+                                    echo '<p class="text-xs text-gray-500 mt-1">Needs blotter number</p>';
+                                }
+                                echo '</td>';
+                                echo '<td class="py-3 px-4">' . date('M d, Y', strtotime($case['created_at'])) . '</td>';
+                                echo '<td class="py-3 px-4">' . htmlspecialchars($case['complainant_name'] ?? 'Unknown') . '</td>';
+                                echo '<td class="py-3 px-4">';
+                                echo '<span class="category-badge ' . $category_class . '">';
+                                echo htmlspecialchars($case['category'] ?? 'Uncategorized');
+                                echo '</span>';
+                                echo '</td>';
+                                echo '<td class="py-3 px-4">';
+                                if ($case['attachment_count'] > 0) {
+                                    echo '<div class="flex items-center">';
+                                    echo '<span class="mr-2 text-sm text-gray-600">' . $case['attachment_count'] . ' file(s)</span>';
+                                    echo '<button onclick="viewAttachments(' . $case['id'] . ')" class="text-blue-600 hover:text-blue-800 transition-colors" title="View attachments">';
+                                    echo '<i class="fas fa-paperclip"></i>';
+                                    echo '</button>';
+                                    echo '</div>';
+                                } else {
+                                    echo '<span class="text-gray-400 text-sm">No attachments</span>';
+                                }
+                                echo '</td>';
+                                echo '<td class="py-3 px-4">';
+                                echo '<span class="' . $status_class . '">' . $status_text . '</span>';
+                                echo '</td>';
+                                echo '<td class="py-3 px-4">';
+                                echo '<div class="flex space-x-2">';
+                                echo '<button onclick="viewCaseDetails(' . $case['id'] . ')" class="px-3 py-1 bg-gray-100 text-gray-700 rounded-lg text-sm hover:bg-gray-200 transition-colors" title="View full report">';
+                                echo '<i class="fas fa-eye mr-1"></i> View';
+                                echo '</button>';
+                                if ($case['status'] === 'pending') {
+                                    echo '<button onclick="openAssignmentModal(' . $case['id'] . ')" class="px-3 py-1 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 transition-colors" title="Assign to officer">';
+                                    echo '<i class="fas fa-user-check mr-1"></i> Assign';
+                                    echo '</button>';
+                                } else {
+                                    echo '<button class="px-3 py-1 bg-gray-300 text-gray-600 rounded-lg text-sm cursor-not-allowed" title="Already assigned">';
+                                    echo '<i class="fas fa-user-check mr-1"></i> Assigned';
+                                    echo '</button>';
+                                }
+                                echo '</div>';
+                                echo '</td>';
+                                echo '</tr>';
+                            }
+                        } else {
+                            echo '<tr><td colspan="7" class="py-8 text-center text-gray-500">No cases found matching your criteria.</td></tr>';
+                        }
+                        
+                        // Store pagination data in JavaScript variables
+                        echo '<script>';
+                        echo 'currentPage = ' . $page . ';';
+                        echo 'totalPages = ' . $total_pages . ';';
+                        echo 'totalRecords = ' . $total_records . ';';
+                        echo '</script>';
+                        
+                    } catch (Exception $e) {
+                        echo '<tr><td colspan="7" class="py-8 text-center text-red-500">Error loading cases: ' . htmlspecialchars($e->getMessage()) . '</td></tr>';
+                    }
+                    ?>
+                    <?php else: ?>
+                    <!-- Show loading message if no connection -->
                     <tr>
                         <td colspan="7" class="py-8 text-center text-gray-500">
                             <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mb-4"></div>
-                            <p>Loading cases...</p>
+                            <p>Connecting to database...</p>
                         </td>
                     </tr>
+                    <?php endif; ?>
                 </tbody>
             </table>
         </div>
         
         <!-- Pagination -->
         <div class="flex justify-center items-center mt-6 space-x-2" id="paginationContainer">
-            <!-- Pagination will be loaded here -->
+            <?php if ($conn && isset($total_pages) && $total_pages > 1): ?>
+            <div class="flex items-center space-x-2">
+                <button onclick="changePage(<?php echo max(1, $page - 1); ?>)" 
+                        class="pagination-btn <?php echo $page <= 1 ? 'opacity-50 cursor-not-allowed' : ''; ?>">
+                    <i class="fas fa-chevron-left"></i>
+                </button>
+                
+                <?php 
+                $maxVisiblePages = 5;
+                $startPage = max(1, $page - floor($maxVisiblePages / 2));
+                $endPage = min($total_pages, $startPage + $maxVisiblePages - 1);
+                
+                if ($endPage - $startPage + 1 < $maxVisiblePages) {
+                    $startPage = max(1, $endPage - $maxVisiblePages + 1);
+                }
+                
+                for ($i = $startPage; $i <= $endPage; $i++): 
+                ?>
+                <button onclick="changePage(<?php echo $i; ?>)" 
+                        class="pagination-btn <?php echo $i == $page ? 'active' : ''; ?>">
+                    <?php echo $i; ?>
+                </button>
+                <?php endfor; ?>
+                
+                <button onclick="changePage(<?php echo min($total_pages, $page + 1); ?>)" 
+                        class="pagination-btn <?php echo $page >= $total_pages ? 'opacity-50 cursor-not-allowed' : ''; ?>">
+                    <i class="fas fa-chevron-right"></i>
+                </button>
+            </div>
+            <div class="text-gray-600 ml-4">
+                Page <?php echo $page; ?> of <?php echo $total_pages; ?> • <?php echo $total_records; ?> records
+            </div>
+            <?php elseif ($conn && isset($total_records)): ?>
+            <div class="text-gray-600">
+                Showing <?php echo $total_records; ?> records
+            </div>
+            <?php endif; ?>
         </div>
     </div>
 </div>
@@ -416,10 +653,6 @@ try {
         <div class="p-6 overflow-y-auto max-h-[70vh]">
             <div id="assignmentModalContent">
                 <!-- Content will be loaded via AJAX -->
-                <div class="text-center py-8">
-                    <div class="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
-                    <p class="text-gray-600">Loading assignment options...</p>
-                </div>
             </div>
         </div>
         
@@ -677,21 +910,26 @@ try {
 </style>
 
 <script>
-// Current page state
-let currentPage = 1;
-let totalPages = 1;
+// Current page state - will be set by PHP
+let currentPage = <?php echo isset($page) ? $page : 1; ?>;
+let totalPages = <?php echo isset($total_pages) ? $total_pages : 1; ?>;
+let totalRecords = <?php echo isset($total_records) ? $total_records : 0; ?>;
 let currentFilter = {
-    status: 'pending',
-    category: '',
-    from_date: '',
-    to_date: ''
+    status: '<?php echo isset($_GET['status']) ? $_GET['status'] : ''; ?>',
+    category: '<?php echo isset($_GET['category']) ? $_GET['category'] : ''; ?>',
+    from_date: '<?php echo isset($_GET['from_date']) ? $_GET['from_date'] : ''; ?>',
+    to_date: '<?php echo isset($_GET['to_date']) ? $_GET['to_date'] : ''; ?>'
 };
 
 // Initialize when page loads
 document.addEventListener('DOMContentLoaded', function() {
-    checkDatabaseConnection();
+    updateFilterButtons();
     setupFilterListeners();
     setupFileUpload();
+    
+    // Update page indicators
+    document.getElementById('currentPage').textContent = currentPage;
+    document.getElementById('totalPages').textContent = totalPages;
 });
 
 // Setup filter listeners
@@ -701,7 +939,7 @@ function setupFilterListeners() {
         resetFilters();
         currentFilter.status = '';
         currentPage = 1;
-        loadCases();
+        reloadWithFilters();
         updateFilterButtons('all');
     });
 
@@ -710,7 +948,7 @@ function setupFilterListeners() {
         currentFilter.category = 'Barangay Matter';
         document.querySelector('select[name="category"]').value = 'Barangay Matter';
         currentPage = 1;
-        loadCases();
+        reloadWithFilters();
         updateFilterButtons('barangay');
     });
 
@@ -719,7 +957,7 @@ function setupFilterListeners() {
         currentFilter.category = 'Criminal';
         document.querySelector('select[name="category"]').value = 'Criminal';
         currentPage = 1;
-        loadCases();
+        reloadWithFilters();
         updateFilterButtons('criminal');
     });
 
@@ -728,7 +966,7 @@ function setupFilterListeners() {
         currentFilter.category = 'Civil';
         document.querySelector('select[name="category"]').value = 'Civil';
         currentPage = 1;
-        loadCases();
+        reloadWithFilters();
         updateFilterButtons('civil');
     });
 
@@ -742,7 +980,7 @@ function setupFilterListeners() {
             to_date: document.querySelector('input[name="to_date"]').value || ''
         };
         currentPage = 1;
-        loadCases();
+        reloadWithFilters();
         updateFilterButtons('custom');
     });
 
@@ -750,13 +988,13 @@ function setupFilterListeners() {
     document.getElementById('clearFilter').addEventListener('click', function() {
         resetFilters();
         currentFilter = {
-            status: 'pending',
+            status: '',
             category: '',
             from_date: '',
             to_date: ''
         };
         currentPage = 1;
-        loadCases();
+        reloadWithFilters();
         updateFilterButtons('all');
     });
 }
@@ -766,6 +1004,20 @@ function resetFilters() {
     document.querySelector('select[name="category"]').value = '';
     document.querySelector('input[name="from_date"]').value = '';
     document.querySelector('input[name="to_date"]').value = '';
+}
+
+function reloadWithFilters() {
+    const params = new URLSearchParams({
+        page: currentPage,
+        ...currentFilter
+    });
+    
+    // Remove empty values
+    params.forEach((value, key) => {
+        if (!value) params.delete(key);
+    });
+    
+    window.location.href = window.location.pathname + '?' + params.toString();
 }
 
 function updateFilterButtons(activeFilter) {
@@ -784,344 +1036,67 @@ function updateFilterButtons(activeFilter) {
         }
     });
 
-    // Set active button
-    if (buttons[activeFilter]) {
-        buttons[activeFilter].classList.remove('bg-gray-100', 'text-gray-700');
-        buttons[activeFilter].classList.add('bg-blue-600', 'text-white');
+    // Set active button based on current filter
+    if (activeFilter) {
+        if (buttons[activeFilter]) {
+            buttons[activeFilter].classList.remove('bg-gray-100', 'text-gray-700');
+            buttons[activeFilter].classList.add('bg-blue-600', 'text-white');
+        }
+    } else {
+        // Determine active filter from currentFilter
+        if (!currentFilter.status && !currentFilter.category && !currentFilter.from_date && !currentFilter.to_date) {
+            if (buttons['all']) {
+                buttons['all'].classList.remove('bg-gray-100', 'text-gray-700');
+                buttons['all'].classList.add('bg-blue-600', 'text-white');
+            }
+        } else if (currentFilter.category === 'Barangay Matter') {
+            if (buttons['barangay']) {
+                buttons['barangay'].classList.remove('bg-gray-100', 'text-gray-700');
+                buttons['barangay'].classList.add('bg-blue-600', 'text-white');
+            }
+        } else if (currentFilter.category === 'Criminal') {
+            if (buttons['criminal']) {
+                buttons['criminal'].classList.remove('bg-gray-100', 'text-gray-700');
+                buttons['criminal'].classList.add('bg-blue-600', 'text-white');
+            }
+        } else if (currentFilter.category === 'Civil') {
+            if (buttons['civil']) {
+                buttons['civil'].classList.remove('bg-gray-100', 'text-gray-700');
+                buttons['civil'].classList.add('bg-blue-600', 'text-white');
+            }
+        }
     }
 }
 
-// Check database connection and load cases
-function checkDatabaseConnection() {
-    // First, try to load cases normally
-    loadCases();
+// Call this to initialize filter buttons based on current URL
+function updateFilterButtons() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const category = urlParams.get('category');
     
-    // If that fails, show an alternative message after 3 seconds
-    setTimeout(function() {
-        const tableBody = document.getElementById('casesTableBody');
-        const loadingText = tableBody.innerHTML;
-        
-        if (loadingText.includes('Loading cases...')) {
-            // Still loading, might be a connection issue
-            tableBody.innerHTML = `
-                <tr>
-                    <td colspan="7" class="py-8 text-center">
-                        <div class="max-w-md mx-auto">
-                            <i class="fas fa-database text-4xl text-gray-300 mb-4"></i>
-                            <h4 class="text-lg font-semibold text-gray-700 mb-2">Connecting to Database</h4>
-                            <p class="text-gray-600 mb-4">This might take a moment for remote database connection...</p>
-                            <div class="flex justify-center space-x-2">
-                                <button onclick="loadCases()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
-                                    <i class="fas fa-redo mr-2"></i> Retry
-                                </button>
-                            </div>
-                        </div>
-                    </td>
-                </tr>
-            `;
-        }
-    }, 3000);
+    if (!category) {
+        updateFilterButtons('all');
+    } else if (category === 'Barangay Matter') {
+        updateFilterButtons('barangay');
+    } else if (category === 'Criminal') {
+        updateFilterButtons('criminal');
+    } else if (category === 'Civil') {
+        updateFilterButtons('civil');
+    } else {
+        updateFilterButtons('custom');
+    }
 }
 
 function retryConnection() {
     location.reload();
 }
 
-// Load cases with pagination
-function loadCases() {
-    const tableBody = document.getElementById('casesTableBody');
-    const paginationContainer = document.getElementById('paginationContainer');
-    
-    tableBody.innerHTML = `
-        <tr>
-            <td colspan="7" class="py-8 text-center text-gray-500">
-                <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mb-4"></div>
-                <p>Loading cases...</p>
-            </td>
-        </tr>
-    `;
-    
-    // Build query string
-    const queryParams = new URLSearchParams({
-        page: currentPage,
-        ...currentFilter
-    });
-    
-    // Remove empty values
-    queryParams.forEach((value, key) => {
-        if (!value) queryParams.delete(key);
-    });
-    
-    fetch(`../../handlers/load_cases.php?${queryParams}`)
-        .then(response => {
-            // Check content type
-            const contentType = response.headers.get('content-type');
-            if (!contentType || !contentType.includes('application/json')) {
-                throw new Error('Expected JSON response but got: ' + contentType);
-            }
-            return response.json();
-        })
-        .then(data => {
-            if (data.success) {
-                renderCasesTable(data.cases);
-                renderPagination(data.totalPages, data.currentPage, data.totalRecords);
-                document.getElementById('currentPage').textContent = data.currentPage;
-                document.getElementById('totalPages').textContent = data.totalPages;
-            } else {
-                showError(data.message || 'Failed to load cases');
-                // Try to show sample data for testing
-                if (data.message && data.message.includes('database')) {
-                    setTimeout(() => {
-                        showSampleData();
-                    }, 2000);
-                }
-            }
-        })
-        .catch(error => {
-            console.error('Fetch error:', error);
-            showError('Error loading cases. Please check your connection.');
-            // Show sample data after error
-            setTimeout(() => {
-                showSampleData();
-            }, 1000);
-        });
-}
-
-function showError(message) {
-    const tableBody = document.getElementById('casesTableBody');
-    tableBody.innerHTML = `
-        <tr>
-            <td colspan="7" class="py-8 text-center text-red-500">
-                <i class="fas fa-exclamation-triangle mr-2"></i>
-                ${message}
-            </td>
-        </tr>
-    `;
-}
-
-// Sample data for testing when database is not available
-function showSampleData() {
-    const sampleCases = [
-        {
-            id: 1001,
-            complainant_name: 'Juan Dela Cruz',
-            created_at: '2024-01-15 10:30:00',
-            category: 'Barangay Matter',
-            attachment_count: 2,
-            status: 'pending',
-            blotter_number: null
-        },
-        {
-            id: 1002,
-            complainant_name: 'Maria Santos',
-            created_at: '2024-01-10 14:20:00',
-            category: 'Civil',
-            attachment_count: 0,
-            status: 'assigned',
-            blotter_number: 'BLT-2024-001'
-        },
-        {
-            id: 1003,
-            complainant_name: 'Pedro Gomez',
-            created_at: '2024-01-05 09:15:00',
-            category: 'Criminal',
-            attachment_count: 1,
-            status: 'in_progress',
-            blotter_number: 'BLT-2024-002'
-        },
-        {
-            id: 1004,
-            complainant_name: 'Ana Torres',
-            created_at: '2024-01-03 16:45:00',
-            category: 'VAWC',
-            attachment_count: 3,
-            status: 'resolved',
-            blotter_number: 'BLT-2024-003'
-        },
-        {
-            id: 1005,
-            complainant_name: 'Luis Reyes',
-            created_at: '2023-12-28 11:20:00',
-            category: 'Minor',
-            attachment_count: 0,
-            status: 'closed',
-            blotter_number: 'BLT-2023-045'
-        }
-    ];
-    
-    renderCasesTable(sampleCases);
-    renderPagination(1, 1, 5);
-    
-    // Show warning that this is sample data
-    const tableBody = document.getElementById('casesTableBody');
-    const warning = `
-        <tr>
-            <td colspan="7" class="py-2 bg-yellow-50 text-center text-yellow-800 text-sm">
-                <i class="fas fa-exclamation-triangle mr-2"></i>
-                Showing sample data for demonstration. Database connection required for real data.
-            </td>
-        </tr>
-    `;
-    tableBody.innerHTML = warning + tableBody.innerHTML;
-}
-
-function renderCasesTable(cases) {
-    const tableBody = document.getElementById('casesTableBody');
-    
-    if (!cases || cases.length === 0) {
-        tableBody.innerHTML = `
-            <tr>
-                <td colspan="7" class="py-8 text-center text-gray-500">
-                    <i class="fas fa-inbox text-4xl mb-4 text-gray-300"></i>
-                    <p>No cases found matching your criteria.</p>
-                </td>
-            </tr>
-        `;
-        return;
-    }
-    
-    let html = '';
-    cases.forEach(caseItem => {
-        const statusClass = getStatusClass(caseItem.status);
-        const statusText = formatStatusText(caseItem.status);
-        const categoryClass = getCategoryClass(caseItem.category);
-        const formattedDate = formatDate(caseItem.created_at);
-        const complainantName = escapeHtml(caseItem.complainant_name || 'Unknown');
-        const category = escapeHtml(caseItem.category || 'Uncategorized');
-        
-        html += `
-            <tr data-case-id="${caseItem.id}" class="hover:bg-gray-50 transition-colors">
-                <td class="py-3 px-4">
-                    <span class="font-medium text-blue-600">#${caseItem.id}</span>
-                    ${caseItem.blotter_number ? 
-                        `<p class="text-xs text-green-600 mt-1">${escapeHtml(caseItem.blotter_number)}</p>` : 
-                        '<p class="text-xs text-gray-500 mt-1">Needs blotter number</p>'
-                    }
-                </td>
-                <td class="py-3 px-4">${formattedDate}</td>
-                <td class="py-3 px-4">${complainantName}</td>
-                <td class="py-3 px-4">
-                    <span class="category-badge ${categoryClass}">
-                        ${category}
-                    </span>
-                </td>
-                <td class="py-3 px-4">
-                    ${caseItem.attachment_count > 0 ? 
-                        `<div class="flex items-center">
-                            <span class="mr-2 text-sm text-gray-600">${caseItem.attachment_count} file(s)</span>
-                            <button onclick="viewAttachments(${caseItem.id})" class="text-blue-600 hover:text-blue-800 transition-colors" title="View attachments">
-                                <i class="fas fa-paperclip"></i>
-                            </button>
-                        </div>` : 
-                        '<span class="text-gray-400 text-sm">No attachments</span>'
-                    }
-                </td>
-                <td class="py-3 px-4">
-                    <span class="${statusClass}">
-                        ${statusText}
-                    </span>
-                </td>
-                <td class="py-3 px-4">
-                    <div class="flex space-x-2">
-                        <button onclick="viewCaseDetails(${caseItem.id})" 
-                                class="px-3 py-1 bg-gray-100 text-gray-700 rounded-lg text-sm hover:bg-gray-200 transition-colors" 
-                                title="View full report">
-                            <i class="fas fa-eye mr-1"></i> View
-                        </button>
-                        ${caseItem.status === 'pending' ? 
-                            `<button onclick="openAssignmentModal(${caseItem.id})" 
-                                    class="px-3 py-1 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 transition-colors" 
-                                    title="Assign to officer">
-                                <i class="fas fa-user-check mr-1"></i> Assign
-                            </button>` : 
-                            `<button class="px-3 py-1 bg-gray-300 text-gray-600 rounded-lg text-sm cursor-not-allowed" 
-                                    title="Already assigned">
-                                <i class="fas fa-user-check mr-1"></i> Assigned
-                            </button>`
-                        }
-                    </div>
-                </td>
-            </tr>
-        `;
-    });
-    
-    tableBody.innerHTML = html;
-}
-
-function renderPagination(totalPages, currentPage, totalRecords) {
-    const paginationContainer = document.getElementById('paginationContainer');
-    
-    if (totalPages <= 1) {
-        paginationContainer.innerHTML = `
-            <div class="text-gray-600">
-                Showing ${totalRecords} records
-            </div>
-        `;
-        return;
-    }
-    
-    let html = `
-        <div class="flex items-center space-x-2">
-            <button onclick="changePage(${currentPage - 1})" ${currentPage <= 1 ? 'disabled' : ''} class="pagination-btn">
-                <i class="fas fa-chevron-left"></i>
-            </button>
-    `;
-    
-    // Show page numbers
-    const maxVisiblePages = 5;
-    let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
-    let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
-    
-    if (endPage - startPage + 1 < maxVisiblePages) {
-        startPage = Math.max(1, endPage - maxVisiblePages + 1);
-    }
-    
-    for (let i = startPage; i <= endPage; i++) {
-        html += `
-            <button onclick="changePage(${i})" class="pagination-btn ${i === currentPage ? 'active' : ''}">
-                ${i}
-            </button>
-        `;
-    }
-    
-    html += `
-            <button onclick="changePage(${currentPage + 1})" ${currentPage >= totalPages ? 'disabled' : ''} class="pagination-btn">
-                <i class="fas fa-chevron-right"></i>
-            </button>
-        </div>
-        <div class="text-gray-600 ml-4">
-            Page ${currentPage} of ${totalPages} • ${totalRecords} records
-        </div>
-    `;
-    
-    paginationContainer.innerHTML = html;
-}
-
 function changePage(page) {
     if (page < 1 || page > totalPages) return;
     currentPage = page;
-    loadCases();
-    // Smooth scroll to top of table
-    document.querySelector('.case-table').scrollIntoView({ behavior: 'smooth' });
+    reloadWithFilters();
 }
 
 // Utility functions
-function formatDate(dateString) {
-    if (!dateString) return 'N/A';
-    const date = new Date(dateString);
-    if (isNaN(date.getTime())) return 'Invalid Date';
-    return date.toLocaleDateString('en-US', { 
-        month: 'short', 
-        day: '2-digit', 
-        year: 'numeric' 
-    });
-}
-
-function formatStatusText(status) {
-    if (!status) return 'UNKNOWN';
-    return status.replace('_', ' ').toUpperCase();
-}
-
 function getStatusClass(status) {
     switch(status) {
         case 'pending': return 'badge-pending';
@@ -1142,13 +1117,6 @@ function getCategoryClass(category) {
         case 'Minor': return 'category-minor';
         default: return 'category-other';
     }
-}
-
-function escapeHtml(text) {
-    if (!text) return '';
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
 }
 
 // File upload handling
@@ -1455,8 +1423,8 @@ function submitAssignment() {
         if (data.success) {
             alert('Case assigned successfully!');
             closeAssignmentModal();
-            // Reload cases to update status
-            loadCases();
+            // Reload the page to update status
+            location.reload();
         } else {
             alert('Error assigning case: ' + (data.message || 'Unknown error'));
         }
@@ -1606,11 +1574,6 @@ window.onclick = function(event) {
     });
 }
 
-// Prevent form resubmission
-if (window.history.replaceState) {
-    window.history.replaceState(null, null, window.location.href);
-}
-
 // Keyboard shortcuts
 document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape') {
@@ -1620,11 +1583,29 @@ document.addEventListener('keydown', function(e) {
         closeAssignmentModal();
     }
 });
-
-// Refresh cases every 60 seconds if on the page
-setInterval(() => {
-    if (!document.hidden) {
-        loadCases();
-    }
-}, 60000);
 </script>
+
+<?php
+// Helper functions
+function getStatusClass($status) {
+    switch($status) {
+        case 'pending': return 'badge-pending';
+        case 'assigned': return 'badge-assigned';
+        case 'in_progress': return 'badge-in-progress';
+        case 'resolved': return 'badge-resolved';
+        case 'closed': return 'badge-closed';
+        default: return 'badge-pending';
+    }
+}
+
+function getCategoryClass($category) {
+    switch($category) {
+        case 'Barangay Matter': return 'category-barangay';
+        case 'Criminal': return 'category-criminal';
+        case 'Civil': return 'category-civil';
+        case 'VAWC': return 'category-vawc';
+        case 'Minor': return 'category-minor';
+        default: return 'category-other';
+    }
+}
+?>
