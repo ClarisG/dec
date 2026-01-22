@@ -446,7 +446,7 @@ function getModuleTitle($module) {
         
         @media (max-width: 768px) {
             .mobile-menu-btn {
-                display: block;
+                display: none;
             }
             
             .desktop-only {
@@ -474,8 +474,8 @@ function getModuleTitle($module) {
         <!-- Logo -->
         <div class="p-6 border-b border-blue-400/30">
             <div class="flex items-center space-x-3">
-                <div class="w-10 h-10 flex items-center justify-center">
-                    <img src="images/10213.png" alt="Logo" class="w-19 h-22 object-contain">
+                <div class="w-12 h-12 flex items-center justify-center">
+                    <img src="images/10213.png" alt="Logo" class="w-24 h-28 object-contain drop-shadow-[0_0_10px_rgba(255,255,255,0.8)]">
                 </div>
                 <div>
                     <h1 class="text-xl font-bold text-white">LEIR</h1>
@@ -604,24 +604,14 @@ function getModuleTitle($module) {
         <header class="bg-white shadow-sm sticky top-0 z-30">
             <div class="px-4 sm:px-6 lg:px-8">
                 <div class="flex items-center justify-between py-4">
-                    <!-- Left: Mobile menu button -->
-                    <div class="flex items-center">
-                        <button id="mobileMenuButton" class="mobile-menu-btn p-2 rounded-md text-gray-600 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                            <i class="fas fa-bars text-xl"></i>
-                        </button>
-                        <div class="ml-3 md:hidden">
-                            <h1 class="text-lg font-bold text-gray-800">LEIR</h1>
-                        </div>
-                    </div>
-                    
-                    <!-- Center: Page Title -->
-                    <div class="flex-1 text-center md:text-left px-4">
+                    <!-- Left: Page Title for Mobile & Desktop -->
+                    <div class="flex-1 text-center md:text-left">
                         <h2 class="text-xl font-bold text-gray-800" id="pageTitle"><?php echo getModuleTitle($current_module); ?></h2>
                         <p class="text-sm text-gray-600 hidden md:block">Welcome back, <?php echo htmlspecialchars($_SESSION['first_name']); ?>!</p>
                     </div>
                     
-                    <!-- Right: User Menu -->
-                    <div class="flex items-center space-x-4">
+                    <!-- Right: User Menu (Desktop only) -->
+                    <div class="hidden md:flex items-center space-x-4">
                         <!-- Notifications -->
                         <div class="relative">
                             <button id="notificationButton" class="p-2 rounded-full text-gray-600 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500">
@@ -689,7 +679,7 @@ function getModuleTitle($module) {
                                     <?php endif; ?>
                                     <div class="absolute bottom-0 right-0 w-2 h-2 rounded-full border border-white <?php echo $is_active ? 'bg-green-500' : 'bg-red-500'; ?>"></div>
                                 </div>
-                                <span class="hidden md:block font-medium text-gray-700"><?php echo htmlspecialchars($_SESSION['first_name']); ?></span>
+                                <span class="font-medium text-gray-700"><?php echo htmlspecialchars($_SESSION['first_name']); ?></span>
                                 <i class="fas fa-chevron-down text-gray-500 text-sm"></i>
                             </button>
                             
@@ -1069,21 +1059,6 @@ function getModuleTitle($module) {
     </div>
 
     <script>
-        // Mobile menu toggle
-        document.getElementById('mobileMenuButton').addEventListener('click', function() {
-            const sidebar = document.querySelector('.sidebar');
-            const overlay = document.getElementById('mobileOverlay');
-            sidebar.classList.toggle('active');
-            overlay.classList.toggle('active');
-        });
-
-        // Close mobile menu when clicking overlay
-        document.getElementById('mobileOverlay').addEventListener('click', function() {
-            const sidebar = document.querySelector('.sidebar');
-            this.classList.remove('active');
-            sidebar.classList.remove('active');
-        });
-
         // User dropdown
         const userMenuButton = document.getElementById('userMenuButton');
         const userDropdown = document.getElementById('userDropdown');
