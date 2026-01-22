@@ -279,24 +279,6 @@ if (isset($_GET['view_report'])) {
     </style>
 </head>
 <body class="bg-gray-50 min-h-screen">
-    <!-- Navigation -->
-    <nav class="bg-blue-800 text-white p-4">
-        <div class="container mx-auto flex justify-between items-center">
-            <div class="flex items-center space-x-4">
-                <a href="../tanod_dashboard.php" class="flex items-center">
-                    <i class="fas fa-arrow-left mr-2"></i>
-                    <span>Back to Dashboard</span>
-                </a>
-                <h1 class="text-xl font-bold">Report Vetting System</h1>
-            </div>
-            <div class="flex items-center space-x-4">
-                <span class="text-sm">Logged in as: <strong><?php echo htmlspecialchars($tanod_name); ?></strong></span>
-                <a href="../../logout.php" class="bg-red-600 hover:bg-red-700 px-3 py-1 rounded text-sm">
-                    <i class="fas fa-sign-out-alt mr-1"></i> Logout
-                </a>
-            </div>
-        </div>
-    </nav>
 
     <div class="container mx-auto px-4 py-8">
         <!-- Success/Error Messages -->
