@@ -474,8 +474,8 @@ function getModuleTitle($module) {
         <!-- Logo -->
         <div class="p-6 border-b border-blue-400/30">
             <div class="flex items-center space-x-3">
-                <div class="w-12 h-12 flex items-center justify-center">
-                    <img src="images/10213.png" alt="Logo" class="w-24 h-28 object-contain drop-shadow-[0_0_10px_rgba(255,255,255,0.8)]">
+                <div class="w-14 h-14 flex items-center justify-center">
+                    <img src="images/10213.png" alt="Logo" class="w-26 h-30 object-contain drop-shadow-[0_0_15px_rgba(255,255,255,0.9)] drop-shadow-[0_0_30px_rgba(255,255,255,0.7)] drop-shadow-[0_0_60px_rgba(255,255,255,0.5)] transition-filter duration-300">
                 </div>
                 <div>
                     <h1 class="text-xl font-bold text-white">LEIR</h1>
