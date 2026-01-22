@@ -1,43 +1,12 @@
 <?php
 // handlers/load_cases.php
-
-// Start session and include database
 session_start();
-
-// First, try to include database.php with error handling
-$database_file = __DIR__ . '/../config/database.php';
-
-if (!file_exists($database_file)) {
-    echo json_encode([
-        'success' => false,
-        'message' => 'Database configuration file not found at: ' . $database_file
-    ]);
-    exit;
-}
-
-// Include database configuration
-require_once $database_file;
 
 // Set header to JSON
 header('Content-Type: application/json');
 
-// Check if database connection is established
-if (!isset($conn)) {
-    echo json_encode([
-        'success' => false,
-        'message' => 'Database connection not established. Please run setup_database.php first.'
-    ]);
-    exit;
-}
-
-// Check if user is logged in (optional, depending on your requirements)
-if (!isset($_SESSION['user_id'])) {
-    echo json_encode([
-        'success' => false,
-        'message' => 'Session expired. Please login again.'
-    ]);
-    exit;
-}
+// Include the direct database connection
+require_once 'direct_db.php';
 
 // Get filter parameters
 $page = isset($_GET['page']) ? max(1, intval($_GET['page'])) : 1;
@@ -50,16 +19,21 @@ $records_per_page = 10;
 $offset = ($page - 1) * $records_per_page;
 
 try {
-    // Build query with filters
+    // Check if we have a database connection
+    if (!$conn) {
+        throw new Exception('Could not establish database connection');
+    }
+    
+    // Build the query
     $where_clauses = [];
     $params = [];
     
-    if (!empty($status)) {
+    if (!empty($status) && $status !== 'all') {
         $where_clauses[] = "r.status = ?";
         $params[] = $status;
     }
     
-    if (!empty($category)) {
+    if (!empty($category) && $category !== 'all') {
         $where_clauses[] = "r.category = ?";
         $params[] = $category;
     }
@@ -74,7 +48,7 @@ try {
         $params[] = $to_date;
     }
     
-    // Default: show pending cases
+    // Default to pending cases
     if (empty($where_clauses)) {
         $where_clauses[] = "r.status = 'pending'";
     }
@@ -91,8 +65,6 @@ try {
     // Get cases with pagination
     $cases_sql = "SELECT r.*, 
                  CONCAT(u.first_name, ' ', u.last_name) as complainant_name,
-                 u.contact_number,
-                 u.email,
                  (SELECT COUNT(*) FROM report_attachments ra WHERE ra.report_id = r.id) as attachment_count
                  FROM reports r 
                  LEFT JOIN users u ON r.user_id = u.id 
@@ -108,6 +80,13 @@ try {
     $cases_stmt->execute($params);
     $cases = $cases_stmt->fetchAll(PDO::FETCH_ASSOC);
     
+    // Ensure all required fields exist
+    foreach ($cases as &$case) {
+        $case['complainant_name'] = $case['complainant_name'] ?? 'Unknown';
+        $case['category'] = $case['category'] ?? 'Uncategorized';
+        $case['attachment_count'] = $case['attachment_count'] ?? 0;
+    }
+    
     echo json_encode([
         'success' => true,
         'cases' => $cases,
@@ -117,19 +96,14 @@ try {
         'recordsPerPage' => $records_per_page
     ]);
     
-} catch (PDOException $e) {
-    // Log error for debugging
-    error_log("Database error in load_cases.php: " . $e->getMessage());
-    
-    echo json_encode([
-        'success' => false,
-        'message' => 'Database error. Please check your database setup.',
-        'debug_info' => (ini_get('display_errors') == '1') ? $e->getMessage() : null
-    ]);
 } catch (Exception $e) {
     echo json_encode([
         'success' => false,
-        'message' => 'Error: ' . $e->getMessage()
+        'message' => 'Error loading cases: ' . $e->getMessage(),
+        'cases' => [],
+        'currentPage' => 1,
+        'totalPages' => 1,
+        'totalRecords' => 0
     ]);
 }
 ?>

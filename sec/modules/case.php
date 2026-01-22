@@ -1,14 +1,61 @@
 <?php
-// Temporary direct connection for testing
+// Start session and connect to remote database
+session_start();
+
+// Direct remote database connection
 try {
-    $conn = new PDO("mysql:host=localhost;dbname=leir_db;charset=utf8mb4", "root", "");
-    $conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-} catch(PDOException $e) {
-    die("Database connection failed: " . $e->getMessage());
+    $host = "153.92.15.81";
+    $dbname = "u514031374_leir";
+    $username = "u514031374_leir";
+    $password = "leirP@55w0rd";
+    $port = 3306;
+    
+    $conn = new PDO(
+        "mysql:host=$host;port=$port;dbname=$dbname;charset=utf8mb4",
+        $username,
+        $password,
+        [
+            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+            PDO::ATTR_EMULATE_PREPARES => false,
+            PDO::MYSQL_ATTR_INIT_COMMAND => "SET NAMES utf8mb4",
+            PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT => false
+        ]
+    );
+    
+} catch (PDOException $e) {
+    // Store error for display
+    $db_error = $e->getMessage();
+    $conn = null;
 }
 ?>
+
 <!-- Case-Blotter Management Module -->
 <div class="space-y-8">
+    <!-- Connection Status Alert -->
+    <?php if (!isset($conn) || $conn === null): ?>
+    <div class="bg-red-50 border border-red-200 rounded-xl p-4 mb-6">
+        <div class="flex items-center">
+            <div class="flex-shrink-0">
+                <i class="fas fa-database text-red-400 text-xl"></i>
+            </div>
+            <div class="ml-3">
+                <h3 class="text-sm font-medium text-red-800">Database Connection Error</h3>
+                <div class="mt-2 text-sm text-red-700">
+                    <p>Unable to connect to database. Some features may be limited.</p>
+                    <p class="mt-1 text-xs">Error: <?php echo htmlspecialchars($db_error ?? 'Unknown error'); ?></p>
+                </div>
+                <div class="mt-3">
+                    <button onclick="retryConnection()" 
+                            class="inline-flex items-center px-3 py-1 border border-transparent text-xs font-medium rounded text-red-700 bg-red-100 hover:bg-red-200">
+                        <i class="fas fa-redo mr-1"></i> Retry Connection
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <?php endif; ?>
+    
     <!-- Header Section -->
     <div class="glass-card rounded-xl p-6">
         <div class="flex justify-between items-center mb-6">
@@ -16,7 +63,7 @@ try {
                 <i class="fas fa-gavel mr-3 text-blue-600"></i>
                 Case & Blotter Management
             </h2>
-            <button onclick="openNewBlotterModal()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center">
+            <button onclick="openNewBlotterModal()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center transition-colors">
                 <i class="fas fa-plus mr-2"></i> New Blotter Entry
             </button>
         </div>
@@ -31,13 +78,17 @@ try {
                         <p class="text-sm text-gray-600">Official Blotter Numbers</p>
                         <p class="text-xl font-bold text-gray-800">
                             <?php
-                            try {
-                                $blotter_query = "SELECT CONCAT('BLT-', YEAR(NOW()), '-', LPAD(COUNT(*), 3, '0')) as last_blotter FROM blotter_records WHERE YEAR(created_at) = YEAR(NOW())";
-                                $blotter_stmt = $conn->prepare($blotter_query);
-                                $blotter_stmt->execute();
-                                $blotter_count = $blotter_stmt->fetch(PDO::FETCH_ASSOC);
-                                echo 'BLT-' . date('Y') . '-001 to ' . ($blotter_count ? '0' . $blotter_count['last_blotter'] : '045');
-                            } catch (Exception $e) {
+                            if (isset($conn)) {
+                                try {
+                                    $blotter_query = "SELECT CONCAT('BLT-', YEAR(NOW()), '-', LPAD(COUNT(*), 3, '0')) as last_blotter FROM blotter_records WHERE YEAR(created_at) = YEAR(NOW())";
+                                    $blotter_stmt = $conn->prepare($blotter_query);
+                                    $blotter_stmt->execute();
+                                    $blotter_count = $blotter_stmt->fetch(PDO::FETCH_ASSOC);
+                                    echo 'BLT-' . date('Y') . '-001 to ' . ($blotter_count ? '0' . $blotter_count['last_blotter'] : '045');
+                                } catch (Exception $e) {
+                                    echo 'BLT-' . date('Y') . '-001 to 045';
+                                }
+                            } else {
                                 echo 'BLT-' . date('Y') . '-001 to 045';
                             }
                             ?>
@@ -52,16 +103,20 @@ try {
                         <i class="fas fa-users text-green-600 text-xl"></i>
                     </div>
                     <div>
-                        <p class="text-sm text-gray-600">Assigned Lupon Members</p>
+                        <p class="text-sm text-gray-600">Active Officers</p>
                         <p class="text-xl font-bold text-gray-800">
                             <?php
-                            try {
-                                $lupon_query = "SELECT COUNT(*) as count FROM users WHERE role IN ('lupon', 'lupon_chairman') AND status = 'active'";
-                                $lupon_stmt = $conn->prepare($lupon_query);
-                                $lupon_stmt->execute();
-                                $lupon_count = $lupon_stmt->fetch(PDO::FETCH_ASSOC);
-                                echo ($lupon_count['count'] ?? 0) . ' Active';
-                            } catch (Exception $e) {
+                            if (isset($conn)) {
+                                try {
+                                    $lupon_query = "SELECT COUNT(*) as count FROM users WHERE role IN ('lupon', 'lupon_chairman', 'tanod') AND status = 'active'";
+                                    $lupon_stmt = $conn->prepare($lupon_query);
+                                    $lupon_stmt->execute();
+                                    $lupon_count = $lupon_stmt->fetch(PDO::FETCH_ASSOC);
+                                    echo ($lupon_count['count'] ?? 0) . ' Active';
+                                } catch (Exception $e) {
+                                    echo '12 Active';
+                                }
+                            } else {
                                 echo '12 Active';
                             }
                             ?>
@@ -76,17 +131,21 @@ try {
                         <i class="fas fa-sticky-note text-purple-600 text-xl"></i>
                     </div>
                     <div>
-                        <p class="text-sm text-gray-600">Formal Case Notes</p>
+                        <p class="text-sm text-gray-600">Active Cases</p>
                         <p class="text-xl font-bold text-gray-800">
                             <?php
-                            try {
-                                $notes_query = "SELECT COUNT(*) as count FROM case_notes";
-                                $notes_stmt = $conn->prepare($notes_query);
-                                $notes_stmt->execute();
-                                $notes_count = $notes_stmt->fetch(PDO::FETCH_ASSOC);
-                                echo ($notes_count['count'] ?? 0) . ' Entries';
-                            } catch (Exception $e) {
-                                echo '156 Entries';
+                            if (isset($conn)) {
+                                try {
+                                    $cases_query = "SELECT COUNT(*) as count FROM reports WHERE status != 'closed'";
+                                    $cases_stmt = $conn->prepare($cases_query);
+                                    $cases_stmt->execute();
+                                    $cases_count = $cases_stmt->fetch(PDO::FETCH_ASSOC);
+                                    echo ($cases_count['count'] ?? 0) . ' Active';
+                                } catch (Exception $e) {
+                                    echo '156 Active';
+                                }
+                            } else {
+                                echo '156 Active';
                             }
                             ?>
                         </p>
@@ -591,6 +650,30 @@ try {
         background-color: #e5e7eb;
         color: #374151;
     }
+    
+    .glass-card {
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+    }
+    
+    .case-table {
+        border-collapse: separate;
+        border-spacing: 0;
+    }
+    
+    .case-table th {
+        border-bottom: 2px solid #e5e7eb;
+    }
+    
+    .case-table td {
+        border-bottom: 1px solid #f3f4f6;
+    }
+    
+    .case-table tr:last-child td {
+        border-bottom: none;
+    }
 </style>
 
 <script>
@@ -606,7 +689,7 @@ let currentFilter = {
 
 // Initialize when page loads
 document.addEventListener('DOMContentLoaded', function() {
-    loadCases();
+    checkDatabaseConnection();
     setupFilterListeners();
     setupFileUpload();
 });
@@ -708,6 +791,42 @@ function updateFilterButtons(activeFilter) {
     }
 }
 
+// Check database connection and load cases
+function checkDatabaseConnection() {
+    // First, try to load cases normally
+    loadCases();
+    
+    // If that fails, show an alternative message after 3 seconds
+    setTimeout(function() {
+        const tableBody = document.getElementById('casesTableBody');
+        const loadingText = tableBody.innerHTML;
+        
+        if (loadingText.includes('Loading cases...')) {
+            // Still loading, might be a connection issue
+            tableBody.innerHTML = `
+                <tr>
+                    <td colspan="7" class="py-8 text-center">
+                        <div class="max-w-md mx-auto">
+                            <i class="fas fa-database text-4xl text-gray-300 mb-4"></i>
+                            <h4 class="text-lg font-semibold text-gray-700 mb-2">Connecting to Database</h4>
+                            <p class="text-gray-600 mb-4">This might take a moment for remote database connection...</p>
+                            <div class="flex justify-center space-x-2">
+                                <button onclick="loadCases()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+                                    <i class="fas fa-redo mr-2"></i> Retry
+                                </button>
+                            </div>
+                        </div>
+                    </td>
+                </tr>
+            `;
+        }
+    }, 3000);
+}
+
+function retryConnection() {
+    location.reload();
+}
+
 // Load cases with pagination
 function loadCases() {
     const tableBody = document.getElementById('casesTableBody');
@@ -750,31 +869,22 @@ function loadCases() {
                 document.getElementById('totalPages').textContent = data.totalPages;
             } else {
                 showError(data.message || 'Failed to load cases');
+                // Try to show sample data for testing
+                if (data.message && data.message.includes('database')) {
+                    setTimeout(() => {
+                        showSampleData();
+                    }, 2000);
+                }
             }
         })
         .catch(error => {
             console.error('Fetch error:', error);
-            showError('Error loading cases. Please try again.');
-            // Try fallback
+            showError('Error loading cases. Please check your connection.');
+            // Show sample data after error
             setTimeout(() => {
-                loadFallbackCases();
+                showSampleData();
             }, 1000);
         });
-}
-
-function loadFallbackCases() {
-    const tableBody = document.getElementById('casesTableBody');
-    
-    // Simple fallback - show static message
-    tableBody.innerHTML = `
-        <tr>
-            <td colspan="7" class="py-8 text-center text-gray-500">
-                <i class="fas fa-database text-4xl mb-4 text-gray-300"></i>
-                <p>Unable to load cases at the moment.</p>
-                <p class="text-sm text-gray-400 mt-2">Please check your connection and try again.</p>
-            </td>
-        </tr>
-    `;
 }
 
 function showError(message) {
@@ -787,6 +897,72 @@ function showError(message) {
             </td>
         </tr>
     `;
+}
+
+// Sample data for testing when database is not available
+function showSampleData() {
+    const sampleCases = [
+        {
+            id: 1001,
+            complainant_name: 'Juan Dela Cruz',
+            created_at: '2024-01-15 10:30:00',
+            category: 'Barangay Matter',
+            attachment_count: 2,
+            status: 'pending',
+            blotter_number: null
+        },
+        {
+            id: 1002,
+            complainant_name: 'Maria Santos',
+            created_at: '2024-01-10 14:20:00',
+            category: 'Civil',
+            attachment_count: 0,
+            status: 'assigned',
+            blotter_number: 'BLT-2024-001'
+        },
+        {
+            id: 1003,
+            complainant_name: 'Pedro Gomez',
+            created_at: '2024-01-05 09:15:00',
+            category: 'Criminal',
+            attachment_count: 1,
+            status: 'in_progress',
+            blotter_number: 'BLT-2024-002'
+        },
+        {
+            id: 1004,
+            complainant_name: 'Ana Torres',
+            created_at: '2024-01-03 16:45:00',
+            category: 'VAWC',
+            attachment_count: 3,
+            status: 'resolved',
+            blotter_number: 'BLT-2024-003'
+        },
+        {
+            id: 1005,
+            complainant_name: 'Luis Reyes',
+            created_at: '2023-12-28 11:20:00',
+            category: 'Minor',
+            attachment_count: 0,
+            status: 'closed',
+            blotter_number: 'BLT-2023-045'
+        }
+    ];
+    
+    renderCasesTable(sampleCases);
+    renderPagination(1, 1, 5);
+    
+    // Show warning that this is sample data
+    const tableBody = document.getElementById('casesTableBody');
+    const warning = `
+        <tr>
+            <td colspan="7" class="py-2 bg-yellow-50 text-center text-yellow-800 text-sm">
+                <i class="fas fa-exclamation-triangle mr-2"></i>
+                Showing sample data for demonstration. Database connection required for real data.
+            </td>
+        </tr>
+    `;
+    tableBody.innerHTML = warning + tableBody.innerHTML;
 }
 
 function renderCasesTable(cases) {
@@ -1444,4 +1620,11 @@ document.addEventListener('keydown', function(e) {
         closeAssignmentModal();
     }
 });
+
+// Refresh cases every 60 seconds if on the page
+setInterval(() => {
+    if (!document.hidden) {
+        loadCases();
+    }
+}, 60000);
 </script>
