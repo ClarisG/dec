@@ -1,79 +1,41 @@
 <?php
-// Check if session is already started
-if (session_status() == PHP_SESSION_NONE) {
-    session_start();
+// sec/modules/case.php - Fixed Database Connection
+session_start();
+
+// Check if user is logged in
+if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'secretary') {
+    header('Location: ../../index.php');
+    exit();
 }
 
-// Direct database connection - fix the connection error
-$host = "153.92.15.81";
-$dbname = "u514031374_leir";
-$username = "u514031374_leir";
-$password = "leirP@55w0rd";
-$port = 3306;
+// Include database configuration
+require_once '../../config/database.php';
 
-$conn = null;
+// The database.php now returns $conn
 $db_error = null;
 
+// Test connection
 try {
-    // Try without SSL first
-    $dsn = "mysql:host=$host;port=$port;dbname=$dbname;charset=utf8mb4";
+    // Test query to verify connection
+    $test_query = "SELECT 1 as test";
+    $test_stmt = $conn->query($test_query);
+    $test_result = $test_stmt->fetch();
     
-    // Add connection options for better error handling
-    $options = [
-        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-        PDO::ATTR_EMULATE_PREPARES => false,
-        PDO::MYSQL_ATTR_INIT_COMMAND => "SET NAMES utf8mb4",
-        // Try without SSL verification
-        PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT => false,
-    ];
+    if (!$test_result || $test_result['test'] != 1) {
+        throw new Exception("Database test query failed");
+    }
     
-    $conn = new PDO($dsn, $username, $password, $options);
+    // Check if required tables exist
+    $tables = ['reports', 'users'];
+    foreach ($tables as $table) {
+        $check_stmt = $conn->query("SHOW TABLES LIKE '$table'");
+        if ($check_stmt->rowCount() == 0) {
+            throw new Exception("Required table '$table' not found in database");
+        }
+    }
     
-} catch (PDOException $e) {
+} catch (Exception $e) {
     $db_error = $e->getMessage();
-    $conn = null;
-    
-    // Try alternative connection without SSL options
-    try {
-        $options = [
-            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-            PDO::ATTR_EMULATE_PREPARES => false
-        ];
-        
-        $conn = new PDO($dsn, $username, $password, $options);
-        $db_error = null; // Reset error if successful
-    } catch (PDOException $e2) {
-        $db_error = $e2->getMessage();
-        $conn = null;
-    }
-}
-
-// Test connection by running a simple query
-if ($conn) {
-    try {
-        $test_query = "SELECT 1 as test";
-        $test_stmt = $conn->query($test_query);
-        $test_result = $test_stmt->fetch();
-        
-        if (!$test_result || $test_result['test'] != 1) {
-            throw new Exception("Database test query failed");
-        }
-        
-        // Check if required tables exist
-        $tables = ['reports', 'users'];
-        foreach ($tables as $table) {
-            $check_stmt = $conn->query("SHOW TABLES LIKE '$table'");
-            if ($check_stmt->rowCount() == 0) {
-                throw new Exception("Required table '$table' not found in database");
-            }
-        }
-        
-    } catch (Exception $e) {
-        $db_error = $e->getMessage();
-        $conn = null;
-    }
 }
 ?>
 
