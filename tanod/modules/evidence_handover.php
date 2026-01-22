@@ -2,33 +2,32 @@
 // Fixed path: from modules folder to config folder
 require_once __DIR__ . '/../../config/database.php';
 
-// Don't call session_start() here - it's already started in the main file
-// session_start(); // Remove this line
-
 // Check if user is logged in and is a tanod
 if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'tanod') {
     header('Location: ../../index.php');
     exit();
 }
 
-// Include database connection
-require_once __DIR__ . '/../../config/database.php';
-
-// If database.php doesn't set $pdo, create the connection here
-if (!isset($pdo)) {
+// Use the existing connection from tanod_dashboard.php
+// Check if $conn exists (from parent file), if not create connection
+if (!isset($conn)) {
     try {
-        // IMPORTANT: Update these with your actual database credentials
-        $host = 'localhost';
-        $dbname = 'barangay_leir_db'; // Change to your actual database name
-        $username = 'root'; // Change to your actual username
-        $password = ''; // Change to your actual password
+        // Use credentials from config.php
+        $host = '153.92.15.81';
+        $dbname = 'u514031374_leir';
+        $username = 'u514031374_leir';
+        $password = 'leirP@55w0rd';
+        $port = '3306';
         
-        $pdo = new PDO("mysql:host=$host;dbname=$dbname;charset=utf8mb4", $username, $password);
+        $pdo = new PDO("mysql:host=$host;port=$port;dbname=$dbname;charset=utf8mb4", $username, $password);
         $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
         $pdo->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
     } catch (PDOException $e) {
         die("Database connection failed: " . $e->getMessage());
     }
+} else {
+    // Use the connection from parent file
+    $pdo = $conn;
 }
 
 $user_id = $_SESSION['user_id'];
