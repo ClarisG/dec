@@ -37,6 +37,14 @@ try {
 } catch (Exception $e) {
     $db_error = $e->getMessage();
 }
+
+// Set current filter values from GET parameters
+$currentFilter = [
+    'status' => $_GET['status'] ?? '',
+    'category' => $_GET['category'] ?? '',
+    'from_date' => $_GET['from_date'] ?? '',
+    'to_date' => $_GET['to_date'] ?? ''
+];
 ?>
 
 <!-- Case-Blotter Management Module -->
@@ -169,22 +177,19 @@ try {
         </div>
     </div>
     
-    <!-- Filter Section -->
+    <!-- Enhanced Filter Section -->
     <div class="glass-card rounded-xl p-6">
         <div class="flex justify-between items-center mb-4">
             <h3 class="text-xl font-bold text-gray-800">Filter Reports</h3>
             <div class="flex space-x-2">
                 <button id="filterAll" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
-                    All
+                    All Reports
                 </button>
                 <button id="filterBarangay" class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors">
                     Barangay Matters
                 </button>
-                <button id="filterCriminal" class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors">
-                    Criminal
-                </button>
-                <button id="filterCivil" class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors">
-                    Civil
+                <button id="filterPolice" class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors">
+                    Police Matters
                 </button>
             </div>
         </div>
@@ -192,41 +197,42 @@ try {
         <form id="filterForm" method="GET" class="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">Status</label>
-                <select name="status" class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                <select name="status" class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
                     <option value="">All Status</option>
-                    <option value="pending">Pending</option>
-                    <option value="assigned">Assigned</option>
-                    <option value="in_progress">In Progress</option>
-                    <option value="resolved">Resolved</option>
-                    <option value="closed">Closed</option>
+                    <option value="pending" <?php echo ($currentFilter['status'] ?? '') === 'pending' ? 'selected' : ''; ?>>Pending</option>
+                    <option value="assigned" <?php echo ($currentFilter['status'] ?? '') === 'assigned' ? 'selected' : ''; ?>>Assigned</option>
+                    <option value="in_progress" <?php echo ($currentFilter['status'] ?? '') === 'in_progress' ? 'selected' : ''; ?>>In Progress</option>
+                    <option value="resolved" <?php echo ($currentFilter['status'] ?? '') === 'resolved' ? 'selected' : ''; ?>>Resolved</option>
+                    <option value="closed" <?php echo ($currentFilter['status'] ?? '') === 'closed' ? 'selected' : ''; ?>>Closed</option>
                 </select>
             </div>
             <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Category</label>
-                <select name="category" class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-                    <option value="">All Categories</option>
-                    <option value="Barangay Matter">Barangay Matter</option>
-                    <option value="Criminal">Criminal</option>
-                    <option value="Civil">Civil</option>
-                    <option value="VAWC">VAWC</option>
-                    <option value="Minor">Minor</option>
-                    <option value="Other">Other</option>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Classification</label>
+                <select name="category" class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                    <option value="">All Types</option>
+                    <option value="Barangay Matter" <?php echo ($currentFilter['category'] ?? '') === 'Barangay Matter' ? 'selected' : ''; ?>>Barangay Matter</option>
+                    <option value="Police Matter" <?php echo ($currentFilter['category'] ?? '') === 'Police Matter' ? 'selected' : ''; ?>>Police Matter</option>
+                    <option value="Criminal" <?php echo ($currentFilter['category'] ?? '') === 'Criminal' ? 'selected' : ''; ?>>Criminal</option>
+                    <option value="Civil" <?php echo ($currentFilter['category'] ?? '') === 'Civil' ? 'selected' : ''; ?>>Civil</option>
+                    <option value="VAWC" <?php echo ($currentFilter['category'] ?? '') === 'VAWC' ? 'selected' : ''; ?>>VAWC</option>
                 </select>
             </div>
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">From Date</label>
-                <input type="date" name="from_date" class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                <input type="date" name="from_date" value="<?php echo $currentFilter['from_date'] ?? ''; ?>"
+                       class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
             </div>
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">To Date</label>
-                <input type="date" name="to_date" class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                <input type="date" name="to_date" value="<?php echo $currentFilter['to_date'] ?? ''; ?>"
+                       class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
             </div>
             <div class="flex items-end space-x-2">
                 <button type="button" id="clearFilter" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors">
-                    Clear
+                    <i class="fas fa-times mr-1"></i> Clear
                 </button>
                 <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
-                    Apply
+                    <i class="fas fa-filter mr-1"></i> Filter
                 </button>
             </div>
         </form>
@@ -540,6 +546,7 @@ try {
                                 class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                             <option value="">Select Category</option>
                             <option value="Barangay Matter">Barangay Matter</option>
+                            <option value="Police Matter">Police Matter</option>
                             <option value="Criminal">Criminal Case</option>
                             <option value="Civil">Civil Case</option>
                             <option value="VAWC">VAWC</option>
@@ -821,6 +828,11 @@ try {
         color: #065f46;
     }
     
+    .category-police {
+        background-color: #fee2e2;
+        color: #dc2626;
+    }
+    
     .category-criminal {
         background-color: #fee2e2;
         color: #dc2626;
@@ -877,10 +889,10 @@ let currentPage = <?php echo isset($page) ? $page : 1; ?>;
 let totalPages = <?php echo isset($total_pages) ? $total_pages : 1; ?>;
 let totalRecords = <?php echo isset($total_records) ? $total_records : 0; ?>;
 let currentFilter = {
-    status: '<?php echo isset($_GET['status']) ? $_GET['status'] : ''; ?>',
-    category: '<?php echo isset($_GET['category']) ? $_GET['category'] : ''; ?>',
-    from_date: '<?php echo isset($_GET['from_date']) ? $_GET['from_date'] : ''; ?>',
-    to_date: '<?php echo isset($_GET['to_date']) ? $_GET['to_date'] : ''; ?>'
+    status: '<?php echo $_GET['status'] ?? ''; ?>',
+    category: '<?php echo $_GET['category'] ?? ''; ?>',
+    from_date: '<?php echo $_GET['from_date'] ?? ''; ?>',
+    to_date: '<?php echo $_GET['to_date'] ?? ''; ?>'
 };
 
 // Initialize when page loads
@@ -900,9 +912,10 @@ function setupFilterListeners() {
     document.getElementById('filterAll').addEventListener('click', function() {
         resetFilters();
         currentFilter.status = '';
+        currentFilter.category = '';
         currentPage = 1;
         reloadWithFilters();
-        updateFilterButtons('all');
+        setActiveFilterButton('all');
     });
 
     document.getElementById('filterBarangay').addEventListener('click', function() {
@@ -911,25 +924,16 @@ function setupFilterListeners() {
         document.querySelector('select[name="category"]').value = 'Barangay Matter';
         currentPage = 1;
         reloadWithFilters();
-        updateFilterButtons('barangay');
+        setActiveFilterButton('barangay');
     });
 
-    document.getElementById('filterCriminal').addEventListener('click', function() {
+    document.getElementById('filterPolice').addEventListener('click', function() {
         resetFilters();
-        currentFilter.category = 'Criminal';
-        document.querySelector('select[name="category"]').value = 'Criminal';
+        currentFilter.category = 'Police Matter';
+        document.querySelector('select[name="category"]').value = 'Police Matter';
         currentPage = 1;
         reloadWithFilters();
-        updateFilterButtons('criminal');
-    });
-
-    document.getElementById('filterCivil').addEventListener('click', function() {
-        resetFilters();
-        currentFilter.category = 'Civil';
-        document.querySelector('select[name="category"]').value = 'Civil';
-        currentPage = 1;
-        reloadWithFilters();
-        updateFilterButtons('civil');
+        setActiveFilterButton('police');
     });
 
     // Filter form submission
@@ -943,7 +947,7 @@ function setupFilterListeners() {
         };
         currentPage = 1;
         reloadWithFilters();
-        updateFilterButtons('custom');
+        setActiveFilterButton('custom');
     });
 
     // Clear filter button
@@ -957,7 +961,7 @@ function setupFilterListeners() {
         };
         currentPage = 1;
         reloadWithFilters();
-        updateFilterButtons('all');
+        setActiveFilterButton('all');
     });
 }
 
@@ -982,12 +986,11 @@ function reloadWithFilters() {
     window.location.href = window.location.pathname + '?' + params.toString();
 }
 
-function updateFilterButtons(activeFilter) {
+function setActiveFilterButton(activeFilter) {
     const buttons = {
         all: document.getElementById('filterAll'),
         barangay: document.getElementById('filterBarangay'),
-        criminal: document.getElementById('filterCriminal'),
-        civil: document.getElementById('filterCivil')
+        police: document.getElementById('filterPolice')
     };
 
     // Reset all buttons
@@ -1016,15 +1019,10 @@ function updateFilterButtons(activeFilter) {
                 buttons['barangay'].classList.remove('bg-gray-100', 'text-gray-700');
                 buttons['barangay'].classList.add('bg-blue-600', 'text-white');
             }
-        } else if (currentFilter.category === 'Criminal') {
-            if (buttons['criminal']) {
-                buttons['criminal'].classList.remove('bg-gray-100', 'text-gray-700');
-                buttons['criminal'].classList.add('bg-blue-600', 'text-white');
-            }
-        } else if (currentFilter.category === 'Civil') {
-            if (buttons['civil']) {
-                buttons['civil'].classList.remove('bg-gray-100', 'text-gray-700');
-                buttons['civil'].classList.add('bg-blue-600', 'text-white');
+        } else if (currentFilter.category === 'Police Matter') {
+            if (buttons['police']) {
+                buttons['police'].classList.remove('bg-gray-100', 'text-gray-700');
+                buttons['police'].classList.add('bg-blue-600', 'text-white');
             }
         }
     }
@@ -1036,15 +1034,13 @@ function updateFilterButtons() {
     const category = urlParams.get('category');
     
     if (!category) {
-        updateFilterButtons('all');
+        setActiveFilterButton('all');
     } else if (category === 'Barangay Matter') {
-        updateFilterButtons('barangay');
-    } else if (category === 'Criminal') {
-        updateFilterButtons('criminal');
-    } else if (category === 'Civil') {
-        updateFilterButtons('civil');
+        setActiveFilterButton('barangay');
+    } else if (category === 'Police Matter') {
+        setActiveFilterButton('police');
     } else {
-        updateFilterButtons('custom');
+        setActiveFilterButton('custom');
     }
 }
 
@@ -1073,10 +1069,10 @@ function getStatusClass(status) {
 function getCategoryClass(category) {
     switch(category) {
         case 'Barangay Matter': return 'category-barangay';
+        case 'Police Matter': return 'category-police';
         case 'Criminal': return 'category-criminal';
         case 'Civil': return 'category-civil';
         case 'VAWC': return 'category-vawc';
-        case 'Minor': return 'category-minor';
         default: return 'category-other';
     }
 }
@@ -1563,6 +1559,7 @@ function getStatusClass($status) {
 function getCategoryClass($category) {
     switch($category) {
         case 'Barangay Matter': return 'category-barangay';
+        case 'Police Matter': return 'category-police';
         case 'Criminal': return 'category-criminal';
         case 'Civil': return 'category-civil';
         case 'VAWC': return 'category-vawc';
