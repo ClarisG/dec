@@ -140,7 +140,7 @@
                                 echo '<button onclick="viewCaseDetails(' . $case_id . ')" class="px-3 py-1 bg-gray-100 text-gray-700 rounded-lg text-sm hover:bg-gray-200" title="View full report">';
                                 echo '<i class="fas fa-eye mr-1"></i> View';
                                 echo '</button>';
-                                echo '<button onclick="openAssignmentModal(' . $case_id . ')" class="px-3 py-1 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700" title="Assign to Lupon member">';
+                                echo '<button onclick="openAssignmentModal(' . $case_id . ')" class="px-3 py-1 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700" title="Assign to officer">';
                                 echo '<i class="fas fa-user-check mr-1"></i> Assign';
                                 echo '</button>';
                                 echo '</div>';
@@ -309,26 +309,154 @@
     </div>
 </div>
 
+<!-- Assignment Modal -->
+<div id="assignmentModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden">
+        <div class="flex justify-between items-center p-6 border-b">
+            <h3 class="text-xl font-bold text-gray-800">Assign Case to Officer</h3>
+            <button onclick="closeAssignmentModal()" class="text-gray-400 hover:text-gray-600">
+                <i class="fas fa-times text-2xl"></i>
+            </button>
+        </div>
+        
+        <div class="p-6 overflow-y-auto max-h-[70vh]">
+            <div id="assignmentModalContent">
+                <!-- Content will be loaded via AJAX -->
+                <div class="text-center py-8">
+                    <div class="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
+                    <p class="text-gray-600">Loading assignment options...</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="p-6 border-t bg-gray-50 flex justify-end space-x-3">
+            <button onclick="closeAssignmentModal()" 
+                    class="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50">
+                Cancel
+            </button>
+            <button onclick="submitAssignment()" 
+                    class="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                <i class="fas fa-check mr-2"></i> Assign Case
+            </button>
+        </div>
+    </div>
+</div>
+
 <style>
     .file-item {
-        @apply flex items-center justify-between p-3 bg-gray-50 rounded-lg mb-2;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0.75rem;
+        background-color: #f9fafb;
+        border-radius: 0.5rem;
+        margin-bottom: 0.5rem;
     }
     
     .file-icon {
-        @apply w-10 h-10 flex items-center justify-center rounded-lg mr-3;
+        width: 2.5rem;
+        height: 2.5rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 0.5rem;
+        margin-right: 0.75rem;
     }
     
-    .file-icon-pdf { @apply bg-red-100 text-red-600; }
-    .file-icon-image { @apply bg-green-100 text-green-600; }
-    .file-icon-video { @apply bg-purple-100 text-purple-600; }
-    .file-icon-doc { @apply bg-blue-100 text-blue-600; }
+    .file-icon-pdf {
+        background-color: #fee2e2;
+        color: #dc2626;
+    }
+    
+    .file-icon-image {
+        background-color: #d1fae5;
+        color: #059669;
+    }
+    
+    .file-icon-video {
+        background-color: #e9d5ff;
+        color: #7c3aed;
+    }
+    
+    .file-icon-doc {
+        background-color: #dbeafe;
+        color: #2563eb;
+    }
     
     .attachment-preview {
-        @apply max-w-full max-h-64 mx-auto rounded-lg shadow-md;
+        max-width: 100%;
+        max-height: 16rem;
+        margin-left: auto;
+        margin-right: auto;
+        border-radius: 0.5rem;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
     }
     
     .video-preview {
-        @apply w-full max-h-64 rounded-lg;
+        width: 100%;
+        max-height: 16rem;
+        border-radius: 0.5rem;
+    }
+    
+    .assignment-option {
+        padding: 1rem;
+        border: 1px solid #e5e7eb;
+        border-radius: 0.5rem;
+        cursor: pointer;
+        transition: background-color 0.2s, border-color 0.2s;
+    }
+    
+    .assignment-option:hover {
+        background-color: #f9fafb;
+    }
+    
+    .assignment-option.active {
+        border-color: #3b82f6;
+        background-color: #eff6ff;
+    }
+    
+    .officer-item {
+        padding: 0.75rem;
+        border: 1px solid #e5e7eb;
+        border-radius: 0.5rem;
+        margin-bottom: 0.5rem;
+        cursor: pointer;
+        transition: background-color 0.2s, border-color 0.2s;
+    }
+    
+    .officer-item:hover {
+        background-color: #f9fafb;
+    }
+    
+    .officer-item.active {
+        border-color: #3b82f6;
+        background-color: #eff6ff;
+    }
+    
+    .role-badge {
+        padding: 0.25rem 0.5rem;
+        border-radius: 9999px;
+        font-size: 0.75rem;
+        font-weight: 500;
+    }
+    
+    .role-badge.lupon {
+        background-color: #d1fae5;
+        color: #065f46;
+    }
+    
+    .role-badge.tanod {
+        background-color: #dbeafe;
+        color: #1e40af;
+    }
+    
+    .badge.badge-pending {
+        padding: 0.25rem 0.5rem;
+        background-color: #fef3c7;
+        color: #92400e;
+        border-radius: 9999px;
+        font-size: 0.75rem;
+        font-weight: 500;
     }
 </style>
 
@@ -455,6 +583,283 @@ function viewAttachments(caseId) {
         });
 }
 
+// Assignment functionality
+let selectedCaseId = null;
+let selectedOfficerId = null;
+let selectedOfficerType = null;
+
+function openAssignmentModal(caseId) {
+    selectedCaseId = caseId;
+    selectedOfficerId = null;
+    selectedOfficerType = null;
+    
+    const modal = document.getElementById('assignmentModal');
+    const content = document.getElementById('assignmentModalContent');
+    
+    // Show loading
+    content.innerHTML = `
+        <div class="text-center py-8">
+            <div class="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
+            <p class="text-gray-600">Loading assignment options...</p>
+        </div>
+    `;
+    
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+    
+    // Fetch assignment options via AJAX
+    fetch(`../handlers/get_assignment_options.php?case_id=${caseId}`)
+        .then(response => response.text())
+        .then(data => {
+            content.innerHTML = data;
+            attachAssignmentListeners();
+        })
+        .catch(error => {
+            content.innerHTML = `
+                <div class="text-center py-8">
+                    <i class="fas fa-exclamation-triangle text-red-500 text-4xl mb-4"></i>
+                    <p class="text-red-600">Error loading assignment options</p>
+                </div>
+            `;
+        });
+}
+
+function closeAssignmentModal() {
+    document.getElementById('assignmentModal').classList.add('hidden');
+    document.getElementById('assignmentModal').classList.remove('flex');
+    selectedCaseId = null;
+    selectedOfficerId = null;
+    selectedOfficerType = null;
+}
+
+function attachAssignmentListeners() {
+    // Add click listeners to assignment type options
+    document.querySelectorAll('.assignment-option').forEach(option => {
+        option.addEventListener('click', function() {
+            const type = this.getAttribute('data-type');
+            
+            // Remove active class from all options
+            document.querySelectorAll('.assignment-option').forEach(opt => {
+                opt.classList.remove('active');
+            });
+            
+            // Add active class to clicked option
+            this.classList.add('active');
+            
+            // Load officer list for this type
+            loadOfficersForType(type);
+        });
+    });
+    
+    // Add click listeners to officer items
+    document.querySelectorAll('.officer-item').forEach(item => {
+        item.addEventListener('click', function() {
+            const officerId = this.getAttribute('data-officer-id');
+            const officerType = this.getAttribute('data-officer-type');
+            
+            // Remove active class from all officer items
+            document.querySelectorAll('.officer-item').forEach(officer => {
+                officer.classList.remove('active');
+            });
+            
+            // Add active class to clicked officer
+            this.classList.add('active');
+            
+            // Store selection
+            selectedOfficerId = officerId;
+            selectedOfficerType = officerType;
+            
+            // Update selection info
+            updateSelectionInfo();
+        });
+    });
+}
+
+function loadOfficersForType(type) {
+    const officerList = document.getElementById('officerList');
+    
+    // Show loading
+    officerList.innerHTML = `
+        <div class="text-center py-4">
+            <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mb-2"></div>
+            <p class="text-gray-600">Loading officers...</p>
+        </div>
+    `;
+    
+    // Fetch officers for the selected type
+    fetch(`../handlers/get_officers.php?type=${type}&case_id=${selectedCaseId}`)
+        .then(response => response.text())
+        .then(data => {
+            officerList.innerHTML = data;
+            
+            // Re-attach click listeners to officer items
+            document.querySelectorAll('.officer-item').forEach(item => {
+                item.addEventListener('click', function() {
+                    const officerId = this.getAttribute('data-officer-id');
+                    const officerType = this.getAttribute('data-officer-type');
+                    
+                    // Remove active class from all officer items
+                    document.querySelectorAll('.officer-item').forEach(officer => {
+                        officer.classList.remove('active');
+                    });
+                    
+                    // Add active class to clicked officer
+                    this.classList.add('active');
+                    
+                    // Store selection
+                    selectedOfficerId = officerId;
+                    selectedOfficerType = officerType;
+                    
+                    // Update selection info
+                    updateSelectionInfo();
+                });
+            });
+            
+            // Add a "None" option at the top
+            const noneOption = document.createElement('div');
+            noneOption.className = 'officer-item';
+            noneOption.setAttribute('data-officer-id', '0');
+            noneOption.setAttribute('data-officer-type', 'none');
+            noneOption.innerHTML = `
+                <div class="flex items-center">
+                    <div class="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center mr-3">
+                        <i class="fas fa-user-slash text-gray-600"></i>
+                    </div>
+                    <div>
+                        <p class="font-medium">Unassigned / Keep Pending</p>
+                        <p class="text-sm text-gray-600">Case will remain in pending queue</p>
+                    </div>
+                </div>
+            `;
+            
+            noneOption.addEventListener('click', function() {
+                document.querySelectorAll('.officer-item').forEach(officer => {
+                    officer.classList.remove('active');
+                });
+                this.classList.add('active');
+                selectedOfficerId = '0';
+                selectedOfficerType = 'none';
+                updateSelectionInfo();
+            });
+            
+            officerList.insertBefore(noneOption, officerList.firstChild);
+        })
+        .catch(error => {
+            officerList.innerHTML = `
+                <div class="text-center py-4">
+                    <i class="fas fa-exclamation-triangle text-red-500 text-2xl mb-2"></i>
+                    <p class="text-red-600">Error loading officers</p>
+                </div>
+            `;
+        });
+}
+
+function updateSelectionInfo() {
+    const selectionInfo = document.getElementById('selectionInfo');
+    if (!selectionInfo) return;
+    
+    if (selectedOfficerId && selectedOfficerType && selectedOfficerId !== '0') {
+        const officerName = document.querySelector(`.officer-item[data-officer-id="${selectedOfficerId}"] .officer-name`)?.textContent || 'Selected Officer';
+        selectionInfo.innerHTML = `
+            <div class="bg-green-50 p-4 rounded-lg mb-4">
+                <div class="flex items-center">
+                    <i class="fas fa-check-circle text-green-600 mr-2"></i>
+                    <span class="font-medium">Selected:</span>
+                    <span class="ml-2">${officerName}</span>
+                    <span class="ml-2 px-2 py-1 rounded-full text-xs font-medium ${selectedOfficerType === 'lupon' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'}">
+                        ${selectedOfficerType === 'lupon' ? 'Lupon Member' : 'Tanod'}
+                    </span>
+                </div>
+            </div>
+        `;
+    } else if (selectedOfficerId === '0') {
+        selectionInfo.innerHTML = `
+            <div class="bg-yellow-50 p-4 rounded-lg mb-4">
+                <div class="flex items-center">
+                    <i class="fas fa-info-circle text-yellow-600 mr-2"></i>
+                    <span class="font-medium">Case will remain unassigned and pending.</span>
+                </div>
+            </div>
+        `;
+    } else {
+        selectionInfo.innerHTML = '';
+    }
+}
+
+function submitAssignment() {
+    if (!selectedCaseId) {
+        alert('No case selected.');
+        return;
+    }
+    
+    // If officer ID is 0, we're keeping it unassigned
+    if (selectedOfficerId === '0') {
+        if (!confirm('Keep this case unassigned and in pending queue?')) {
+            return;
+        }
+        
+        // Submit unassignment via AJAX
+        const formData = new FormData();
+        formData.append('case_id', selectedCaseId);
+        formData.append('action', 'keep_pending');
+        
+        fetch('../handlers/assign_case.php', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('Case remains pending.');
+                closeAssignmentModal();
+                // Refresh the page or update the table row
+                location.reload();
+            } else {
+                alert('Error: ' + (data.message || 'Unknown error'));
+            }
+        })
+        .catch(error => {
+            alert('Error: ' + error.message);
+        });
+        return;
+    }
+    
+    if (!selectedOfficerId || !selectedOfficerType) {
+        alert('Please select an officer to assign this case to, or select "Unassigned" to keep pending.');
+        return;
+    }
+    
+    // Confirm assignment
+    if (!confirm('Are you sure you want to assign this case to the selected officer?')) {
+        return;
+    }
+    
+    // Submit assignment via AJAX
+    const formData = new FormData();
+    formData.append('case_id', selectedCaseId);
+    formData.append('officer_id', selectedOfficerId);
+    formData.append('officer_type', selectedOfficerType);
+    
+    fetch('../handlers/assign_case.php', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('Case assigned successfully!');
+            closeAssignmentModal();
+            // Refresh the page or update the table row
+            location.reload();
+        } else {
+            alert('Error assigning case: ' + (data.message || 'Unknown error'));
+        }
+    })
+    .catch(error => {
+        alert('Error assigning case: ' + error.message);
+    });
+}
+
 // Modal control functions
 function closeCaseDetailsModal() {
     document.getElementById('caseDetailsModal').classList.add('hidden');
@@ -523,13 +928,14 @@ function printCaseDetails() {
 
 // Close modals when clicking outside
 window.onclick = function(event) {
-    const modals = ['caseDetailsModal', 'attachmentsModal', 'newBlotterModal'];
+    const modals = ['caseDetailsModal', 'attachmentsModal', 'newBlotterModal', 'assignmentModal'];
     modals.forEach(modalId => {
         const modal = document.getElementById(modalId);
         if (event.target == modal) {
             if (modalId === 'caseDetailsModal') closeCaseDetailsModal();
             if (modalId === 'attachmentsModal') closeAttachmentsModal();
             if (modalId === 'newBlotterModal') closeNewBlotterModal();
+            if (modalId === 'assignmentModal') closeAssignmentModal();
         }
     });
 }
