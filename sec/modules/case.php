@@ -587,11 +587,15 @@ function viewAttachments(caseId) {
 let selectedCaseId = null;
 let selectedOfficerId = null;
 let selectedOfficerType = null;
+let selectedAssignmentTitle = null;
 
 function openAssignmentModal(caseId) {
     selectedCaseId = caseId;
     selectedOfficerId = null;
     selectedOfficerType = null;
+    selectedAssignmentTitle = null;
+    
+    console.log('Opening assignment modal for case:', caseId);
     
     const modal = document.getElementById('assignmentModal');
     const content = document.getElementById('assignmentModalContent');
@@ -609,16 +613,22 @@ function openAssignmentModal(caseId) {
     
     // Fetch assignment options via AJAX - FIXED PATH
     fetch(`../../handlers/get_assignment_options.php?case_id=${caseId}`)
-        .then(response => response.text())
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
+            return response.text();
+        })
         .then(data => {
             content.innerHTML = data;
             attachAssignmentListeners();
         })
         .catch(error => {
+            console.error('Error loading assignment options:', error);
             content.innerHTML = `
                 <div class="text-center py-8">
                     <i class="fas fa-exclamation-triangle text-red-500 text-4xl mb-4"></i>
-                    <p class="text-red-600">Error loading assignment options</p>
+                    <p class="text-red-600">Error loading assignment options: ${error.message}</p>
                 </div>
             `;
         });
@@ -630,6 +640,7 @@ function closeAssignmentModal() {
     selectedCaseId = null;
     selectedOfficerId = null;
     selectedOfficerType = null;
+    selectedAssignmentTitle = null;
 }
 
 function attachAssignmentListeners() {
@@ -637,6 +648,9 @@ function attachAssignmentListeners() {
     document.querySelectorAll('.assignment-option').forEach(option => {
         option.addEventListener('click', function() {
             const type = this.getAttribute('data-type');
+            const title = this.querySelector('h5').textContent.trim();
+            
+            console.log('Selected assignment type:', type, 'Title:', title);
             
             // Remove active class from all options
             document.querySelectorAll('.assignment-option').forEach(opt => {
@@ -646,31 +660,11 @@ function attachAssignmentListeners() {
             // Add active class to clicked option
             this.classList.add('active');
             
+            // Store assignment title for display
+            selectedAssignmentTitle = title;
+            
             // Load officer list for this type
             loadOfficersForType(type);
-        });
-    });
-    
-    // Add click listeners to officer items
-    document.querySelectorAll('.officer-item').forEach(item => {
-        item.addEventListener('click', function() {
-            const officerId = this.getAttribute('data-officer-id');
-            const officerType = this.getAttribute('data-officer-type');
-            
-            // Remove active class from all officer items
-            document.querySelectorAll('.officer-item').forEach(officer => {
-                officer.classList.remove('active');
-            });
-            
-            // Add active class to clicked officer
-            this.classList.add('active');
-            
-            // Store selection
-            selectedOfficerId = officerId;
-            selectedOfficerType = officerType;
-            
-            // Update selection info
-            updateSelectionInfo();
         });
     });
 }
@@ -688,32 +682,26 @@ function loadOfficersForType(type) {
     
     // Fetch officers for the selected type - FIXED PATH
     fetch(`../../handlers/get_officers.php?type=${type}&case_id=${selectedCaseId}`)
-        .then(response => response.text())
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
+            return response.text();
+        })
         .then(data => {
-            officerList.innerHTML = data;
+            console.log('Officers data received:', data.substring(0, 200));
             
-            // Re-attach click listeners to officer items
-            document.querySelectorAll('.officer-item').forEach(item => {
-                item.addEventListener('click', function() {
-                    const officerId = this.getAttribute('data-officer-id');
-                    const officerType = this.getAttribute('data-officer-type');
-                    
-                    // Remove active class from all officer items
-                    document.querySelectorAll('.officer-item').forEach(officer => {
-                        officer.classList.remove('active');
-                    });
-                    
-                    // Add active class to clicked officer
-                    this.classList.add('active');
-                    
-                    // Store selection
-                    selectedOfficerId = officerId;
-                    selectedOfficerType = officerType;
-                    
-                    // Update selection info
-                    updateSelectionInfo();
-                });
-            });
+            if (data.includes('Invalid officer type') || data.includes('Error') || data.includes('Database error')) {
+                officerList.innerHTML = `
+                    <div class="text-center py-4">
+                        <i class="fas fa-exclamation-triangle text-red-500 text-2xl mb-2"></i>
+                        <p class="text-red-600">${data}</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            officerList.innerHTML = data;
             
             // Add a "None" option at the top
             const noneOption = document.createElement('div');
@@ -743,12 +731,38 @@ function loadOfficersForType(type) {
             });
             
             officerList.insertBefore(noneOption, officerList.firstChild);
+            
+            // Re-attach click listeners to officer items (excluding the None option)
+            document.querySelectorAll('.officer-item:not([data-officer-id="0"])').forEach(item => {
+                item.addEventListener('click', function() {
+                    const officerId = this.getAttribute('data-officer-id');
+                    const officerType = this.getAttribute('data-officer-type');
+                    
+                    console.log('Selected officer:', officerId, 'Type:', officerType);
+                    
+                    // Remove active class from all officer items
+                    document.querySelectorAll('.officer-item').forEach(officer => {
+                        officer.classList.remove('active');
+                    });
+                    
+                    // Add active class to clicked officer
+                    this.classList.add('active');
+                    
+                    // Store selection
+                    selectedOfficerId = officerId;
+                    selectedOfficerType = officerType;
+                    
+                    // Update selection info
+                    updateSelectionInfo();
+                });
+            });
         })
         .catch(error => {
+            console.error('Error loading officers:', error);
             officerList.innerHTML = `
                 <div class="text-center py-4">
                     <i class="fas fa-exclamation-triangle text-red-500 text-2xl mb-2"></i>
-                    <p class="text-red-600">Error loading officers</p>
+                    <p class="text-red-600">Error loading officers: ${error.message}</p>
                 </div>
             `;
         });
@@ -760,6 +774,8 @@ function updateSelectionInfo() {
     
     if (selectedOfficerId && selectedOfficerType && selectedOfficerId !== '0') {
         const officerName = document.querySelector(`.officer-item[data-officer-id="${selectedOfficerId}"] .officer-name`)?.textContent || 'Selected Officer';
+        const displayTitle = selectedAssignmentTitle || (selectedOfficerType === 'lupon' ? 'Lupon Member' : 'Tanod');
+        
         selectionInfo.innerHTML = `
             <div class="bg-green-50 p-4 rounded-lg mb-4">
                 <div class="flex items-center">
@@ -767,7 +783,7 @@ function updateSelectionInfo() {
                     <span class="font-medium">Selected:</span>
                     <span class="ml-2">${officerName}</span>
                     <span class="ml-2 px-2 py-1 rounded-full text-xs font-medium ${selectedOfficerType === 'lupon' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'}">
-                        ${selectedOfficerType === 'lupon' ? 'Lupon Member' : 'Tanod'}
+                        ${displayTitle}
                     </span>
                 </div>
             </div>
@@ -830,7 +846,10 @@ function submitAssignment() {
     }
     
     // Confirm assignment
-    if (!confirm('Are you sure you want to assign this case to the selected officer?')) {
+    const officerName = document.querySelector(`.officer-item[data-officer-id="${selectedOfficerId}"] .officer-name`)?.textContent || 'the selected officer';
+    const displayTitle = selectedAssignmentTitle || (selectedOfficerType === 'lupon' ? 'Lupon Member' : 'Tanod');
+    
+    if (!confirm(`Are you sure you want to assign this case to ${officerName} (${displayTitle})?`)) {
         return;
     }
     
@@ -924,6 +943,14 @@ function printCaseDetails() {
         </html>
     `);
     printWindow.document.close();
+}
+
+// Debug function
+function debugAssignment() {
+    console.log('Selected Case ID:', selectedCaseId);
+    console.log('Selected Officer ID:', selectedOfficerId);
+    console.log('Selected Officer Type:', selectedOfficerType);
+    console.log('Selected Assignment Title:', selectedAssignmentTitle);
 }
 
 // Close modals when clicking outside
