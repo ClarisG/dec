@@ -289,12 +289,6 @@ try {
         </div>
     </div>
 
-    <div class="container mx-auto px-4 py-8">
-        <div class="mb-8">
-            <h1 class="text-3xl font-bold text-gray-800">Duty & Patrol Schedule</h1>
-            <p class="text-gray-600">Manage your shifts and patrol assignments</p>
-        </div>
-
         <!-- Current Duty Status -->
         <div class="bg-white rounded-xl shadow-lg p-6 mb-8">
             <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
