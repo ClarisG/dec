@@ -249,16 +249,21 @@ if (isset($_GET['view_report'])) {
             to { opacity: 1; transform: translateY(0); }
         }
         .badge {
-            @apply px-2 py-1 text-xs font-semibold rounded-full;
+            display: inline-block;
+            padding: 0.25rem 0.5rem;
+            font-size: 0.75rem;
+            line-height: 1rem;
+            font-weight: 600;
+            border-radius: 9999px;
         }
-        .status-pending { @apply bg-yellow-100 text-yellow-800; }
-        .status-pending_field_verification { @apply bg-orange-100 text-orange-800; }
-        .status-assigned { @apply bg-blue-100 text-blue-800; }
-        .status-investigating { @apply bg-purple-100 text-purple-800; }
-        .status-completed { @apply bg-green-100 text-green-800; }
-        .status-approved { @apply bg-emerald-100 text-emerald-800; }
-        .status-rejected { @apply bg-red-100 text-red-800; }
-        .status-needs_info { @apply bg-orange-100 text-orange-800; }
+        .status-pending { background-color: rgb(254 252 232); color: rgb(133 77 14); }
+        .status-pending_field_verification { background-color: rgb(255 237 213); color: rgb(154 52 18); }
+        .status-assigned { background-color: rgb(239 246 255); color: rgb(30 64 175); }
+        .status-investigating { background-color: rgb(250 245 255); color: rgb(126 34 206); }
+        .status-completed { background-color: rgb(240 253 244); color: rgb(22 101 52); }
+        .status-approved { background-color: rgb(236 253 245); color: rgb(6 95 70); }
+        .status-rejected { background-color: rgb(254 242 242); color: rgb(153 27 27); }
+        .status-needs_info { background-color: rgb(255 237 213); color: rgb(154 52 18); }
         
         /* Responsive adjustments */
         @media (max-width: 768px) {
@@ -274,6 +279,41 @@ if (isset($_GET['view_report'])) {
             }
             .lg\:col-span-1 {
                 grid-column: span 1;
+            }
+        }
+        
+        /* Custom scrollbar */
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 10px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 10px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+        
+        /* Print styles */
+        @media print {
+            .no-print {
+                display: none !important;
+            }
+            body {
+                background-color: white !important;
+            }
+            .bg-gray-50 {
+                background-color: white !important;
+            }
+            .shadow-md {
+                box-shadow: none !important;
+            }
+            .border {
+                border: 1px solid #ddd !important;
             }
         }
     </style>
@@ -306,13 +346,71 @@ if (isset($_GET['view_report'])) {
             </div>
         <?php endif; ?>
 
+        <!-- Header with navigation -->
+        <div class="mb-8">
+            <div class="flex justify-between items-center">
+                <div>
+                    <h1 class="text-3xl font-bold text-gray-800">Report Vetting</h1>
+                    <p class="text-gray-600 mt-2">Verify and validate incident reports in the field</p>
+                </div>
+                <div class="flex space-x-3">
+                    <a href="../tanod_dashboard.php" class="bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded-lg no-print">
+                        <i class="fas fa-arrow-left mr-2"></i>Back to Dashboard
+                    </a>
+                    <button onclick="window.print()" class="bg-blue-100 hover:bg-blue-200 text-blue-800 px-4 py-2 rounded-lg no-print">
+                        <i class="fas fa-print mr-2"></i>Print
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Stats Cards -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
+                <div class="bg-white rounded-lg shadow p-4">
+                    <div class="flex items-center">
+                        <div class="p-3 rounded-full bg-blue-100 text-blue-600 mr-4">
+                            <i class="fas fa-clock text-xl"></i>
+                        </div>
+                        <div>
+                            <p class="text-gray-600 text-sm">Pending Assignment</p>
+                            <p class="text-2xl font-bold text-gray-800"><?php echo count($pending_reports); ?></p>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-white rounded-lg shadow p-4">
+                    <div class="flex items-center">
+                        <div class="p-3 rounded-full bg-yellow-100 text-yellow-600 mr-4">
+                            <i class="fas fa-user-check text-xl"></i>
+                        </div>
+                        <div>
+                            <p class="text-gray-600 text-sm">Assigned to Me</p>
+                            <p class="text-2xl font-bold text-gray-800"><?php echo count($assigned_reports); ?></p>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-white rounded-lg shadow p-4">
+                    <div class="flex items-center">
+                        <div class="p-3 rounded-full bg-green-100 text-green-600 mr-4">
+                            <i class="fas fa-check-circle text-xl"></i>
+                        </div>
+                        <div>
+                            <p class="text-gray-600 text-sm">Completed Vettings</p>
+                            <p class="text-2xl font-bold text-gray-800"><?php echo count($completed_vettings); ?></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
             <!-- Left Column: Pending Reports -->
             <div class="lg:col-span-2 space-y-8">
                 <!-- Pending Reports for Assignment -->
                 <div class="bg-white rounded-lg shadow-md p-6">
                     <div class="flex justify-between items-center mb-6">
-                        <h2 class="text-xl font-semibold text-gray-700">Pending Reports for Verification</h2>
+                        <div>
+                            <h2 class="text-xl font-semibold text-gray-700">Pending Reports for Verification</h2>
+                            <p class="text-sm text-gray-500 mt-1">Reports requiring field verification</p>
+                        </div>
                         <span class="bg-blue-100 text-blue-800 text-sm font-semibold px-3 py-1 rounded-full">
                             <?php echo count($pending_reports); ?> pending
                         </span>
@@ -326,6 +424,7 @@ if (isset($_GET['view_report'])) {
                                         <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Report ID</th>
                                         <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Title</th>
                                         <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Reporter</th>
+                                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
                                         <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
                                     </tr>
                                 </thead>
@@ -337,28 +436,32 @@ if (isset($_GET['view_report'])) {
                                             </td>
                                             <td class="px-4 py-3">
                                                 <div class="text-sm font-medium text-gray-900"><?php echo htmlspecialchars($report['title'] ?? 'Untitled Report'); ?></div>
-                                                <div class="text-xs text-gray-500">
-                                                    <?php echo date('M d, Y', strtotime($report['created_at'] ?? $current_date)); ?>
-                                                    <?php if (!empty($report['location'])): ?>
-                                                        • <?php echo htmlspecialchars(substr($report['location'], 0, 30)); ?>...
-                                                    <?php endif; ?>
-                                                </div>
+                                                <?php if (!empty($report['location'])): ?>
+                                                    <div class="text-xs text-gray-500 truncate max-w-xs">
+                                                        <i class="fas fa-map-marker-alt mr-1"></i><?php echo htmlspecialchars($report['location']); ?>
+                                                    </div>
+                                                <?php endif; ?>
                                             </td>
                                             <td class="px-4 py-3 text-sm text-gray-900">
                                                 <?php echo htmlspecialchars($report['reporter_name'] ?? 'Unknown'); ?>
                                             </td>
+                                            <td class="px-4 py-3 text-sm text-gray-500">
+                                                <?php echo date('M d, Y', strtotime($report['created_at'] ?? $current_date)); ?>
+                                            </td>
                                             <td class="px-4 py-3 text-sm">
-                                                <form method="POST" class="inline">
-                                                    <input type="hidden" name="report_id" value="<?php echo $report['id']; ?>">
-                                                    <button type="submit" name="assign_report" 
-                                                            class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-sm transition-colors">
-                                                        <i class="fas fa-user-check mr-1"></i> Assign
-                                                    </button>
-                                                </form>
-                                                <a href="?view_report=<?php echo $report['id']; ?>" 
-                                                   class="ml-2 text-blue-600 hover:text-blue-800">
-                                                    <i class="fas fa-eye"></i> View
-                                                </a>
+                                                <div class="flex space-x-2">
+                                                    <form method="POST" class="inline">
+                                                        <input type="hidden" name="report_id" value="<?php echo $report['id']; ?>">
+                                                        <button type="submit" name="assign_report" 
+                                                                class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-sm transition-colors no-print">
+                                                            <i class="fas fa-user-check mr-1"></i> Assign
+                                                        </button>
+                                                    </form>
+                                                    <a href="?view_report=<?php echo $report['id']; ?>" 
+                                                       class="inline-block bg-gray-100 hover:bg-gray-200 text-gray-800 px-3 py-1 rounded text-sm transition-colors no-print">
+                                                        <i class="fas fa-eye mr-1"></i> View
+                                                    </a>
+                                                </div>
                                             </td>
                                         </tr>
                                     <?php endforeach; ?>
@@ -377,7 +480,10 @@ if (isset($_GET['view_report'])) {
                 <!-- Assigned Reports -->
                 <div class="bg-white rounded-lg shadow-md p-6">
                     <div class="flex justify-between items-center mb-6">
-                        <h2 class="text-xl font-semibold text-gray-700">My Assigned Reports</h2>
+                        <div>
+                            <h2 class="text-xl font-semibold text-gray-700">My Assigned Reports</h2>
+                            <p class="text-sm text-gray-500 mt-1">Reports assigned to you for verification</p>
+                        </div>
                         <span class="bg-yellow-100 text-yellow-800 text-sm font-semibold px-3 py-1 rounded-full">
                             <?php echo count($assigned_reports); ?> assigned
                         </span>
@@ -409,19 +515,24 @@ if (isset($_GET['view_report'])) {
                                                 <?php endif; ?>
                                             </div>
                                             <h3 class="font-semibold text-gray-800"><?php echo htmlspecialchars($report['title'] ?? 'Untitled Report'); ?></h3>
-                                            <p class="text-sm text-gray-600 mt-1">
-                                                <i class="fas fa-user mr-1"></i><?php echo htmlspecialchars($report['reporter_name'] ?? 'Unknown'); ?>
+                                            <div class="flex flex-wrap gap-2 mt-2">
+                                                <span class="text-sm text-gray-600">
+                                                    <i class="fas fa-user mr-1"></i><?php echo htmlspecialchars($report['reporter_name'] ?? 'Unknown'); ?>
+                                                </span>
                                                 <?php if (!empty($report['location'])): ?>
-                                                    • <i class="fas fa-map-marker-alt mr-1"></i><?php echo htmlspecialchars($report['location']); ?>
+                                                    <span class="text-sm text-gray-600">
+                                                        <i class="fas fa-map-marker-alt mr-1"></i><?php echo htmlspecialchars($report['location']); ?>
+                                                    </span>
                                                 <?php endif; ?>
-                                            </p>
+                                            </div>
                                             <?php if (!empty($report['verification_date'])): ?>
                                                 <p class="text-xs text-gray-500 mt-2">
+                                                    <i class="far fa-calendar mr-1"></i>
                                                     Last verified: <?php echo date('M d, Y', strtotime($report['verification_date'])); ?>
                                                 </p>
                                             <?php endif; ?>
                                         </div>
-                                        <div class="flex space-x-2">
+                                        <div class="flex space-x-2 no-print">
                                             <a href="?view_report=<?php echo $report['id']; ?>" 
                                                class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-sm transition-colors">
                                                 <i class="fas fa-edit mr-1"></i> Review
@@ -439,6 +550,48 @@ if (isset($_GET['view_report'])) {
                         </div>
                     <?php endif; ?>
                 </div>
+                
+                <!-- Completed Vettings -->
+                <?php if (!empty($completed_vettings)): ?>
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <div class="flex justify-between items-center mb-6">
+                        <div>
+                            <h2 class="text-xl font-semibold text-gray-700">Recently Completed Vettings</h2>
+                            <p class="text-sm text-gray-500 mt-1">Your recent verification reports</p>
+                        </div>
+                        <span class="bg-green-100 text-green-800 text-sm font-semibold px-3 py-1 rounded-full">
+                            <?php echo count($completed_vettings); ?> completed
+                        </span>
+                    </div>
+                    
+                    <div class="space-y-3">
+                        <?php foreach ($completed_vettings as $vetting): ?>
+                            <div class="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
+                                <div class="flex justify-between items-start">
+                                    <div>
+                                        <h4 class="font-medium text-gray-800"><?php echo htmlspecialchars($vetting['report_title'] ?? 'Report'); ?></h4>
+                                        <div class="flex items-center space-x-3 mt-2">
+                                            <span class="text-sm text-gray-600">
+                                                <i class="fas fa-user mr-1"></i><?php echo htmlspecialchars($vetting['reporter_name'] ?? 'Unknown'); ?>
+                                            </span>
+                                            <span class="text-sm text-gray-600">
+                                                <i class="far fa-calendar mr-1"></i><?php echo date('M d, Y', strtotime($vetting['verification_date'] ?? $current_date)); ?>
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <?php 
+                                    $rec = $vetting['recommendation'] ?? 'Needs More Info';
+                                    $rec_class = 'status-' . strtolower(str_replace(' ', '_', $rec));
+                                    ?>
+                                    <span class="badge <?php echo $rec_class; ?>">
+                                        <?php echo $rec; ?>
+                                    </span>
+                                </div>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
+                </div>
+                <?php endif; ?>
             </div>
 
             <!-- Right Column: Report Details / Vetting Form -->
@@ -447,8 +600,8 @@ if (isset($_GET['view_report'])) {
                     <div class="bg-white rounded-lg shadow-md p-6 sticky top-8">
                         <div class="flex justify-between items-center mb-6">
                             <h2 class="text-xl font-semibold text-gray-700">Report Details</h2>
-                            <a href="?" class="text-gray-500 hover:text-gray-700">
-                                <i class="fas fa-times"></i>
+                            <a href="?" class="text-gray-500 hover:text-gray-700 no-print">
+                                <i class="fas fa-times text-lg"></i>
                             </a>
                         </div>
                         
@@ -459,13 +612,18 @@ if (isset($_GET['view_report'])) {
                                 <p class="mt-1 text-gray-900 p-2 bg-gray-50 rounded"><?php echo htmlspecialchars($report_details['title'] ?? 'No title'); ?></p>
                             </div>
                             
-                            <div>
-                                <label class="block text-sm font-medium text-gray-600">Reporter</label>
-                                <p class="mt-1 text-gray-900"><?php echo htmlspecialchars($report_details['reporter_name'] ?? 'Unknown'); ?></p>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-600">Reporter</label>
+                                    <p class="mt-1 text-gray-900"><?php echo htmlspecialchars($report_details['reporter_name'] ?? 'Unknown'); ?></p>
+                                </div>
                                 <?php if (!empty($report_details['contact_number'])): ?>
-                                    <p class="text-sm text-gray-600 mt-1">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-600">Contact Number</label>
+                                    <p class="mt-1 text-gray-900">
                                         <i class="fas fa-phone mr-1"></i><?php echo htmlspecialchars($report_details['contact_number']); ?>
                                     </p>
+                                </div>
                                 <?php endif; ?>
                             </div>
                             
@@ -479,7 +637,7 @@ if (isset($_GET['view_report'])) {
                             
                             <div>
                                 <label class="block text-sm font-medium text-gray-600">Incident Details</label>
-                                <div class="mt-1 p-3 bg-gray-50 rounded text-gray-700 max-h-48 overflow-y-auto">
+                                <div class="mt-1 p-3 bg-gray-50 rounded text-gray-700 max-h-48 overflow-y-auto custom-scrollbar">
                                     <?php 
                                     $details = $report_details['description'] ?? 'No details provided';
                                     echo nl2br(htmlspecialchars($details)); 
@@ -487,12 +645,21 @@ if (isset($_GET['view_report'])) {
                                 </div>
                             </div>
                             
-                            <div>
-                                <label class="block text-sm font-medium text-gray-600">Report Date</label>
-                                <p class="mt-1 text-gray-900">
-                                    <i class="far fa-calendar mr-1"></i>
-                                    <?php echo date('F d, Y h:i A', strtotime($report_details['created_at'] ?? $current_date)); ?>
-                                </p>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-600">Report Date</label>
+                                    <p class="mt-1 text-gray-900">
+                                        <i class="far fa-calendar mr-1"></i>
+                                        <?php echo date('F d, Y', strtotime($report_details['created_at'] ?? $current_date)); ?>
+                                    </p>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-600">Time</label>
+                                    <p class="mt-1 text-gray-900">
+                                        <i class="far fa-clock mr-1"></i>
+                                        <?php echo date('h:i A', strtotime($report_details['created_at'] ?? $current_date)); ?>
+                                    </p>
+                                </div>
                             </div>
                         </div>
                         
@@ -553,7 +720,7 @@ if (isset($_GET['view_report'])) {
                                             <span class="text-sm text-gray-700"><?php echo $value; ?></span>
                                         </label>
                                     <?php endforeach; ?>
-                                    </div>
+                                </div>
                             </div>
                             
                             <!-- Verification Notes -->
@@ -592,7 +759,7 @@ if (isset($_GET['view_report'])) {
                             <!-- Submit Button -->
                             <div class="pt-2">
                                 <button type="submit" name="submit_vetting" 
-                                        class="w-full bg-green-600 hover:bg-green-700 text-white font-medium py-3 px-4 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition-colors">
+                                        class="w-full bg-green-600 hover:bg-green-700 text-white font-medium py-3 px-4 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition-colors no-print">
                                     <i class="fas fa-paper-plane mr-2"></i>Submit Vetting Report
                                 </button>
                                 <p class="text-xs text-gray-500 mt-2 text-center">
@@ -602,79 +769,58 @@ if (isset($_GET['view_report'])) {
                         </form>
                     </div>
                 <?php else: ?>
-                    <!-- Summary Stats -->
+                    <!-- Summary Stats & Quick Actions -->
                     <div class="bg-white rounded-lg shadow-md p-6 sticky top-8">
                         <h2 class="text-xl font-semibold text-gray-700 mb-6">Vetting Summary</h2>
                         
-                        <div class="space-y-4">
-                            <div class="flex items-center justify-between p-4 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors">
-                                <div>
-                                    <p class="text-sm text-gray-600">Pending Assignment</p>
-                                    <p class="text-2xl font-bold text-blue-600"><?php echo count($pending_reports); ?></p>
-                                </div>
-                                <i class="fas fa-clock text-blue-500 text-2xl"></i>
+                        <!-- Quick Stats -->
+                        <div class="space-y-4 mb-6">
+                            <div class="p-4 bg-blue-50 rounded-lg">
+                                <p class="text-sm font-medium text-gray-600">Pending Assignment</p>
+                                <p class="text-2xl font-bold text-blue-600"><?php echo count($pending_reports); ?></p>
                             </div>
                             
-                            <div class="flex items-center justify-between p-4 bg-yellow-50 rounded-lg hover:bg-yellow-100 transition-colors">
-                                <div>
-                                    <p class="text-sm text-gray-600">Assigned to Me</p>
-                                    <p class="text-2xl font-bold text-yellow-600"><?php echo count($assigned_reports); ?></p>
-                                </div>
-                                <i class="fas fa-user-check text-yellow-500 text-2xl"></i>
+                            <div class="p-4 bg-yellow-50 rounded-lg">
+                                <p class="text-sm font-medium text-gray-600">Assigned to Me</p>
+                                <p class="text-2xl font-bold text-yellow-600"><?php echo count($assigned_reports); ?></p>
                             </div>
                             
-                            <div class="flex items-center justify-between p-4 bg-green-50 rounded-lg hover:bg-green-100 transition-colors">
-                                <div>
-                                    <p class="text-sm text-gray-600">Completed Vettings</p>
-                                    <p class="text-2xl font-bold text-green-600"><?php echo count($completed_vettings); ?></p>
-                                </div>
-                                <i class="fas fa-check-circle text-green-500 text-2xl"></i>
+                            <div class="p-4 bg-green-50 rounded-lg">
+                                <p class="text-sm font-medium text-gray-600">Completed Vettings</p>
+                                <p class="text-2xl font-bold text-green-600"><?php echo count($completed_vettings); ?></p>
                             </div>
                         </div>
                         
                         <!-- Quick Actions -->
-                        <div class="mt-8">
+                        <div class="mb-8">
                             <h3 class="text-lg font-semibold text-gray-700 mb-4">Quick Actions</h3>
                             <div class="space-y-3">
-                                <a href="../tanod_dashboard.php" class="flex items-center p-3 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors">
+                                <a href="../tanod_dashboard.php" class="flex items-center p-3 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors no-print">
                                     <i class="fas fa-tachometer-alt mr-3 text-gray-600"></i>
                                     <span>Return to Dashboard</span>
                                 </a>
-                                <a href="?refresh=1" class="flex items-center p-3 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors">
+                                <button onclick="window.location.reload()" class="flex items-center p-3 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors w-full text-left no-print">
                                     <i class="fas fa-sync-alt mr-3 text-gray-600"></i>
                                     <span>Refresh List</span>
-                                </a>
+                                </button>
+                                <button onclick="window.print()" class="flex items-center p-3 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors w-full text-left no-print">
+                                    <i class="fas fa-print mr-3 text-gray-600"></i>
+                                    <span>Print Page</span>
+                                </button>
                             </div>
                         </div>
                         
-                        <!-- Recent Vettings -->
-                        <?php if (!empty($completed_vettings)): ?>
-                            <div class="mt-8">
-                                <h3 class="text-lg font-semibold text-gray-700 mb-4">Recent Vettings</h3>
-                                <div class="space-y-3">
-                                    <?php foreach ($completed_vettings as $vetting): ?>
-                                        <div class="p-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
-                                            <div class="flex justify-between items-start">
-                                                <div class="flex-1">
-                                                    <p class="font-medium text-gray-800 text-sm"><?php echo htmlspecialchars($vetting['report_title'] ?? 'Report'); ?></p>
-                                                    <p class="text-xs text-gray-500 mt-1">
-                                                        <i class="far fa-calendar mr-1"></i>
-                                                        <?php echo date('M d, Y', strtotime($vetting['verification_date'] ?? $current_date)); ?>
-                                                    </p>
-                                                </div>
-                                                <?php 
-                                                $rec = $vetting['recommendation'] ?? 'Needs More Info';
-                                                $rec_class = 'status-' . strtolower(str_replace(' ', '_', $rec));
-                                                ?>
-                                                <span class="badge <?php echo $rec_class; ?> text-xs">
-                                                    <?php echo $rec; ?>
-                                                </span>
-                                            </div>
-                                        </div>
-                                    <?php endforeach; ?>
-                                </div>
-                            </div>
-                        <?php endif; ?>
+                        <!-- Instructions -->
+                        <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                            <h3 class="text-sm font-semibold text-blue-800 mb-2">How to use this module:</h3>
+                            <ul class="text-xs text-blue-700 space-y-1">
+                                <li>1. Assign pending reports to yourself</li>
+                                <li>2. Review report details</li>
+                                <li>3. Conduct field verification</li>
+                                <li>4. Submit vetting with recommendation</li>
+                                <li>5. Report status updates automatically</li>
+                            </ul>
+                        </div>
                     </div>
                 <?php endif; ?>
             </div>
@@ -775,15 +921,6 @@ if (isset($_GET['view_report'])) {
                 }
             });
             
-            // Refresh page when clicking refresh button
-            const refreshBtn = document.querySelector('a[href*="refresh=1"]');
-            if (refreshBtn) {
-                refreshBtn.addEventListener('click', function(e) {
-                    e.preventDefault();
-                    window.location.reload();
-                });
-            }
-            
             // Add loading state to form submission
             if (form) {
                 form.addEventListener('submit', function() {
@@ -793,6 +930,27 @@ if (isset($_GET['view_report'])) {
                         submitBtn.disabled = true;
                     }
                 });
+            }
+            
+            // Auto-focus on verification notes when showing report details
+            if (textarea && location.hash === '#vetting') {
+                setTimeout(() => {
+                    textarea.focus();
+                }, 300);
+            }
+        });
+        
+        // Keyboard shortcuts
+        document.addEventListener('keydown', function(e) {
+            // Ctrl + R to refresh
+            if (e.ctrlKey && e.key === 'r') {
+                e.preventDefault();
+                window.location.reload();
+            }
+            
+            // Escape to close report details
+            if (e.key === 'Escape' && window.location.search.includes('view_report')) {
+                window.location.href = window.location.pathname;
             }
         });
     </script>

@@ -1,5 +1,5 @@
 <?php
-// sec/modules/case.php - Fixed Database Connection
+// sec/modules/case.php - Fixed Database Connection with better error handling
 session_start();
 
 // Check if user is logged in
@@ -9,29 +9,33 @@ if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'secretary') {
 }
 
 // Include database configuration
-require_once '../../config/database.php';
-
-// The database.php now returns $conn
 $db_error = null;
+$conn = null;
 
-// Test connection
 try {
-    // Test query to verify connection
-    $test_query = "SELECT 1 as test";
-    $test_stmt = $conn->query($test_query);
-    $test_result = $test_stmt->fetch();
+    // Include database configuration
+    require_once '../../config/database.php';
     
-    if (!$test_result || $test_result['test'] != 1) {
-        throw new Exception("Database test query failed");
-    }
-    
-    // Check if required tables exist
-    $tables = ['reports', 'users'];
-    foreach ($tables as $table) {
-        $check_stmt = $conn->query("SHOW TABLES LIKE '$table'");
-        if ($check_stmt->rowCount() == 0) {
-            throw new Exception("Required table '$table' not found in database");
+    // Test connection
+    if ($conn) {
+        $test_query = "SELECT 1 as test";
+        $test_stmt = $conn->query($test_query);
+        $test_result = $test_stmt->fetch();
+        
+        if (!$test_result || $test_result['test'] != 1) {
+            throw new Exception("Database test query failed");
         }
+        
+        // Check if required tables exist
+        $tables = ['reports', 'users'];
+        foreach ($tables as $table) {
+            $check_stmt = $conn->query("SHOW TABLES LIKE '$table'");
+            if ($check_stmt->rowCount() == 0) {
+                throw new Exception("Required table '$table' not found in database");
+            }
+        }
+    } else {
+        throw new Exception("Database connection is null");
     }
     
 } catch (Exception $e) {
@@ -45,6 +49,11 @@ $currentFilter = [
     'from_date' => $_GET['from_date'] ?? '',
     'to_date' => $_GET['to_date'] ?? ''
 ];
+
+// Initialize variables for pagination
+$page = isset($_GET['page']) ? max(1, intval($_GET['page'])) : 1;
+$total_pages = 1;
+$total_records = 0;
 ?>
 
 <!-- Case-Blotter Management Module -->
@@ -100,7 +109,7 @@ $currentFilter = [
                         <p class="text-sm text-gray-600">Active Cases</p>
                         <p class="text-xl font-bold text-gray-800">
                             <?php
-                            if ($conn) {
+                            if (!$db_error && $conn) {
                                 try {
                                     $query = "SELECT COUNT(*) as count FROM reports WHERE status != 'closed'";
                                     $stmt = $conn->prepare($query);
@@ -108,10 +117,10 @@ $currentFilter = [
                                     $result = $stmt->fetch(PDO::FETCH_ASSOC);
                                     echo ($result['count'] ?? 0) . ' Cases';
                                 } catch (Exception $e) {
-                                    echo 'Loading...';
+                                    echo 'Error';
                                 }
                             } else {
-                                echo 'Loading...';
+                                echo 'N/A';
                             }
                             ?>
                         </p>
@@ -128,7 +137,7 @@ $currentFilter = [
                         <p class="text-sm text-gray-600">Pending Cases</p>
                         <p class="text-xl font-bold text-gray-800">
                             <?php
-                            if ($conn) {
+                            if (!$db_error && $conn) {
                                 try {
                                     $query = "SELECT COUNT(*) as count FROM reports WHERE status = 'pending'";
                                     $stmt = $conn->prepare($query);
@@ -136,10 +145,10 @@ $currentFilter = [
                                     $result = $stmt->fetch(PDO::FETCH_ASSOC);
                                     echo ($result['count'] ?? 0) . ' Pending';
                                 } catch (Exception $e) {
-                                    echo 'Loading...';
+                                    echo 'Error';
                                 }
                             } else {
-                                echo 'Loading...';
+                                echo 'N/A';
                             }
                             ?>
                         </p>
@@ -156,7 +165,7 @@ $currentFilter = [
                         <p class="text-sm text-gray-600">Assigned Cases</p>
                         <p class="text-xl font-bold text-gray-800">
                             <?php
-                            if ($conn) {
+                            if (!$db_error && $conn) {
                                 try {
                                     $query = "SELECT COUNT(*) as count FROM reports WHERE status = 'assigned'";
                                     $stmt = $conn->prepare($query);
@@ -164,10 +173,10 @@ $currentFilter = [
                                     $result = $stmt->fetch(PDO::FETCH_ASSOC);
                                     echo ($result['count'] ?? 0) . ' Assigned';
                                 } catch (Exception $e) {
-                                    echo 'Loading...';
+                                    echo 'Error';
                                 }
                             } else {
-                                echo 'Loading...';
+                                echo 'N/A';
                             }
                             ?>
                         </p>
@@ -265,7 +274,7 @@ $currentFilter = [
                     </tr>
                 </thead>
                 <tbody id="casesTableBody">
-                    <?php if ($conn): ?>
+                    <?php if (!$db_error && $conn): ?>
                     <!-- Show real data from PHP if connection is available -->
                     <?php
                     try {
@@ -400,13 +409,6 @@ $currentFilter = [
                             echo '<tr><td colspan="7" class="py-8 text-center text-gray-500">No cases found matching your criteria.</td></tr>';
                         }
                         
-                        // Store pagination data in JavaScript variables
-                        echo '<script>';
-                        echo 'currentPage = ' . $page . ';';
-                        echo 'totalPages = ' . $total_pages . ';';
-                        echo 'totalRecords = ' . $total_records . ';';
-                        echo '</script>';
-                        
                     } catch (Exception $e) {
                         echo '<tr><td colspan="7" class="py-8 text-center text-red-500">Error loading cases: ' . htmlspecialchars($e->getMessage()) . '</td></tr>';
                     }
@@ -415,8 +417,14 @@ $currentFilter = [
                     <!-- Show loading message if no connection -->
                     <tr>
                         <td colspan="7" class="py-8 text-center text-gray-500">
+                            <?php if ($db_error): ?>
+                            <i class="fas fa-exclamation-triangle text-red-500 text-4xl mb-4"></i>
+                            <p class="text-red-600">Database Connection Error</p>
+                            <p class="text-sm text-gray-500 mt-2"><?php echo htmlspecialchars($db_error); ?></p>
+                            <?php else: ?>
                             <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mb-4"></div>
                             <p>Connecting to database...</p>
+                            <?php endif; ?>
                         </td>
                     </tr>
                     <?php endif; ?>
@@ -426,7 +434,7 @@ $currentFilter = [
         
         <!-- Pagination -->
         <div class="flex justify-center items-center mt-6 space-x-2" id="paginationContainer">
-            <?php if ($conn && isset($total_pages) && $total_pages > 1): ?>
+            <?php if (!$db_error && $conn && isset($total_pages) && $total_pages > 1): ?>
             <div class="flex items-center space-x-2">
                 <button onclick="changePage(<?php echo max(1, $page - 1); ?>)" 
                         class="pagination-btn <?php echo $page <= 1 ? 'opacity-50 cursor-not-allowed' : ''; ?>">
@@ -458,7 +466,7 @@ $currentFilter = [
             <div class="text-gray-600 ml-4">
                 Page <?php echo $page; ?> of <?php echo $total_pages; ?> • <?php echo $total_records; ?> records
             </div>
-            <?php elseif ($conn && isset($total_records)): ?>
+            <?php elseif (!$db_error && $conn && isset($total_records)): ?>
             <div class="text-gray-600">
                 Showing <?php echo $total_records; ?> records
             </div>
@@ -467,147 +475,6 @@ $currentFilter = [
     </div>
 </div>
 
-<!-- View Case Details Modal -->
-<div id="caseDetailsModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50 p-4">
-    <div class="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
-        <div class="flex justify-between items-center p-6 border-b">
-            <h3 class="text-xl font-bold text-gray-800">Case Report Details</h3>
-            <button onclick="closeCaseDetailsModal()" class="text-gray-400 hover:text-gray-600">
-                <i class="fas fa-times text-2xl"></i>
-            </button>
-        </div>
-        
-        <div class="p-6 overflow-y-auto max-h-[70vh]" id="caseDetailsContent">
-            <!-- Content will be loaded via AJAX -->
-        </div>
-        
-        <div class="p-6 border-t bg-gray-50 flex justify-end space-x-3">
-            <button onclick="closeCaseDetailsModal()" 
-                    class="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors">
-                Close
-            </button>
-            <button onclick="printCaseDetails()" 
-                    class="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
-                <i class="fas fa-print mr-2"></i> Print Report
-            </button>
-        </div>
-    </div>
-</div>
-
-<!-- View Attachments Modal -->
-<div id="attachmentsModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50 p-4">
-    <div class="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
-        <div class="flex justify-between items-center p-6 border-b">
-            <h3 class="text-xl font-bold text-gray-800">Report Attachments</h3>
-            <button onclick="closeAttachmentsModal()" class="text-gray-400 hover:text-gray-600">
-                <i class="fas fa-times text-2xl"></i>
-            </button>
-        </div>
-        
-        <div class="p-6 overflow-y-auto max-h-[70vh]" id="attachmentsContent">
-            <!-- Content will be loaded via AJAX -->
-        </div>
-        
-        <div class="p-6 border-t bg-gray-50 flex justify-end">
-            <button onclick="closeAttachmentsModal()" 
-                    class="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors">
-                Close
-            </button>
-        </div>
-    </div>
-</div>
-
-<!-- New Blotter Entry Modal -->
-<div id="newBlotterModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50 p-4">
-    <div class="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
-        <div class="flex justify-between items-center p-6 border-b">
-            <h3 class="text-xl font-bold text-gray-800">New Blotter Entry</h3>
-            <button onclick="closeNewBlotterModal()" class="text-gray-400 hover:text-gray-600">
-                <i class="fas fa-times text-2xl"></i>
-            </button>
-        </div>
-        
-        <div class="p-6 overflow-y-auto max-h-[70vh]">
-            <form id="newBlotterForm" method="POST" action="../../handlers/create_blotter.php" enctype="multipart/form-data">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Complainant Name</label>
-                        <input type="text" name="complainant_name" required
-                               class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Complainant Contact</label>
-                        <input type="text" name="complainant_contact" required
-                               class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Case Category</label>
-                        <select name="category" required
-                                class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-                            <option value="">Select Category</option>
-                            <option value="Barangay Matter">Barangay Matter</option>
-                            <option value="Police Matter">Police Matter</option>
-                            <option value="Criminal">Criminal Case</option>
-                            <option value="Civil">Civil Case</option>
-                            <option value="VAWC">VAWC</option>
-                            <option value="Minor">Minor Case</option>
-                            <option value="Other">Other</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Incident Date</label>
-                        <input type="date" name="incident_date" required
-                               class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-                    </div>
-                </div>
-                
-                <div class="mb-6">
-                    <label class="block text-sm font-medium text-gray-700 mb-2">Case Description</label>
-                    <textarea name="description" rows="4" required
-                              class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                              placeholder="Provide detailed description of the incident..."></textarea>
-                </div>
-                
-                <div class="mb-6">
-                    <label class="block text-sm font-medium text-gray-700 mb-2">Attachments (Optional)</label>
-                    <div class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
-                        <div class="flex flex-col items-center justify-center">
-                            <i class="fas fa-cloud-upload-alt text-4xl text-gray-400 mb-3"></i>
-                            <p class="text-gray-600 mb-2">Drag & drop files or click to browse</p>
-                            <p class="text-sm text-gray-500 mb-4">Supports images, PDF, DOCX, and videos (Max 10MB each)</p>
-                            <input type="file" name="attachments[]" multiple 
-                                   accept=".jpg,.jpeg,.png,.gif,.pdf,.doc,.docx,.mp4,.avi,.mov"
-                                   class="hidden" id="fileInput">
-                            <button type="button" onclick="document.getElementById('fileInput').click()" 
-                                    class="px-4 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors">
-                                <i class="fas fa-plus mr-2"></i> Add Files
-                            </button>
-                        </div>
-                        <div id="fileList" class="mt-4 text-left"></div>
-                    </div>
-                </div>
-                
-                <div class="mb-6">
-                    <label class="block text-sm font-medium text-gray-700 mb-2">Initial Action</label>
-                    <textarea name="initial_action" rows="2"
-                              class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                              placeholder="Initial action taken or recommended..."></textarea>
-                </div>
-                
-                <div class="flex justify-end space-x-3">
-                    <button type="button" onclick="closeNewBlotterModal()" 
-                            class="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors">
-                        Cancel
-                    </button>
-                    <button type="submit" 
-                            class="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
-                        <i class="fas fa-save mr-2"></i> Save Blotter Entry
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>
-</div>
 
 <!-- Assignment Modal -->
 <div id="assignmentModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50 p-4">
