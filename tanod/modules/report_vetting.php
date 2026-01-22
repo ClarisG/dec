@@ -345,23 +345,6 @@ if (isset($_GET['view_report'])) {
                 <?php unset($_SESSION['error']); ?>
             </div>
         <?php endif; ?>
-
-        <!-- Header with navigation -->
-        <div class="mb-8">
-            <div class="flex justify-between items-center">
-                <div>
-                    <h1 class="text-3xl font-bold text-gray-800">Report Vetting</h1>
-                    <p class="text-gray-600 mt-2">Verify and validate incident reports in the field</p>
-                </div>
-                <div class="flex space-x-3">
-                    <a href="../tanod_dashboard.php" class="bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded-lg no-print">
-                        <i class="fas fa-arrow-left mr-2"></i>Back to Dashboard
-                    </a>
-                    <button onclick="window.print()" class="bg-blue-100 hover:bg-blue-200 text-blue-800 px-4 py-2 rounded-lg no-print">
-                        <i class="fas fa-print mr-2"></i>Print
-                    </button>
-                </div>
-            </div>
             
             <!-- Stats Cards -->
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
