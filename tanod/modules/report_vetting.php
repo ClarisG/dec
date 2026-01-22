@@ -1,234 +1,364 @@
 <?php
-// tanod/modules/report_vetting.php
-
-// Start session and include configurations
-require_once __DIR__ . '/../../config/session.php';
-require_once __DIR__ . '/../../config/constants.php';
+// Fixed path: from modules folder to config folder
 require_once __DIR__ . '/../../config/database.php';
-require_once __DIR__ . '/../../config/functions.php';
 
-// Check if user is logged in
-if (!isset($_SESSION['user_id']) || !isset($_SESSION['role'])) {
-    header('Location: ' . BASE_URL . 'login.php');
+// Start session if not already started
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
+// Check if user is logged in and is a tanod
+if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'tanod') {
+    header('Location: ../../index.php');
     exit();
 }
 
-// Check if user is a Tanod
-if ($_SESSION['role'] !== 'tanod') {
-    // Redirect based on role
-    switch ($_SESSION['role']) {
-        case 'citizen':
-            header('Location: ' . BASE_URL . 'citizen_dashboard.php');
-            exit();
-        case 'secretary':
-            header('Location: ' . BASE_URL . 'sec/secretary_dashboard.php');
-            exit();
-        case 'captain':
-            header('Location: ' . BASE_URL . 'captain/dashboard.php');
-            exit();
-        default:
-            header('Location: ' . BASE_URL . 'login.php');
-            exit();
-    }
+$tanod_id = $_SESSION['user_id'];
+$tanod_name = $_SESSION['first_name'] . ' ' . $_SESSION['last_name'];
+
+// Get database connection
+try {
+    $pdo = getDbConnection();
+} catch (PDOException $e) {
+    die("Database connection failed: " . $e->getMessage());
 }
 
-// Get PDO connection from database.php
-$pdo = getDbConnection();
-
-// Now we can safely use $pdo
-$tanod_id = $_SESSION['user_id'];
-$tanod_name = $_SESSION['first_name'] . ' ' . $_SESSION['last_name'] ?? 'Tanod';
-$current_date = date('Y-m-d H:i:s');
-
-// Initialize error variable
-$error = '';
+// Initialize variables
+$success_message = '';
+$error_message = '';
+$pending_reports = [];
+$assigned_reports = [];
+$completed_vettings = [];
+$report_details = null;
 
 // Handle form submissions
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (isset($_POST['assign_report'])) {
         $report_id = intval($_POST['report_id']);
         
-        $sql = "UPDATE reports SET assigned_tanod = ?, status = 'assigned', needs_verification = 0 WHERE id = ?";
-        $stmt = $pdo->prepare($sql);
-        
-        if ($stmt) {
+        try {
+            $pdo->beginTransaction();
+            
+            // Assign report to tanod
+            $stmt = $pdo->prepare("
+                UPDATE reports 
+                SET assigned_tanod = ?, 
+                    status = 'assigned_for_verification',
+                    assigned_at = NOW(),
+                    updated_at = NOW()
+                WHERE id = ? AND status = 'pending_field_verification'
+            ");
+            
             if ($stmt->execute([$tanod_id, $report_id])) {
-                // Log the assignment
-                logActivity($tanod_id, 'assigned_report', "Assigned report #$report_id for vetting", $pdo);
+                // Create notification for secretary
+                $notif_stmt = $pdo->prepare("
+                    INSERT INTO notifications 
+                    (user_id, title, message, related_type, related_id, priority, is_read, created_at) 
+                    VALUES (?, ?, ?, 'report_assigned', ?, 'medium', 0, NOW())
+                ");
                 
-                $_SESSION['success'] = "Report assigned successfully for vetting.";
+                // Get secretaries
+                $sec_stmt = $pdo->prepare("
+                    SELECT id FROM users WHERE role = 'secretary' AND status = 'active'
+                ");
+                $sec_stmt->execute();
+                $secretaries = $sec_stmt->fetchAll();
+                
+                foreach ($secretaries as $secretary) {
+                    $notif_stmt->execute([
+                        $secretary['id'],
+                        '📋 Report Assigned for Verification',
+                        "Tanod $tanod_name has assigned report #$report_id for field verification",
+                        $report_id
+                    ]);
+                }
+                
+                // Log activity
+                addActivityLog($pdo, $tanod_id, 'report_assigned', 
+                    "Assigned report #$report_id for field verification");
+                
+                $pdo->commit();
+                $success_message = "✅ Report assigned successfully for field verification.";
             } else {
-                $errorInfo = $stmt->errorInfo();
-                $_SESSION['error'] = "Error assigning report: " . $errorInfo[2];
+                $error_message = "Report not found or already assigned.";
             }
-        } else {
-            $_SESSION['error'] = "Database error: Failed to prepare statement";
+            
+        } catch (PDOException $e) {
+            $pdo->rollBack();
+            error_log("Report Assignment Error: " . $e->getMessage());
+            $error_message = "❌ Error assigning report: " . $e->getMessage();
         }
     }
     
     if (isset($_POST['submit_vetting'])) {
         $report_id = intval($_POST['report_id']);
-        $location_verified = $_POST['location_verified'] ?? 'No';
-        $facts_verified = $_POST['facts_verified'] ?? 'Unconfirmed';
-        $verification_notes = $_POST['verification_notes'] ?? '';
-        $recommendation = $_POST['recommendation'] ?? 'Needs More Info';
+        $location_verified = $_POST['location_verified'] ?? 'no';
+        $facts_verified = $_POST['facts_verified'] ?? 'unconfirmed';
+        $verification_notes = trim($_POST['verification_notes'] ?? '');
+        $recommendation = $_POST['recommendation'] ?? 'needs_more_info';
+        $verification_date = date('Y-m-d H:i:s');
         
-        // Sanitize inputs
-        $location_verified = sanitize($location_verified);
-        $facts_verified = sanitize($facts_verified);
-        $verification_notes = sanitize($verification_notes);
-        $recommendation = sanitize($recommendation);
-        
-        // Check if vetting already exists
-        $check_sql = "SELECT vetting_id FROM report_vetting WHERE report_id = ?";
-        $check_stmt = $pdo->prepare($check_sql);
-        
-        if ($check_stmt) {
-            $check_stmt->execute([$report_id]);
-            $check_result = $check_stmt->fetchAll(PDO::FETCH_ASSOC);
-            
-            if (count($check_result) > 0) {
-                // Update existing vetting
-                $sql = "UPDATE report_vetting SET 
-                        location_verified = ?, 
-                        facts_verified = ?, 
-                        verification_notes = ?, 
-                        recommendation = ?, 
-                        status = 'Completed', 
-                        updated_at = ? 
-                        WHERE report_id = ?";
-            } else {
-                // Insert new vetting
-                $sql = "INSERT INTO report_vetting 
-                        (report_id, tanod_id, location_verified, facts_verified, verification_notes, recommendation, status) 
-                        VALUES (?, ?, ?, ?, ?, ?, 'Completed')";
-            }
-            
-            $stmt = $pdo->prepare($sql);
-            
-            if ($stmt) {
-                if (count($check_result) > 0) {
-                    // Update
-                    $stmt->execute([$location_verified, $facts_verified, $verification_notes, $recommendation, $current_date, $report_id]);
+        // Validate inputs
+        if (empty($verification_notes) || strlen($verification_notes) < 10) {
+            $error_message = "Verification notes must be at least 10 characters.";
+        } else {
+            try {
+                $pdo->beginTransaction();
+                
+                // Check if vetting already exists
+                $check_stmt = $pdo->prepare("SELECT id FROM report_vetting WHERE report_id = ?");
+                $check_stmt->execute([$report_id]);
+                
+                if ($check_stmt->rowCount() > 0) {
+                    // Update existing vetting
+                    $stmt = $pdo->prepare("
+                        UPDATE report_vetting 
+                        SET location_verified = ?, 
+                            facts_verified = ?, 
+                            verification_notes = ?, 
+                            recommendation = ?,
+                            verification_date = ?,
+                            updated_at = NOW()
+                        WHERE report_id = ?
+                    ");
+                    $stmt->execute([
+                        $location_verified, 
+                        $facts_verified, 
+                        $verification_notes, 
+                        $recommendation,
+                        $verification_date,
+                        $report_id
+                    ]);
                 } else {
-                    // Insert
-                    $stmt->execute([$report_id, $tanod_id, $location_verified, $facts_verified, $verification_notes, $recommendation]);
+                    // Insert new vetting
+                    $stmt = $pdo->prepare("
+                        INSERT INTO report_vetting 
+                        (report_id, tanod_id, location_verified, facts_verified, 
+                         verification_notes, recommendation, verification_date) 
+                        VALUES (?, ?, ?, ?, ?, ?, ?)
+                    ");
+                    $stmt->execute([
+                        $report_id, 
+                        $tanod_id, 
+                        $location_verified, 
+                        $facts_verified, 
+                        $verification_notes, 
+                        $recommendation,
+                        $verification_date
+                    ]);
                 }
                 
-                if ($stmt->rowCount() > 0) {
-                    // Update report status based on recommendation
-                    $report_status = 'assigned';
-                    if ($recommendation == 'Approved') {
-                        $report_status = 'investigating';
-                    } elseif ($recommendation == 'Rejected') {
-                        $report_status = 'closed';
-                    }
-                    
-                    $update_sql = "UPDATE reports SET status = ?, verification_notes = ?, verification_date = NOW(), verified_by = ? WHERE id = ?";
-                    $update_stmt = $pdo->prepare($update_sql);
-                    
-                    if ($update_stmt) {
-                        $update_stmt->execute([$report_status, $verification_notes, $tanod_id, $report_id]);
-                    }
-                    
-                    // Log activity
-                    logActivity($tanod_id, 'submitted_vetting', "Submitted vetting for report #$report_id with recommendation: $recommendation", $pdo);
-                    
-                    $_SESSION['success'] = "Vetting report submitted successfully.";
-                    
-                    // Redirect to clear POST data
-                    header("Location: " . $_SERVER['PHP_SELF'] . "?success=1");
-                    exit();
-                } else {
-                    $errorInfo = $stmt->errorInfo();
-                    $_SESSION['error'] = "Error submitting vetting report: " . $errorInfo[2];
+                // Update report status based on recommendation
+                $report_status = 'verified';
+                if ($recommendation === 'approved') {
+                    $report_status = 'verified_approved';
+                } elseif ($recommendation === 'rejected') {
+                    $report_status = 'verified_rejected';
+                } elseif ($recommendation === 'needs_more_info') {
+                    $report_status = 'needs_more_info';
                 }
+                
+                $update_stmt = $pdo->prepare("
+                    UPDATE reports 
+                    SET status = ?, 
+                        verification_notes = ?, 
+                        verification_date = ?, 
+                        verified_by = ?,
+                        updated_at = NOW()
+                    WHERE id = ?
+                ");
+                $update_stmt->execute([
+                    $report_status, 
+                    $verification_notes, 
+                    $verification_date, 
+                    $tanod_id, 
+                    $report_id
+                ]);
+                
+                // Create notification for secretary
+                $notif_stmt = $pdo->prepare("
+                    INSERT INTO notifications 
+                    (user_id, title, message, related_type, related_id, priority, is_read, created_at) 
+                    VALUES (?, ?, ?, 'report_vetted', ?, 'high', 0, NOW())
+                ");
+                
+                // Get secretaries and admins
+                $admin_stmt = $pdo->prepare("
+                    SELECT id FROM users 
+                    WHERE role IN ('secretary', 'admin') AND status = 'active'
+                ");
+                $admin_stmt->execute();
+                $admins = $admin_stmt->fetchAll();
+                
+                $rec_text = ucwords(str_replace('_', ' ', $recommendation));
+                
+                foreach ($admins as $admin) {
+                    $notif_stmt->execute([
+                        $admin['id'],
+                        '📋 Report Verification Complete',
+                        "Tanod $tanod_name has completed verification of report #$report_id (Recommendation: $rec_text)",
+                        $report_id
+                    ]);
+                }
+                
+                // Notify citizen if report was submitted by citizen
+                $citizen_stmt = $pdo->prepare("
+                    SELECT user_id FROM reports WHERE id = ?
+                ");
+                $citizen_stmt->execute([$report_id]);
+                $citizen = $citizen_stmt->fetch();
+                
+                if ($citizen) {
+                    $citizen_notif = $pdo->prepare("
+                        INSERT INTO notifications 
+                        (user_id, title, message, related_type, related_id, priority, is_read, created_at) 
+                        VALUES (?, ?, ?, 'report_status', ?, 'medium', 0, NOW())
+                    ");
+                    
+                    $status_message = "Your report has been verified. Status: " . ucwords(str_replace('_', ' ', $report_status));
+                    $citizen_notif->execute([
+                        $citizen['user_id'],
+                        '📋 Report Update',
+                        $status_message,
+                        $report_id
+                    ]);
+                }
+                
+                // Log activity
+                addActivityLog($pdo, $tanod_id, 'report_vetted', 
+                    "Submitted vetting for report #$report_id with recommendation: $recommendation");
+                
+                $pdo->commit();
+                $success_message = "✅ Vetting report submitted successfully.";
+                
+                // Clear form data
+                unset($_POST);
+                
+            } catch (PDOException $e) {
+                $pdo->rollBack();
+                error_log("Vetting Submission Error: " . $e->getMessage());
+                $error_message = "❌ Error submitting vetting report: " . $e->getMessage();
             }
         }
     }
 }
 
-// Get assigned reports for this tanod (reports that need verification and are assigned to this tanod)
-$assigned_reports = [];
-$assigned_sql = "
-    SELECT r.*, 
-           CONCAT(u.first_name, ' ', u.last_name) as reporter_name,
-           v.vetting_id, v.verification_date, v.recommendation as vetting_recommendation
-    FROM reports r
-    LEFT JOIN users u ON r.user_id = u.id
-    LEFT JOIN report_vetting v ON r.id = v.report_id
-    WHERE (r.assigned_tanod = ? OR r.assigned_to = ?)
-    AND r.status IN ('pending_field_verification', 'assigned', 'investigating')
-    ORDER BY r.created_at DESC
-";
-
-$assigned_stmt = $pdo->prepare($assigned_sql);
-if ($assigned_stmt) {
-    $assigned_stmt->execute([$tanod_id, $tanod_id]);
-    $assigned_reports = $assigned_stmt->fetchAll(PDO::FETCH_ASSOC);
+// Get pending reports for verification
+try {
+    $stmt = $pdo->prepare("
+        SELECT r.*, 
+               CONCAT(u.first_name, ' ', u.last_name) as reporter_name,
+               u.contact_number,
+               rt.name as report_type
+        FROM reports r
+        JOIN users u ON r.user_id = u.id
+        LEFT JOIN report_types rt ON r.report_type_id = rt.id
+        WHERE r.status = 'pending_field_verification'
+        AND (r.assigned_tanod IS NULL OR r.assigned_tanod = 0)
+        AND r.needs_field_verification = 1
+        ORDER BY r.created_at DESC
+        LIMIT 20
+    ");
+    $stmt->execute();
+    $pending_reports = $stmt->fetchAll(PDO::FETCH_ASSOC);
+} catch (PDOException $e) {
+    error_log("Error fetching pending reports: " . $e->getMessage());
 }
 
-// Get pending reports available for assignment (reports needing verification, not assigned yet)
-$pending_reports = [];
-$pending_sql = "
-    SELECT r.*, 
-           CONCAT(u.first_name, ' ', u.last_name) as reporter_name 
-    FROM reports r
-    LEFT JOIN users u ON r.user_id = u.id
-    WHERE r.status = 'pending_field_verification'
-    AND r.needs_verification = 1
-    AND (r.assigned_tanod IS NULL OR r.assigned_tanod = 0)
-    ORDER BY r.created_at DESC
-    LIMIT 10
-";
-
-$pending_stmt = $pdo->prepare($pending_sql);
-if ($pending_stmt) {
-    $pending_stmt->execute();
-    $pending_reports = $pending_stmt->fetchAll(PDO::FETCH_ASSOC);
+// Get assigned reports to this tanod
+try {
+    $stmt = $pdo->prepare("
+        SELECT r.*, 
+               CONCAT(u.first_name, ' ', u.last_name) as reporter_name,
+               u.contact_number,
+               rt.name as report_type,
+               v.recommendation as vetting_recommendation,
+               v.verification_date
+        FROM reports r
+        JOIN users u ON r.user_id = u.id
+        LEFT JOIN report_types rt ON r.report_type_id = rt.id
+        LEFT JOIN report_vetting v ON r.id = v.report_id
+        WHERE r.assigned_tanod = ?
+        AND r.status IN ('assigned_for_verification', 'pending_field_verification')
+        ORDER BY r.created_at DESC
+        LIMIT 20
+    ");
+    $stmt->execute([$tanod_id]);
+    $assigned_reports = $stmt->fetchAll(PDO::FETCH_ASSOC);
+} catch (PDOException $e) {
+    error_log("Error fetching assigned reports: " . $e->getMessage());
 }
 
-// Get completed vettings
-$completed_vettings = [];
-$completed_sql = "
-    SELECT v.*, r.title as report_title, r.location,
-           CONCAT(u.first_name, ' ', u.last_name) as reporter_name
-    FROM report_vetting v
-    JOIN reports r ON v.report_id = r.id
-    LEFT JOIN users u ON r.user_id = u.id
-    WHERE v.tanod_id = ?
-    AND v.status = 'Completed'
-    ORDER BY v.verification_date DESC
-    LIMIT 10
-";
-
-$completed_stmt = $pdo->prepare($completed_sql);
-if ($completed_stmt) {
-    $completed_stmt->execute([$tanod_id]);
-    $completed_vettings = $completed_stmt->fetchAll(PDO::FETCH_ASSOC);
+// Get completed vettings by this tanod
+try {
+    $stmt = $pdo->prepare("
+        SELECT v.*, 
+               r.title as report_title,
+               r.location,
+               r.case_number,
+               CONCAT(u.first_name, ' ', u.last_name) as reporter_name
+        FROM report_vetting v
+        JOIN reports r ON v.report_id = r.id
+        JOIN users u ON r.user_id = u.id
+        WHERE v.tanod_id = ?
+        ORDER BY v.verification_date DESC
+        LIMIT 10
+    ");
+    $stmt->execute([$tanod_id]);
+    $completed_vettings = $stmt->fetchAll(PDO::FETCH_ASSOC);
+} catch (PDOException $e) {
+    error_log("Error fetching completed vettings: " . $e->getMessage());
 }
 
 // Get specific report details if requested
-$report_details = null;
 if (isset($_GET['view_report'])) {
     $report_id = intval($_GET['view_report']);
-    $report_sql = "
-        SELECT r.*, 
-               CONCAT(u.first_name, ' ', u.last_name) as reporter_name, 
-               u.contact_number,
-               v.*
-        FROM reports r
-        LEFT JOIN users u ON r.user_id = u.id
-        LEFT JOIN report_vetting v ON r.id = v.report_id
-        WHERE r.id = ?
-    ";
     
-    $report_stmt = $pdo->prepare($report_sql);
-    if ($report_stmt) {
-        $report_stmt->execute([$report_id]);
-        if ($report_stmt->rowCount() > 0) {
-            $report_details = $report_stmt->fetch(PDO::FETCH_ASSOC);
+    try {
+        $stmt = $pdo->prepare("
+            SELECT r.*, 
+                   CONCAT(u.first_name, ' ', u.last_name) as reporter_name, 
+                   u.contact_number, u.email,
+                   rt.name as report_type,
+                   v.*
+            FROM reports r
+            JOIN users u ON r.user_id = u.id
+            LEFT JOIN report_types rt ON r.report_type_id = rt.id
+            LEFT JOIN report_vetting v ON r.id = v.report_id
+            WHERE r.id = ?
+        ");
+        $stmt->execute([$report_id]);
+        
+        if ($stmt->rowCount() > 0) {
+            $report_details = $stmt->fetch(PDO::FETCH_ASSOC);
         }
+    } catch (PDOException $e) {
+        error_log("Error fetching report details: " . $e->getMessage());
+    }
+}
+
+// Get statistics
+$stats = [
+    'pending' => count($pending_reports),
+    'assigned' => count($assigned_reports),
+    'completed' => count($completed_vettings),
+    'total' => count($pending_reports) + count($assigned_reports) + count($completed_vettings)
+];
+
+// Activity log function
+function addActivityLog($pdo, $user_id, $action, $description) {
+    try {
+        $ip_address = $_SERVER['REMOTE_ADDR'] ?? 'Unknown';
+        $user_agent = $_SERVER['HTTP_USER_AGENT'] ?? 'Unknown';
+        
+        $stmt = $pdo->prepare("
+            INSERT INTO activity_logs 
+            (user_id, action, description, ip_address, user_agent, created_at) 
+            VALUES (?, ?, ?, ?, ?, NOW())
+        ");
+        $stmt->execute([$user_id, $action, $description, $ip_address, $user_agent]);
+    } catch (PDOException $e) {
+        error_log("Activity Log Error: " . $e->getMessage());
     }
 }
 ?>
@@ -237,711 +367,925 @@ if (isset($_GET['view_report'])) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Report Vetting - Barangay LEIR System</title>
+    <title>Witness & Report Vetting Queue - Barangay LEIR System</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        .fade-in {
-            animation: fadeIn 0.3s ease-in-out;
+        .glass-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
         }
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(-10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        .badge {
-            display: inline-block;
-            padding: 0.25rem 0.5rem;
-            font-size: 0.75rem;
-            line-height: 1rem;
-            font-weight: 600;
-            border-radius: 9999px;
-        }
-        .status-pending { background-color: rgb(254 252 232); color: rgb(133 77 14); }
-        .status-pending_field_verification { background-color: rgb(255 237 213); color: rgb(154 52 18); }
-        .status-assigned { background-color: rgb(239 246 255); color: rgb(30 64 175); }
-        .status-investigating { background-color: rgb(250 245 255); color: rgb(126 34 206); }
-        .status-completed { background-color: rgb(240 253 244); color: rgb(22 101 52); }
-        .status-approved { background-color: rgb(236 253 245); color: rgb(6 95 70); }
-        .status-rejected { background-color: rgb(254 242 242); color: rgb(153 27 27); }
-        .status-needs_info { background-color: rgb(255 237 213); color: rgb(154 52 18); }
         
-        /* Responsive adjustments */
-        @media (max-width: 768px) {
-            .container {
-                padding-left: 1rem;
-                padding-right: 1rem;
-            }
-            .grid-cols-1 {
-                grid-template-columns: 1fr;
-            }
-            .lg\:col-span-2 {
-                grid-column: span 1;
-            }
-            .lg\:col-span-1 {
-                grid-column: span 1;
-            }
+        .report-card {
+            transition: all 0.3s ease;
+            border-left: 4px solid;
+        }
+        
+        .report-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+        }
+        
+        .status-badge {
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .status-pending { 
+            background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); 
+            color: #92400e; 
+            border-left-color: #f59e0b; 
+        }
+        .status-assigned { 
+            background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%); 
+            color: #1e40af; 
+            border-left-color: #3b82f6; 
+        }
+        .status-verified { 
+            background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%); 
+            color: #065f46; 
+            border-left-color: #10b981; 
+        }
+        .status-rejected { 
+            background: linear-gradient(135deg, #fecaca 0%, #fca5a5 100%); 
+            color: #991b1b; 
+            border-left-color: #ef4444; 
+        }
+        
+        .priority-high { 
+            background: linear-gradient(135deg, #fecaca 0%, #fca5a5 100%); 
+            color: #991b1b; 
+        }
+        .priority-medium { 
+            background: linear-gradient(135deg, #fde68a 0%, #fcd34d 100%); 
+            color: #92400e; 
+        }
+        .priority-low { 
+            background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%); 
+            color: #065f46; 
+        }
+        
+        .timeline {
+            position: relative;
+            padding-left: 30px;
+        }
+        
+        .timeline::before {
+            content: '';
+            position: absolute;
+            left: 10px;
+            top: 0;
+            bottom: 0;
+            width: 2px;
+            background: linear-gradient(to bottom, #3b82f6, #10b981, #ef4444);
+        }
+        
+        .timeline-item {
+            position: relative;
+            margin-bottom: 20px;
+        }
+        
+        .timeline-item::before {
+            content: '';
+            position: absolute;
+            left: -20px;
+            top: 5px;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #3b82f6;
+            border: 2px solid white;
+            box-shadow: 0 0 0 3px #dbeafe;
+        }
+        
+        .timeline-item.completed::before {
+            background: #10b981;
+            box-shadow: 0 0 0 3px #d1fae5;
+        }
+        
+        .timeline-item.pending::before {
+            background: #f59e0b;
+            box-shadow: 0 0 0 3px #fef3c7;
+        }
+        
+        .timeline-item.rejected::before {
+            background: #ef4444;
+            box-shadow: 0 0 0 3px #fecaca;
         }
         
         /* Custom scrollbar */
         .custom-scrollbar::-webkit-scrollbar {
             width: 6px;
         }
+        
         .custom-scrollbar::-webkit-scrollbar-track {
             background: #f1f1f1;
-            border-radius: 10px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb {
-            background: #888;
-            border-radius: 10px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-            background: #555;
+            border-radius: 4px;
         }
         
-        /* Print styles */
-        @media print {
-            .no-print {
-                display: none !important;
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #c1c1c1;
+            border-radius: 4px;
+        }
+        
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #a1a1a1;
+        }
+        
+        /* Animations */
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
             }
-            body {
-                background-color: white !important;
+            to {
+                opacity: 1;
+                transform: translateY(0);
             }
-            .bg-gray-50 {
-                background-color: white !important;
+        }
+        
+        .slide-in {
+            animation: slideIn 0.3s ease-out;
+        }
+        
+        /* Mobile optimizations */
+        @media (max-width: 768px) {
+            .mobile-stack {
+                flex-direction: column;
             }
-            .shadow-md {
-                box-shadow: none !important;
+            
+            .mobile-full {
+                width: 100% !important;
             }
-            .border {
-                border: 1px solid #ddd !important;
-            }
+        }
+        
+        /* Form validation styles */
+        .form-error {
+            border-color: #ef4444 !important;
+        }
+        
+        .error-message {
+            color: #ef4444;
+            font-size: 12px;
+            margin-top: 4px;
         }
     </style>
 </head>
-<body class="bg-gray-50 min-h-screen">
-
-    <div class="container mx-auto px-4 py-8">
-        <!-- Success/Error Messages -->
-        <?php if (isset($_SESSION['success'])): ?>
-            <div class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-4 fade-in">
-                <div class="flex justify-between items-center">
-                    <span><?php echo $_SESSION['success']; ?></span>
-                    <button onclick="this.parentElement.parentElement.remove()" class="text-green-700">
-                        <i class="fas fa-times"></i>
-                    </button>
+<body class="bg-gradient-to-br from-gray-50 to-green-50 min-h-screen p-4">
+    <div class="max-w-7xl mx-auto">
+        <!-- Header -->
+        <div class="glass-card rounded-2xl shadow-xl mb-6 overflow-hidden">
+            <div class="bg-gradient-to-r from-green-600 to-emerald-700 p-6">
+                <div class="flex flex-col md:flex-row justify-between items-start md:items-center">
+                    <div>
+                        <h1 class="text-2xl md:text-3xl font-bold text-white">
+                            <i class="fas fa-user-check mr-3"></i>
+                            Witness & Report Vetting Queue
+                        </h1>
+                        <p class="text-green-100 mt-2">Review incoming Citizen Reports flagged for field verification</p>
+                    </div>
+                    <div class="mt-4 md:mt-0">
+                        <div class="flex items-center space-x-4">
+                            <div class="text-right">
+                                <p class="text-white text-sm">Logged in as:</p>
+                                <p class="text-white font-bold">
+                                    <?php echo htmlspecialchars($tanod_name); ?>
+                                    <span class="bg-white/20 px-2 py-1 rounded-full text-xs ml-2">Tanod</span>
+                                </p>
+                                <p class="text-white text-xs mt-1">
+                                    ID: TAN-<?php echo str_pad($tanod_id, 4, '0', STR_PAD_LEFT); ?>
+                                </p>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-                <?php unset($_SESSION['success']); ?>
             </div>
-        <?php endif; ?>
-        
-        <?php if (isset($_SESSION['error'])): ?>
-            <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4 fade-in">
-                <div class="flex justify-between items-center">
-                    <span><?php echo $_SESSION['error']; ?></span>
-                    <button onclick="this.parentElement.parentElement.remove()" class="text-red-700">
-                        <i class="fas fa-times"></i>
-                    </button>
-                </div>
-                <?php unset($_SESSION['error']); ?>
-            </div>
-        <?php endif; ?>
             
-            <!-- Stats Cards -->
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
-                <div class="bg-white rounded-lg shadow p-4">
-                    <div class="flex items-center">
-                        <div class="p-3 rounded-full bg-blue-100 text-blue-600 mr-4">
-                            <i class="fas fa-clock text-xl"></i>
-                        </div>
-                        <div>
-                            <p class="text-gray-600 text-sm">Pending Assignment</p>
-                            <p class="text-2xl font-bold text-gray-800"><?php echo count($pending_reports); ?></p>
-                        </div>
+            <!-- Stats Bar -->
+            <div class="bg-white p-4 border-b">
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div class="text-center p-3 bg-gradient-to-r from-blue-50 to-blue-100 rounded-lg">
+                        <div class="text-2xl font-bold text-blue-700"><?php echo $stats['pending']; ?></div>
+                        <div class="text-sm text-blue-600">Pending Reports</div>
                     </div>
-                </div>
-                <div class="bg-white rounded-lg shadow p-4">
-                    <div class="flex items-center">
-                        <div class="p-3 rounded-full bg-yellow-100 text-yellow-600 mr-4">
-                            <i class="fas fa-user-check text-xl"></i>
-                        </div>
-                        <div>
-                            <p class="text-gray-600 text-sm">Assigned to Me</p>
-                            <p class="text-2xl font-bold text-gray-800"><?php echo count($assigned_reports); ?></p>
-                        </div>
+                    <div class="text-center p-3 bg-gradient-to-r from-yellow-50 to-yellow-100 rounded-lg">
+                        <div class="text-2xl font-bold text-yellow-700"><?php echo $stats['assigned']; ?></div>
+                        <div class="text-sm text-yellow-600">Assigned to Me</div>
                     </div>
-                </div>
-                <div class="bg-white rounded-lg shadow p-4">
-                    <div class="flex items-center">
-                        <div class="p-3 rounded-full bg-green-100 text-green-600 mr-4">
-                            <i class="fas fa-check-circle text-xl"></i>
-                        </div>
-                        <div>
-                            <p class="text-gray-600 text-sm">Completed Vettings</p>
-                            <p class="text-2xl font-bold text-gray-800"><?php echo count($completed_vettings); ?></p>
-                        </div>
+                    <div class="text-center p-3 bg-gradient-to-r from-green-50 to-green-100 rounded-lg">
+                        <div class="text-2xl font-bold text-green-700"><?php echo $stats['completed']; ?></div>
+                        <div class="text-sm text-green-600">Completed</div>
+                    </div>
+                    <div class="text-center p-3 bg-gradient-to-r from-purple-50 to-purple-100 rounded-lg">
+                        <div class="text-2xl font-bold text-purple-700"><?php echo $stats['total']; ?></div>
+                        <div class="text-sm text-purple-600">Total in Queue</div>
                     </div>
                 </div>
             </div>
         </div>
+        
+        <!-- Alerts -->
+        <?php if ($success_message): ?>
+        <div class="mb-6 p-4 bg-gradient-to-r from-green-50 to-green-100 border-l-4 border-green-500 rounded-lg animate-pulse slide-in">
+            <div class="flex items-center">
+                <i class="fas fa-check-circle text-green-500 text-xl mr-3"></i>
+                <div class="flex-1">
+                    <p class="text-green-700 font-bold"><?php echo $success_message; ?></p>
+                    <p class="text-green-600 text-sm mt-1"><?php echo date('F j, Y - h:i A'); ?></p>
+                </div>
+                <button onclick="this.parentElement.parentElement.remove()" class="text-green-500 hover:text-green-700">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        </div>
+        <?php endif; ?>
+        
+        <?php if ($error_message): ?>
+        <div class="mb-6 p-4 bg-gradient-to-r from-red-50 to-red-100 border-l-4 border-red-500 rounded-lg slide-in">
+            <div class="flex items-center">
+                <i class="fas fa-exclamation-circle text-red-500 text-xl mr-3"></i>
+                <div class="flex-1">
+                    <p class="text-red-700 font-bold"><?php echo $error_message; ?></p>
+                </div>
+                <button onclick="this.parentElement.parentElement.remove()" class="text-red-500 hover:text-red-700">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        </div>
+        <?php endif; ?>
+        
+        <!-- Critical Data Handled Info -->
+        <div class="mb-6 p-4 bg-gradient-to-r from-green-50 to-emerald-50 border-l-4 border-emerald-500 rounded-lg">
+            <div class="flex items-center">
+                <i class="fas fa-shield-alt text-emerald-500 text-xl mr-3"></i>
+                <div>
+                    <p class="text-sm font-bold text-emerald-800">Critical Data Handled</p>
+                    <p class="text-xs text-emerald-700">Citizen report details, Tanod verification notes, Recommendation status, GPS location verification</p>
+                </div>
+            </div>
+        </div>
 
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <!-- Main Content Grid -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <!-- Left Column: Pending Reports -->
-            <div class="lg:col-span-2 space-y-8">
-                <!-- Pending Reports for Assignment -->
-                <div class="bg-white rounded-lg shadow-md p-6">
+            <div class="lg:col-span-2">
+                <!-- Pending Reports Card -->
+                <div class="glass-card rounded-2xl shadow-lg p-6 mb-6">
                     <div class="flex justify-between items-center mb-6">
                         <div>
-                            <h2 class="text-xl font-semibold text-gray-700">Pending Reports for Verification</h2>
-                            <p class="text-sm text-gray-500 mt-1">Reports requiring field verification</p>
+                            <h2 class="text-xl font-bold text-gray-800">Pending Reports for Verification</h2>
+                            <p class="text-gray-600 mt-1">Reports requiring field verification and assignment</p>
                         </div>
-                        <span class="bg-blue-100 text-blue-800 text-sm font-semibold px-3 py-1 rounded-full">
-                            <?php echo count($pending_reports); ?> pending
+                        <span class="px-3 py-1 bg-gradient-to-r from-blue-500 to-blue-600 text-white text-sm font-bold rounded-full">
+                            <?php echo $stats['pending']; ?> pending
                         </span>
                     </div>
                     
                     <?php if (!empty($pending_reports)): ?>
-                        <div class="overflow-x-auto">
-                            <table class="min-w-full divide-y divide-gray-200">
-                                <thead class="bg-gray-50">
-                                    <tr>
-                                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Report ID</th>
-                                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Title</th>
-                                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Reporter</th>
-                                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
-                                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody class="bg-white divide-y divide-gray-200">
-                                    <?php foreach ($pending_reports as $report): ?>
-                                        <tr class="hover:bg-gray-50 transition-colors">
-                                            <td class="px-4 py-3">
-                                                <span class="text-sm font-medium text-gray-900">#<?php echo $report['id']; ?></span>
-                                            </td>
-                                            <td class="px-4 py-3">
-                                                <div class="text-sm font-medium text-gray-900"><?php echo htmlspecialchars($report['title'] ?? 'Untitled Report'); ?></div>
-                                                <?php if (!empty($report['location'])): ?>
-                                                    <div class="text-xs text-gray-500 truncate max-w-xs">
-                                                        <i class="fas fa-map-marker-alt mr-1"></i><?php echo htmlspecialchars($report['location']); ?>
-                                                    </div>
-                                                <?php endif; ?>
-                                            </td>
-                                            <td class="px-4 py-3 text-sm text-gray-900">
-                                                <?php echo htmlspecialchars($report['reporter_name'] ?? 'Unknown'); ?>
-                                            </td>
-                                            <td class="px-4 py-3 text-sm text-gray-500">
-                                                <?php echo date('M d, Y', strtotime($report['created_at'] ?? $current_date)); ?>
-                                            </td>
-                                            <td class="px-4 py-3 text-sm">
-                                                <div class="flex space-x-2">
-                                                    <form method="POST" class="inline">
-                                                        <input type="hidden" name="report_id" value="<?php echo $report['id']; ?>">
-                                                        <button type="submit" name="assign_report" 
-                                                                class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-sm transition-colors no-print">
-                                                            <i class="fas fa-user-check mr-1"></i> Assign
-                                                        </button>
-                                                    </form>
-                                                    <a href="?view_report=<?php echo $report['id']; ?>" 
-                                                       class="inline-block bg-gray-100 hover:bg-gray-200 text-gray-800 px-3 py-1 rounded text-sm transition-colors no-print">
-                                                        <i class="fas fa-eye mr-1"></i> View
-                                                    </a>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    <?php endforeach; ?>
-                                </tbody>
-                            </table>
-                        </div>
-                    <?php else: ?>
-                        <div class="text-center py-8 text-gray-500">
-                            <i class="fas fa-clipboard-check text-4xl mb-4"></i>
-                            <p>No pending reports for verification</p>
-                            <p class="text-sm mt-2">All reports have been assigned or verified</p>
-                        </div>
-                    <?php endif; ?>
-                </div>
-
-                <!-- Assigned Reports -->
-                <div class="bg-white rounded-lg shadow-md p-6">
-                    <div class="flex justify-between items-center mb-6">
-                        <div>
-                            <h2 class="text-xl font-semibold text-gray-700">My Assigned Reports</h2>
-                            <p class="text-sm text-gray-500 mt-1">Reports assigned to you for verification</p>
-                        </div>
-                        <span class="bg-yellow-100 text-yellow-800 text-sm font-semibold px-3 py-1 rounded-full">
-                            <?php echo count($assigned_reports); ?> assigned
-                        </span>
-                    </div>
-                    
-                    <?php if (!empty($assigned_reports)): ?>
                         <div class="space-y-4">
-                            <?php foreach ($assigned_reports as $report): ?>
-                                <div class="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors">
-                                    <div class="flex justify-between items-start">
-                                        <div class="flex-1">
-                                            <div class="flex items-center space-x-2 mb-2">
-                                                <span class="text-sm font-medium text-gray-900">#<?php echo $report['id']; ?></span>
-                                                <?php 
-                                                $status = $report['status'] ?? 'pending';
-                                                $status_class = 'status-' . strtolower($status);
-                                                ?>
-                                                <span class="badge <?php echo $status_class; ?>">
-                                                    <?php echo ucfirst(str_replace('_', ' ', $status)); ?>
-                                                </span>
-                                                <?php if (!empty($report['vetting_recommendation'])): ?>
-                                                    <?php 
-                                                    $rec = $report['vetting_recommendation'];
-                                                    $rec_class = 'status-' . strtolower(str_replace(' ', '_', $rec));
-                                                    ?>
-                                                    <span class="badge <?php echo $rec_class; ?>">
-                                                        <?php echo $rec; ?>
+                            <?php foreach ($pending_reports as $report): ?>
+                                <div class="report-card bg-white rounded-xl border border-gray-200 overflow-hidden status-pending">
+                                    <div class="p-4">
+                                        <div class="flex justify-between items-start">
+                                            <div class="flex-1">
+                                                <div class="flex items-center mb-2">
+                                                    <span class="font-bold text-gray-800 text-lg">
+                                                        #<?php echo str_pad($report['id'], 5, '0', STR_PAD_LEFT); ?>
                                                     </span>
-                                                <?php endif; ?>
-                                            </div>
-                                            <h3 class="font-semibold text-gray-800"><?php echo htmlspecialchars($report['title'] ?? 'Untitled Report'); ?></h3>
-                                            <div class="flex flex-wrap gap-2 mt-2">
-                                                <span class="text-sm text-gray-600">
-                                                    <i class="fas fa-user mr-1"></i><?php echo htmlspecialchars($report['reporter_name'] ?? 'Unknown'); ?>
-                                                </span>
-                                                <?php if (!empty($report['location'])): ?>
-                                                    <span class="text-sm text-gray-600">
-                                                        <i class="fas fa-map-marker-alt mr-1"></i><?php echo htmlspecialchars($report['location']); ?>
+                                                    <span class="status-badge status-pending ml-3">
+                                                        Pending Assignment
                                                     </span>
-                                                <?php endif; ?>
+                                                    <?php if ($report['priority'] === 'high'): ?>
+                                                        <span class="ml-3 px-3 py-1 priority-high text-xs rounded-full">
+                                                            <i class="fas fa-exclamation-triangle mr-1"></i> High Priority
+                                                        </span>
+                                                    <?php endif; ?>
+                                                </div>
+                                                <h3 class="font-bold text-gray-800 text-lg mb-2">
+                                                    <?php echo htmlspecialchars($report['title']); ?>
+                                                </h3>
+                                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-3">
+                                                    <div>
+                                                        <p class="text-sm text-gray-600">
+                                                            <i class="fas fa-user mr-2"></i>
+                                                            <?php echo htmlspecialchars($report['reporter_name']); ?>
+                                                        </p>
+                                                        <?php if (!empty($report['contact_number'])): ?>
+                                                            <p class="text-sm text-gray-600 mt-1">
+                                                                <i class="fas fa-phone mr-2"></i>
+                                                                <?php echo htmlspecialchars($report['contact_number']); ?>
+                                                            </p>
+                                                        <?php endif; ?>
+                                                    </div>
+                                                    <div>
+                                                        <?php if (!empty($report['location'])): ?>
+                                                            <p class="text-sm text-gray-600">
+                                                                <i class="fas fa-map-marker-alt mr-2 text-red-500"></i>
+                                                                <?php echo htmlspecialchars($report['location']); ?>
+                                                            </p>
+                                                        <?php endif; ?>
+                                                        <p class="text-sm text-gray-600 mt-1">
+                                                            <i class="far fa-calendar mr-2"></i>
+                                                            <?php echo date('M d, Y', strtotime($report['created_at'])); ?>
+                                                        </p>
+                                                    </div>
+                                                </div>
                                             </div>
-                                            <?php if (!empty($report['verification_date'])): ?>
-                                                <p class="text-xs text-gray-500 mt-2">
-                                                    <i class="far fa-calendar mr-1"></i>
-                                                    Last verified: <?php echo date('M d, Y', strtotime($report['verification_date'])); ?>
-                                                </p>
-                                            <?php endif; ?>
+                                            <div class="ml-4">
+                                                <form method="POST" class="inline">
+                                                    <input type="hidden" name="report_id" value="<?php echo $report['id']; ?>">
+                                                    <button type="submit" name="assign_report" 
+                                                            class="px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition font-medium">
+                                                        <i class="fas fa-user-check mr-2"></i>
+                                                        Assign to Me
+                                                    </button>
+                                                </form>
+                                            </div>
                                         </div>
-                                        <div class="flex space-x-2 no-print">
-                                            <a href="?view_report=<?php echo $report['id']; ?>" 
-                                               class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-sm transition-colors">
-                                                <i class="fas fa-edit mr-1"></i> Review
-                                            </a>
+                                        
+                                        <div class="flex justify-between items-center mt-4 pt-4 border-t border-gray-100">
+                                            <div>
+                                                <button onclick="viewReportDetails(<?php echo $report['id']; ?>, '<?php echo htmlspecialchars(addslashes($report['title'])); ?>')"
+                                                        class="px-4 py-2 bg-gradient-to-r from-gray-100 to-gray-200 text-gray-700 rounded-lg hover:from-gray-200 hover:to-gray-300 transition text-sm">
+                                                    <i class="fas fa-eye mr-1"></i> View Details
+                                                </button>
+                                            </div>
+                                            <div class="text-sm text-gray-500">
+                                                <?php echo date('h:i A', strtotime($report['created_at'])); ?>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
                             <?php endforeach; ?>
                         </div>
                     <?php else: ?>
-                        <div class="text-center py-8 text-gray-500">
-                            <i class="fas fa-clipboard-list text-4xl mb-4"></i>
-                            <p>No reports assigned to you</p>
-                            <p class="text-sm mt-2">Assign pending reports to get started</p>
+                        <div class="text-center py-12">
+                            <div class="text-gray-300 text-5xl mb-4">
+                                <i class="fas fa-clipboard-check"></i>
+                            </div>
+                            <h3 class="text-xl font-bold text-gray-400 mb-2">No Pending Reports</h3>
+                            <p class="text-gray-500">All reports have been assigned or verified</p>
+                            <p class="text-sm text-gray-400 mt-2">Check back later for new reports</p>
                         </div>
                     <?php endif; ?>
                 </div>
                 
-                <!-- Completed Vettings -->
-                <?php if (!empty($completed_vettings)): ?>
-                <div class="bg-white rounded-lg shadow-md p-6">
+                <!-- My Assigned Reports Card -->
+                <div class="glass-card rounded-2xl shadow-lg p-6">
                     <div class="flex justify-between items-center mb-6">
                         <div>
-                            <h2 class="text-xl font-semibold text-gray-700">Recently Completed Vettings</h2>
-                            <p class="text-sm text-gray-500 mt-1">Your recent verification reports</p>
+                            <h2 class="text-xl font-bold text-gray-800">My Assigned Reports</h2>
+                            <p class="text-gray-600 mt-1">Reports assigned to you for field verification</p>
                         </div>
-                        <span class="bg-green-100 text-green-800 text-sm font-semibold px-3 py-1 rounded-full">
-                            <?php echo count($completed_vettings); ?> completed
+                        <span class="px-3 py-1 bg-gradient-to-r from-yellow-500 to-yellow-600 text-white text-sm font-bold rounded-full">
+                            <?php echo $stats['assigned']; ?> assigned
                         </span>
                     </div>
                     
-                    <div class="space-y-3">
-                        <?php foreach ($completed_vettings as $vetting): ?>
-                            <div class="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
-                                <div class="flex justify-between items-start">
-                                    <div>
-                                        <h4 class="font-medium text-gray-800"><?php echo htmlspecialchars($vetting['report_title'] ?? 'Report'); ?></h4>
-                                        <div class="flex items-center space-x-3 mt-2">
-                                            <span class="text-sm text-gray-600">
-                                                <i class="fas fa-user mr-1"></i><?php echo htmlspecialchars($vetting['reporter_name'] ?? 'Unknown'); ?>
-                                            </span>
-                                            <span class="text-sm text-gray-600">
-                                                <i class="far fa-calendar mr-1"></i><?php echo date('M d, Y', strtotime($vetting['verification_date'] ?? $current_date)); ?>
-                                            </span>
+                    <?php if (!empty($assigned_reports)): ?>
+                        <div class="space-y-4">
+                            <?php foreach ($assigned_reports as $report): ?>
+                                <?php
+                                $status_class = 'status-assigned';
+                                $status_text = 'Assigned';
+                                
+                                if ($report['vetting_recommendation']) {
+                                    if ($report['vetting_recommendation'] === 'approved') {
+                                        $status_class = 'status-verified';
+                                        $status_text = 'Verified';
+                                    } elseif ($report['vetting_recommendation'] === 'rejected') {
+                                        $status_class = 'status-rejected';
+                                        $status_text = 'Rejected';
+                                    }
+                                }
+                                ?>
+                                <div class="report-card bg-white rounded-xl border border-gray-200 overflow-hidden <?php echo $status_class; ?>">
+                                    <div class="p-4">
+                                        <div class="flex justify-between items-start">
+                                            <div class="flex-1">
+                                                <div class="flex items-center mb-2">
+                                                    <span class="font-bold text-gray-800 text-lg">
+                                                        #<?php echo str_pad($report['id'], 5, '0', STR_PAD_LEFT); ?>
+                                                    </span>
+                                                    <span class="status-badge <?php echo $status_class; ?> ml-3">
+                                                        <?php echo ucwords(str_replace('_', ' ', $status_text)); ?>
+                                                    </span>
+                                                    <?php if (!empty($report['report_type'])): ?>
+                                                        <span class="ml-3 px-3 py-1 bg-gray-100 text-gray-700 text-xs rounded-full">
+                                                            <?php echo htmlspecialchars($report['report_type']); ?>
+                                                        </span>
+                                                    <?php endif; ?>
+                                                </div>
+                                                <h3 class="font-bold text-gray-800 text-lg mb-2">
+                                                    <?php echo htmlspecialchars($report['title']); ?>
+                                                </h3>
+                                                
+                                                <div class="mb-3">
+                                                    <p class="text-sm text-gray-600 line-clamp-2">
+                                                        <?php echo htmlspecialchars(substr($report['description'], 0, 150)); ?>
+                                                        <?php if (strlen($report['description']) > 150): ?>...<?php endif; ?>
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <div class="ml-4">
+                                                <a href="?view_report=<?php echo $report['id']; ?>" 
+                                                   class="px-4 py-2 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-lg hover:from-green-700 hover:to-green-800 transition font-medium inline-block">
+                                                    <i class="fas fa-edit mr-2"></i>
+                                                    <?php echo $report['vetting_recommendation'] ? 'Review' : 'Verify'; ?>
+                                                </a>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4 pt-4 border-t border-gray-100">
+                                            <div>
+                                                <p class="text-xs text-gray-500">Reporter</p>
+                                                <p class="text-sm font-medium"><?php echo htmlspecialchars($report['reporter_name']); ?></p>
+                                            </div>
+                                            <div>
+                                                <p class="text-xs text-gray-500">Location</p>
+                                                <p class="text-sm font-medium">
+                                                    <i class="fas fa-map-marker-alt text-red-500 mr-1"></i>
+                                                    <?php echo htmlspecialchars($report['location']); ?>
+                                                </p>
+                                            </div>
+                                            <div>
+                                                <p class="text-xs text-gray-500">Assigned</p>
+                                                <p class="text-sm font-medium">
+                                                    <?php echo date('M d', strtotime($report['assigned_at'])); ?>
+                                                </p>
+                                            </div>
                                         </div>
                                     </div>
-                                    <?php 
-                                    $rec = $vetting['recommendation'] ?? 'Needs More Info';
-                                    $rec_class = 'status-' . strtolower(str_replace(' ', '_', $rec));
-                                    ?>
-                                    <span class="badge <?php echo $rec_class; ?>">
-                                        <?php echo $rec; ?>
-                                    </span>
                                 </div>
+                            <?php endforeach; ?>
+                        </div>
+                    <?php else: ?>
+                        <div class="text-center py-12">
+                            <div class="text-gray-300 text-5xl mb-4">
+                                <i class="fas fa-clipboard-list"></i>
                             </div>
-                        <?php endforeach; ?>
-                    </div>
+                            <h3 class="text-xl font-bold text-gray-400 mb-2">No Assigned Reports</h3>
+                            <p class="text-gray-500">Assign pending reports to get started</p>
+                            <p class="text-sm text-gray-400 mt-2">Use the "Assign to Me" button on pending reports</p>
+                        </div>
+                    <?php endif; ?>
                 </div>
-                <?php endif; ?>
             </div>
-
-            <!-- Right Column: Report Details / Vetting Form -->
+            
+            <!-- Right Column: Verification Form & Stats -->
             <div class="lg:col-span-1">
                 <?php if ($report_details): ?>
-                    <div class="bg-white rounded-lg shadow-md p-6 sticky top-8">
+                    <!-- Verification Form Card -->
+                    <div class="glass-card rounded-2xl shadow-lg p-6 sticky top-6">
                         <div class="flex justify-between items-center mb-6">
-                            <h2 class="text-xl font-semibold text-gray-700">Report Details</h2>
-                            <a href="?" class="text-gray-500 hover:text-gray-700 no-print">
-                                <i class="fas fa-times text-lg"></i>
+                            <h2 class="text-xl font-bold text-gray-800">Field Verification</h2>
+                            <a href="?" class="text-gray-500 hover:text-gray-700">
+                                <i class="fas fa-times"></i>
                             </a>
                         </div>
                         
-                        <!-- Report Information -->
-                        <div class="space-y-4 mb-6">
-                            <div>
-                                <label class="block text-sm font-medium text-gray-600">Report Title</label>
-                                <p class="mt-1 text-gray-900 p-2 bg-gray-50 rounded"><?php echo htmlspecialchars($report_details['title'] ?? 'No title'); ?></p>
-                            </div>
-                            
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div>
-                                    <label class="block text-sm font-medium text-gray-600">Reporter</label>
-                                    <p class="mt-1 text-gray-900"><?php echo htmlspecialchars($report_details['reporter_name'] ?? 'Unknown'); ?></p>
-                                </div>
-                                <?php if (!empty($report_details['contact_number'])): ?>
-                                <div>
-                                    <label class="block text-sm font-medium text-gray-600">Contact Number</label>
-                                    <p class="mt-1 text-gray-900">
-                                        <i class="fas fa-phone mr-1"></i><?php echo htmlspecialchars($report_details['contact_number']); ?>
-                                    </p>
-                                </div>
-                                <?php endif; ?>
-                            </div>
-                            
-                            <div>
-                                <label class="block text-sm font-medium text-gray-600">Incident Location</label>
-                                <p class="mt-1 text-gray-900">
-                                    <i class="fas fa-map-marker-alt mr-1 text-red-500"></i>
-                                    <?php echo htmlspecialchars($report_details['location'] ?? 'Location not specified'); ?>
-                                </p>
-                            </div>
-                            
-                            <div>
-                                <label class="block text-sm font-medium text-gray-600">Incident Details</label>
-                                <div class="mt-1 p-3 bg-gray-50 rounded text-gray-700 max-h-48 overflow-y-auto custom-scrollbar">
-                                    <?php 
-                                    $details = $report_details['description'] ?? 'No details provided';
-                                    echo nl2br(htmlspecialchars($details)); 
-                                    ?>
-                                </div>
-                            </div>
-                            
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div>
-                                    <label class="block text-sm font-medium text-gray-600">Report Date</label>
-                                    <p class="mt-1 text-gray-900">
-                                        <i class="far fa-calendar mr-1"></i>
-                                        <?php echo date('F d, Y', strtotime($report_details['created_at'] ?? $current_date)); ?>
-                                    </p>
-                                </div>
-                                <div>
-                                    <label class="block text-sm font-medium text-gray-600">Time</label>
-                                    <p class="mt-1 text-gray-900">
-                                        <i class="far fa-clock mr-1"></i>
-                                        <?php echo date('h:i A', strtotime($report_details['created_at'] ?? $current_date)); ?>
-                                    </p>
-                                </div>
-                            </div>
+                        <!-- Report Summary -->
+                        <div class="mb-6 p-4 bg-gradient-to-r from-blue-50 to-blue-100 rounded-lg">
+                            <h3 class="font-bold text-blue-800 mb-2">Report Summary</h3>
+                            <p class="text-sm text-gray-700">#<?php echo str_pad($report_details['id'], 5, '0', STR_PAD_LEFT); ?>: 
+                                <?php echo htmlspecialchars(substr($report_details['title'], 0, 50)); ?>
+                            </p>
+                            <p class="text-xs text-gray-600 mt-2">
+                                <i class="fas fa-map-marker-alt mr-1"></i>
+                                <?php echo htmlspecialchars($report_details['location']); ?>
+                            </p>
                         </div>
                         
-                        <!-- Vetting Form -->
+                        <!-- Verification Form -->
                         <form method="POST" id="vettingForm" class="space-y-4">
                             <input type="hidden" name="report_id" value="<?php echo $report_details['id']; ?>">
                             
-                            <h3 class="text-lg font-semibold text-gray-700 border-t pt-4">Field Verification</h3>
-                            
                             <!-- Location Verification -->
                             <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-2">
+                                <label class="block text-sm font-bold text-gray-700 mb-2">
                                     <i class="fas fa-map-pin mr-1"></i>Location Verified?
                                 </label>
                                 <div class="space-y-2">
-                                    <?php 
-                                    $location_options = [
-                                        'Yes' => ['icon' => 'fa-check-circle', 'color' => 'text-green-500'],
-                                        'Partial' => ['icon' => 'fa-exclamation-circle', 'color' => 'text-yellow-500'],
-                                        'No' => ['icon' => 'fa-times-circle', 'color' => 'text-red-500']
-                                    ];
-                                    foreach ($location_options as $value => $info): 
-                                        $checked = ($report_details['location_verified'] ?? '') == $value ? 'checked' : '';
-                                    ?>
-                                        <label class="flex items-center p-2 hover:bg-gray-50 rounded cursor-pointer">
-                                            <input type="radio" name="location_verified" value="<?php echo $value; ?>" 
-                                                   class="form-radio h-4 w-4 text-blue-600" 
-                                                   <?php echo $checked; ?>
-                                                   required>
-                                            <i class="<?php echo $info['icon']; ?> <?php echo $info['color']; ?> ml-2 mr-2"></i>
-                                            <span class="text-sm text-gray-700"><?php echo $value; ?></span>
-                                        </label>
-                                    <?php endforeach; ?>
+                                    <label class="flex items-center p-3 bg-gray-50 hover:bg-gray-100 rounded-lg cursor-pointer border border-gray-200">
+                                        <input type="radio" name="location_verified" value="yes" 
+                                               class="form-radio h-4 w-4 text-green-600" 
+                                               <?php echo ($report_details['location_verified'] ?? '') == 'yes' ? 'checked' : ''; ?>
+                                               required>
+                                        <i class="fas fa-check-circle text-green-500 ml-3 mr-3"></i>
+                                        <div>
+                                            <span class="text-sm font-medium text-gray-700">Yes - Location confirmed</span>
+                                            <p class="text-xs text-gray-500">Accurate as reported</p>
+                                        </div>
+                                    </label>
+                                    
+                                    <label class="flex items-center p-3 bg-gray-50 hover:bg-gray-100 rounded-lg cursor-pointer border border-gray-200">
+                                        <input type="radio" name="location_verified" value="partial" 
+                                               class="form-radio h-4 w-4 text-yellow-600"
+                                               <?php echo ($report_details['location_verified'] ?? '') == 'partial' ? 'checked' : ''; ?>
+                                               required>
+                                        <i class="fas fa-exclamation-circle text-yellow-500 ml-3 mr-3"></i>
+                                        <div>
+                                            <span class="text-sm font-medium text-gray-700">Partial - Some discrepancies</span>
+                                            <p class="text-xs text-gray-500">Minor inaccuracies found</p>
+                                        </div>
+                                    </label>
+                                    
+                                    <label class="flex items-center p-3 bg-gray-50 hover:bg-gray-100 rounded-lg cursor-pointer border border-gray-200">
+                                        <input type="radio" name="location_verified" value="no" 
+                                               class="form-radio h-4 w-4 text-red-600"
+                                               <?php echo ($report_details['location_verified'] ?? '') == 'no' ? 'checked' : ''; ?>
+                                               required>
+                                        <i class="fas fa-times-circle text-red-500 ml-3 mr-3"></i>
+                                        <div>
+                                            <span class="text-sm font-medium text-gray-700">No - Location incorrect</span>
+                                            <p class="text-xs text-gray-500">Significant discrepancies</p>
+                                        </div>
+                                    </label>
                                 </div>
                             </div>
                             
                             <!-- Facts Verification -->
                             <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-2">
+                                <label class="block text-sm font-bold text-gray-700 mb-2">
                                     <i class="fas fa-clipboard-check mr-1"></i>Facts Verified?
                                 </label>
                                 <div class="space-y-2">
-                                    <?php 
-                                    $facts_options = [
-                                        'Confirmed' => ['icon' => 'fa-check-circle', 'color' => 'text-green-500'],
-                                        'Partially Confirmed' => ['icon' => 'fa-exclamation-circle', 'color' => 'text-yellow-500'],
-                                        'Unconfirmed' => ['icon' => 'fa-times-circle', 'color' => 'text-red-500']
-                                    ];
-                                    foreach ($facts_options as $value => $info): 
-                                        $checked = ($report_details['facts_verified'] ?? '') == $value ? 'checked' : '';
-                                    ?>
-                                        <label class="flex items-center p-2 hover:bg-gray-50 rounded cursor-pointer">
-                                            <input type="radio" name="facts_verified" value="<?php echo $value; ?>" 
-                                                   class="form-radio h-4 w-4 text-blue-600"
-                                                   <?php echo $checked; ?>
-                                                   required>
-                                            <i class="<?php echo $info['icon']; ?> <?php echo $info['color']; ?> ml-2 mr-2"></i>
-                                            <span class="text-sm text-gray-700"><?php echo $value; ?></span>
-                                        </label>
-                                    <?php endforeach; ?>
+                                    <label class="flex items-center p-3 bg-gray-50 hover:bg-gray-100 rounded-lg cursor-pointer border border-gray-200">
+                                        <input type="radio" name="facts_verified" value="confirmed" 
+                                               class="form-radio h-4 w-4 text-green-600"
+                                               <?php echo ($report_details['facts_verified'] ?? '') == 'confirmed' ? 'checked' : ''; ?>
+                                               required>
+                                        <i class="fas fa-check-circle text-green-500 ml-3 mr-3"></i>
+                                        <div>
+                                            <span class="text-sm font-medium text-gray-700">Confirmed</span>
+                                            <p class="text-xs text-gray-500">All facts verified</p>
+                                        </div>
+                                    </label>
+                                    
+                                    <label class="flex items-center p-3 bg-gray-50 hover:bg-gray-100 rounded-lg cursor-pointer border border-gray-200">
+                                        <input type="radio" name="facts_verified" value="partially_confirmed" 
+                                               class="form-radio h-4 w-4 text-yellow-600"
+                                               <?php echo ($report_details['facts_verified'] ?? '') == 'partially_confirmed' ? 'checked' : ''; ?>
+                                               required>
+                                        <i class="fas fa-exclamation-circle text-yellow-500 ml-3 mr-3"></i>
+                                        <div>
+                                            <span class="text-sm font-medium text-gray-700">Partially Confirmed</span>
+                                            <p class="text-xs text-gray-500">Some facts verified</p>
+                                        </div>
+                                    </label>
+                                    
+                                    <label class="flex items-center p-3 bg-gray-50 hover:bg-gray-100 rounded-lg cursor-pointer border border-gray-200">
+                                        <input type="radio" name="facts_verified" value="unconfirmed" 
+                                               class="form-radio h-4 w-4 text-red-600"
+                                               <?php echo ($report_details['facts_verified'] ?? '') == 'unconfirmed' ? 'checked' : ''; ?>
+                                               required>
+                                        <i class="fas fa-times-circle text-red-500 ml-3 mr-3"></i>
+                                        <div>
+                                            <span class="text-sm font-medium text-gray-700">Unconfirmed</span>
+                                            <p class="text-xs text-gray-500">Cannot verify facts</p>
+                                        </div>
+                                    </label>
                                 </div>
                             </div>
                             
                             <!-- Verification Notes -->
                             <div>
-                                <label for="verification_notes" class="block text-sm font-medium text-gray-700 mb-2">
-                                    <i class="fas fa-notes-medical mr-1"></i>Verification Notes
+                                <label class="block text-sm font-bold text-gray-700 mb-2">
+                                    <i class="fas fa-notes-medical mr-1"></i>Verification Notes *
                                 </label>
-                                <textarea id="verification_notes" name="verification_notes" rows="4" 
-                                          class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                          placeholder="Enter your field verification notes, observations, and findings..."
-                                          required><?php echo htmlspecialchars($report_details['verification_notes'] ?? ''); ?></textarea>
-                                <p class="text-xs text-gray-500 mt-1">Describe what you found during verification</p>
+                                <textarea name="verification_notes" required rows="4" id="verificationNotes"
+                                          placeholder="Enter detailed field verification notes...
+• What you found at the location
+• Witness statements collected
+• Evidence observed
+• Any discrepancies found
+• Recommendations for further action"
+                                          class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"><?php echo htmlspecialchars($report_details['verification_notes'] ?? ''); ?></textarea>
+                                <div class="flex justify-between items-center mt-1">
+                                    <div id="notesError" class="error-message hidden">Minimum 10 characters required</div>
+                                    <div id="notesCharCount" class="text-xs text-gray-500">0 characters</div>
+                                </div>
                             </div>
                             
                             <!-- Recommendation -->
                             <div>
-                                <label for="recommendation" class="block text-sm font-medium text-gray-700 mb-2">
-                                    <i class="fas fa-file-signature mr-1"></i>Recommendation
+                                <label class="block text-sm font-bold text-gray-700 mb-2">
+                                    <i class="fas fa-file-signature mr-1"></i>Recommendation *
                                 </label>
-                                <select id="recommendation" name="recommendation" 
-                                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                        required>
+                                <select name="recommendation" required id="recommendation"
+                                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition">
                                     <option value="">Select recommendation</option>
-                                    <option value="Approved" <?php echo ($report_details['recommendation'] ?? '') == 'Approved' ? 'selected' : ''; ?>>
+                                    <option value="approved" <?php echo ($report_details['recommendation'] ?? '') == 'approved' ? 'selected' : ''; ?>>
                                         ✓ Approve Report (Verified and Accurate)
                                     </option>
-                                    <option value="Needs More Info" <?php echo ($report_details['recommendation'] ?? '') == 'Needs More Info' ? 'selected' : ''; ?>>
+                                    <option value="needs_more_info" <?php echo ($report_details['recommendation'] ?? '') == 'needs_more_info' ? 'selected' : ''; ?>>
                                         ⚠ Needs More Information
                                     </option>
-                                    <option value="Rejected" <?php echo ($report_details['recommendation'] ?? '') == 'Rejected' ? 'selected' : ''; ?>>
+                                    <option value="rejected" <?php echo ($report_details['recommendation'] ?? '') == 'rejected' ? 'selected' : ''; ?>>
                                         ✗ Reject Report (Inaccurate or False)
                                     </option>
                                 </select>
+                                <div id="recommendationError" class="error-message hidden">Please select a recommendation</div>
                             </div>
                             
                             <!-- Submit Button -->
                             <div class="pt-2">
-                                <button type="submit" name="submit_vetting" 
-                                        class="w-full bg-green-600 hover:bg-green-700 text-white font-medium py-3 px-4 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition-colors no-print">
-                                    <i class="fas fa-paper-plane mr-2"></i>Submit Vetting Report
+                                <button type="submit" name="submit_vetting" id="submitVetting"
+                                        class="w-full bg-gradient-to-r from-green-600 to-green-700 text-white font-bold py-3 px-4 rounded-lg hover:from-green-700 hover:to-green-800 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition">
+                                    <i class="fas fa-paper-plane mr-2"></i>
+                                    Submit Vetting Report
                                 </button>
                                 <p class="text-xs text-gray-500 mt-2 text-center">
-                                    This will update the report status based on your recommendation
+                                    This will update the report status and notify relevant officials
                                 </p>
                             </div>
                         </form>
                     </div>
                 <?php else: ?>
-                    <!-- Summary Stats & Quick Actions -->
-                    <div class="bg-white rounded-lg shadow-md p-6 sticky top-8">
-                        <h2 class="text-xl font-semibold text-gray-700 mb-6">Vetting Summary</h2>
+                    <!-- Stats and Quick Actions Card -->
+                    <div class="glass-card rounded-2xl shadow-lg p-6 sticky top-6">
+                        <h2 class="text-xl font-bold text-gray-800 mb-6">Vetting Dashboard</h2>
                         
                         <!-- Quick Stats -->
                         <div class="space-y-4 mb-6">
-                            <div class="p-4 bg-blue-50 rounded-lg">
-                                <p class="text-sm font-medium text-gray-600">Pending Assignment</p>
-                                <p class="text-2xl font-bold text-blue-600"><?php echo count($pending_reports); ?></p>
+                            <div class="p-4 bg-gradient-to-r from-blue-50 to-blue-100 rounded-xl">
+                                <div class="flex items-center justify-between">
+                                    <div>
+                                        <p class="text-sm font-medium text-blue-700">Pending Assignment</p>
+                                        <p class="text-2xl font-bold text-blue-800"><?php echo $stats['pending']; ?></p>
+                                    </div>
+                                    <div class="h-12 w-12 bg-blue-200 rounded-full flex items-center justify-center">
+                                        <i class="fas fa-clock text-blue-600 text-xl"></i>
+                                    </div>
+                                </div>
                             </div>
                             
-                            <div class="p-4 bg-yellow-50 rounded-lg">
-                                <p class="text-sm font-medium text-gray-600">Assigned to Me</p>
-                                <p class="text-2xl font-bold text-yellow-600"><?php echo count($assigned_reports); ?></p>
+                            <div class="p-4 bg-gradient-to-r from-yellow-50 to-yellow-100 rounded-xl">
+                                <div class="flex items-center justify-between">
+                                    <div>
+                                        <p class="text-sm font-medium text-yellow-700">Assigned to Me</p>
+                                        <p class="text-2xl font-bold text-yellow-800"><?php echo $stats['assigned']; ?></p>
+                                    </div>
+                                    <div class="h-12 w-12 bg-yellow-200 rounded-full flex items-center justify-center">
+                                        <i class="fas fa-user-check text-yellow-600 text-xl"></i>
+                                    </div>
+                                </div>
                             </div>
                             
-                            <div class="p-4 bg-green-50 rounded-lg">
-                                <p class="text-sm font-medium text-gray-600">Completed Vettings</p>
-                                <p class="text-2xl font-bold text-green-600"><?php echo count($completed_vettings); ?></p>
+                            <div class="p-4 bg-gradient-to-r from-green-50 to-green-100 rounded-xl">
+                                <div class="flex items-center justify-between">
+                                    <div>
+                                        <p class="text-sm font-medium text-green-700">Completed Vettings</p>
+                                        <p class="text-2xl font-bold text-green-800"><?php echo $stats['completed']; ?></p>
+                                    </div>
+                                    <div class="h-12 w-12 bg-green-200 rounded-full flex items-center justify-center">
+                                        <i class="fas fa-check-circle text-green-600 text-xl"></i>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                         
                         <!-- Quick Actions -->
-                        <div class="mb-8">
-                            <h3 class="text-lg font-semibold text-gray-700 mb-4">Quick Actions</h3>
+                        <div class="mb-6">
+                            <h3 class="text-lg font-bold text-gray-700 mb-4">Quick Actions</h3>
                             <div class="space-y-3">
-                                <a href="../tanod_dashboard.php" class="flex items-center p-3 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors no-print">
+                                <a href="../tanod_dashboard.php" 
+                                   class="flex items-center p-3 bg-gradient-to-r from-gray-50 to-gray-100 hover:from-gray-100 hover:to-gray-200 rounded-lg transition">
                                     <i class="fas fa-tachometer-alt mr-3 text-gray-600"></i>
-                                    <span>Return to Dashboard</span>
+                                    <span class="font-medium">Return to Dashboard</span>
                                 </a>
-                                <button onclick="window.location.reload()" class="flex items-center p-3 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors w-full text-left no-print">
+                                <button onclick="window.location.reload()" 
+                                        class="flex items-center p-3 bg-gradient-to-r from-gray-50 to-gray-100 hover:from-gray-100 hover:to-gray-200 rounded-lg transition w-full text-left">
                                     <i class="fas fa-sync-alt mr-3 text-gray-600"></i>
-                                    <span>Refresh List</span>
+                                    <span class="font-medium">Refresh List</span>
                                 </button>
-                                <button onclick="window.print()" class="flex items-center p-3 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors w-full text-left no-print">
-                                    <i class="fas fa-print mr-3 text-gray-600"></i>
-                                    <span>Print Page</span>
-                                </button>
+                                <a href="incident_logging.php" 
+                                   class="flex items-center p-3 bg-gradient-to-r from-gray-50 to-gray-100 hover:from-gray-100 hover:to-gray-200 rounded-lg transition">
+                                    <i class="fas fa-exclamation-triangle mr-3 text-gray-600"></i>
+                                    <span class="font-medium">Log Field Incident</span>
+                                </a>
                             </div>
                         </div>
                         
-                        <!-- Instructions -->
-                        <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                            <h3 class="text-sm font-semibold text-blue-800 mb-2">How to use this module:</h3>
-                            <ul class="text-xs text-blue-700 space-y-1">
-                                <li>1. Assign pending reports to yourself</li>
-                                <li>2. Review report details</li>
-                                <li>3. Conduct field verification</li>
-                                <li>4. Submit vetting with recommendation</li>
-                                <li>5. Report status updates automatically</li>
-                            </ul>
+                        <!-- Recent Completed Vettings -->
+                        <?php if (!empty($completed_vettings)): ?>
+                        <div>
+                            <h3 class="text-lg font-bold text-gray-700 mb-4">Recently Completed</h3>
+                            <div class="space-y-3">
+                                <?php foreach ($completed_vettings as $vetting): ?>
+                                    <div class="p-3 bg-gradient-to-r from-gray-50 to-gray-100 rounded-lg">
+                                        <div class="flex justify-between items-start">
+                                            <div>
+                                                <h4 class="font-medium text-gray-800 text-sm">
+                                                    <?php echo htmlspecialchars(substr($vetting['report_title'], 0, 40)); ?>
+                                                    <?php if (strlen($vetting['report_title']) > 40): ?>...<?php endif; ?>
+                                                </h4>
+                                                <p class="text-xs text-gray-600 mt-1">
+                                                    <?php echo date('M d', strtotime($vetting['verification_date'])); ?>
+                                                </p>
+                                            </div>
+                                            <span class="px-2 py-1 text-xs rounded-full font-bold 
+                                                <?php echo $vetting['recommendation'] === 'approved' ? 'bg-green-100 text-green-800' : 
+                                                       ($vetting['recommendation'] === 'rejected' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'); ?>">
+                                                <?php echo ucfirst($vetting['recommendation']); ?>
+                                            </span>
+                                        </div>
+                                    </div>
+                                <?php endforeach; ?>
+                            </div>
                         </div>
+                        <?php endif; ?>
                     </div>
                 <?php endif; ?>
             </div>
         </div>
+        
+        <!-- Footer -->
+        <div class="mt-8 text-center text-gray-500 text-sm">
+            <p>Barangay LEIR Report Vetting System v2.0 &copy; <?php echo date('Y'); ?></p>
+            <p class="mt-1">Field verification ensures accurate and reliable incident reporting.</p>
+        </div>
     </div>
-
-    <!-- JavaScript for enhanced functionality -->
+    
+    <!-- JavaScript -->
     <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            const form = document.getElementById('vettingForm');
-            if (form) {
-                form.addEventListener('submit', function(e) {
-                    const recommendation = document.getElementById('recommendation');
-                    const notes = document.getElementById('verification_notes');
-                    const locationVerified = document.querySelector('input[name="location_verified"]:checked');
-                    const factsVerified = document.querySelector('input[name="facts_verified"]:checked');
-                    
-                    // Validation
-                    let errors = [];
-                    
-                    if (!locationVerified) {
-                        errors.push('Please select location verification status');
-                    }
-                    
-                    if (!factsVerified) {
-                        errors.push('Please select facts verification status');
-                    }
-                    
-                    if (!notes || !notes.value.trim()) {
-                        errors.push('Please provide verification notes');
-                    }
-                    
-                    if (!recommendation || !recommendation.value) {
-                        errors.push('Please select a recommendation');
-                    }
-                    
-                    if (errors.length > 0) {
-                        e.preventDefault();
-                        alert('Please fix the following errors:\n\n' + errors.join('\n'));
-                        return;
-                    }
-                    
-                    // Confirm submission
-                    const confirmation = confirm(
-                        'Are you sure you want to submit this vetting report?\n\n' +
-                        'This action will:\n' +
-                        '1. Update the report status\n' +
-                        '2. Record your verification findings\n' +
-                        '3. Cannot be undone\n\n' +
-                        'Click OK to proceed.'
-                    );
-                    
-                    if (!confirmation) {
-                        e.preventDefault();
-                    }
-                });
-            }
-            
-            // Auto-expand textarea
-            const textarea = document.getElementById('verification_notes');
-            if (textarea) {
-                textarea.addEventListener('input', function() {
-                    this.style.height = 'auto';
-                    this.style.height = (this.scrollHeight) + 'px';
-                });
+    // Character counter for verification notes
+    document.addEventListener('DOMContentLoaded', function() {
+        const notesTextarea = document.getElementById('verificationNotes');
+        if (notesTextarea) {
+            notesTextarea.addEventListener('input', function() {
+                const charCount = this.value.length;
+                document.getElementById('notesCharCount').textContent = charCount + ' characters';
                 
-                // Trigger initial resize
-                setTimeout(() => {
-                    textarea.style.height = 'auto';
-                    textarea.style.height = (textarea.scrollHeight) + 'px';
-                }, 100);
-            }
-            
-            // Add visual feedback for radio buttons
-            const radioButtons = document.querySelectorAll('input[type="radio"]');
-            radioButtons.forEach(radio => {
-                radio.addEventListener('change', function() {
-                    // Remove all highlights
-                    document.querySelectorAll('label').forEach(label => {
-                        label.classList.remove('bg-blue-50', 'border', 'border-blue-200');
-                    });
-                    
-                    // Highlight selected option's label
-                    if (this.checked) {
-                        const label = this.closest('label');
-                        if (label) {
-                            label.classList.add('bg-blue-50', 'border', 'border-blue-200');
-                        }
-                    }
-                });
-                
-                // Initialize highlights
-                if (radio.checked) {
-                    const label = radio.closest('label');
-                    if (label) {
-                        label.classList.add('bg-blue-50', 'border', 'border-blue-200');
-                    }
+                if (charCount < 10 && charCount > 0) {
+                    document.getElementById('notesError').classList.remove('hidden');
+                    this.classList.add('form-error');
+                } else {
+                    document.getElementById('notesError').classList.add('hidden');
+                    this.classList.remove('form-error');
                 }
             });
             
-            // Add loading state to form submission
-            if (form) {
-                form.addEventListener('submit', function() {
-                    const submitBtn = this.querySelector('button[type="submit"]');
-                    if (submitBtn) {
-                        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Submitting...';
-                        submitBtn.disabled = true;
-                    }
-                });
-            }
+            // Initial count
+            const initialCount = notesTextarea.value.length;
+            document.getElementById('notesCharCount').textContent = initialCount + ' characters';
+        }
+        
+        // Form validation
+        const vettingForm = document.getElementById('vettingForm');
+        if (vettingForm) {
+            vettingForm.addEventListener('submit', function(e) {
+                let isValid = true;
+                
+                // Check verification notes
+                const notes = document.getElementById('verificationNotes');
+                if (!notes || notes.value.length < 10) {
+                    document.getElementById('notesError').classList.remove('hidden');
+                    notes.classList.add('form-error');
+                    isValid = false;
+                }
+                
+                // Check recommendation
+                const recommendation = document.getElementById('recommendation');
+                if (!recommendation || !recommendation.value) {
+                    document.getElementById('recommendationError').classList.remove('hidden');
+                    recommendation.classList.add('form-error');
+                    isValid = false;
+                }
+                
+                // Check radio buttons
+                const locationVerified = document.querySelector('input[name="location_verified"]:checked');
+                const factsVerified = document.querySelector('input[name="facts_verified"]:checked');
+                
+                if (!locationVerified || !factsVerified) {
+                    showToast('Please complete all verification fields', 'error');
+                    isValid = false;
+                }
+                
+                if (!isValid) {
+                    e.preventDefault();
+                    showToast('Please fix the errors in the form', 'error');
+                } else {
+                    // Show loading state
+                    const submitBtn = document.getElementById('submitVetting');
+                    const originalText = submitBtn.innerHTML;
+                    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Submitting...';
+                    submitBtn.disabled = true;
+                }
+            });
+        }
+        
+        // Auto-expand textareas
+        document.querySelectorAll('textarea').forEach(textarea => {
+            textarea.style.height = 'auto';
+            textarea.style.height = (textarea.scrollHeight) + 'px';
             
-            // Auto-focus on verification notes when showing report details
-            if (textarea && location.hash === '#vetting') {
-                setTimeout(() => {
-                    textarea.focus();
-                }, 300);
-            }
+            textarea.addEventListener('input', function() {
+                this.style.height = 'auto';
+                this.style.height = (this.scrollHeight) + 'px';
+            });
         });
         
-        // Keyboard shortcuts
-        document.addEventListener('keydown', function(e) {
-            // Ctrl + R to refresh
-            if (e.ctrlKey && e.key === 'r') {
-                e.preventDefault();
-                window.location.reload();
-            }
-            
-            // Escape to close report details
-            if (e.key === 'Escape' && window.location.search.includes('view_report')) {
-                window.location.href = window.location.pathname;
-            }
-        });
+        // Show welcome message
+        if (!localStorage.getItem('reportVettingVisited')) {
+            showToast('Welcome to Report Vetting Queue! Verify citizen reports in the field.', 'info');
+            localStorage.setItem('reportVettingVisited', 'true');
+        }
+    });
+    
+    // View report details in modal
+    function viewReportDetails(reportId, reportTitle) {
+        // In a real implementation, this would fetch report details via AJAX
+        showToast('Loading report details...', 'info');
+        setTimeout(() => {
+            window.location.href = '?view_report=' + reportId;
+        }, 500);
+    }
+    
+    // Toast notification
+    function showToast(message, type = 'info') {
+        // Create toast element
+        const toast = document.createElement('div');
+        const toastId = 'toast-' + Date.now();
+        
+        let bgColor, textColor, icon;
+        switch(type) {
+            case 'success':
+                bgColor = 'bg-gradient-to-r from-green-500 to-green-600';
+                textColor = 'text-white';
+                icon = 'fa-check-circle';
+                break;
+            case 'error':
+                bgColor = 'bg-gradient-to-r from-red-500 to-red-600';
+                textColor = 'text-white';
+                icon = 'fa-exclamation-circle';
+                break;
+            case 'warning':
+                bgColor = 'bg-gradient-to-r from-yellow-500 to-yellow-600';
+                textColor = 'text-white';
+                icon = 'fa-exclamation-triangle';
+                break;
+            default:
+                bgColor = 'bg-gradient-to-r from-blue-500 to-blue-600';
+                textColor = 'text-white';
+                icon = 'fa-info-circle';
+        }
+        
+        toast.id = toastId;
+        toast.className = `fixed top-4 right-4 ${bgColor} ${textColor} px-6 py-4 rounded-lg shadow-xl z-50 transform translate-x-full transition-transform duration-300`;
+        toast.innerHTML = `
+            <div class="flex items-center">
+                <i class="fas ${icon} mr-3"></i>
+                <span class="font-medium">${message}</span>
+                <button onclick="document.getElementById('${toastId}').remove()" class="ml-4">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        `;
+        
+        document.body.appendChild(toast);
+        
+        // Animate in
+        setTimeout(() => {
+            toast.classList.remove('translate-x-full');
+            toast.classList.add('translate-x-0');
+        }, 10);
+        
+        // Auto remove after 5 seconds
+        setTimeout(() => {
+            toast.classList.remove('translate-x-0');
+            toast.classList.add('translate-x-full');
+            setTimeout(() => {
+                if (document.getElementById(toastId)) {
+                    document.getElementById(toastId).remove();
+                }
+            }, 300);
+        }, 5000);
+    }
+    
+    // Prevent form resubmission on refresh
+    if (window.history.replaceState) {
+        window.history.replaceState(null, null, window.location.href);
+    }
+    
+    // Keyboard shortcuts
+    document.addEventListener('keydown', function(e) {
+        // Refresh on Ctrl+R
+        if ((e.ctrlKey || e.metaKey) && e.key === 'r') {
+            e.preventDefault();
+            window.location.reload();
+        }
+        
+        // Escape to clear view
+        if (e.key === 'Escape' && window.location.search.includes('view_report')) {
+            window.location.href = window.location.pathname;
+        }
+    });
     </script>
 </body>
 </html>
-<?php
-// Close database connection
-if (isset($pdo)) {
-    $pdo = null;
-}
-?>
