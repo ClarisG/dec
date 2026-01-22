@@ -16,7 +16,6 @@ require_once 'config/database.php';
 require_once 'config/rate_limit.php';
 require_once 'config/base_url.php';
 
-
 // Get user data
 $user_id = $_SESSION['user_id'];
 $username = $_SESSION['username'];
@@ -184,6 +183,8 @@ function getModuleTitle($module) {
                 transform: translateX(-100%);
                 position: fixed;
                 z-index: 50;
+                height: 100vh;
+                width: 280px;
             }
             
             .sidebar.active {
@@ -334,6 +335,7 @@ function getModuleTitle($module) {
             background: white;
             box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
             z-index: 100;
+            height: 65px;
         }
         
         .nav-active {
@@ -415,9 +417,58 @@ function getModuleTitle($module) {
         .animate-spin {
             animation: spin 1s linear infinite;
         }
+        
+       /* Update line-clamp-2 class with full browser compatibility */
+.line-clamp-2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+    -moz-box-orient: vertical;
+    box-orient: vertical;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+        
+        .dropdown-menu {
+            transform-origin: top right;
+            animation: dropdownFade 0.2s ease-out;
+        }
+        
+        @keyframes dropdownFade {
+            from { opacity: 0; transform: scale(0.95) translateY(-10px); }
+            to { opacity: 1; transform: scale(1) translateY(0); }
+        }
+        
+        .mobile-menu-btn {
+            display: none;
+        }
+        
+        @media (max-width: 768px) {
+            .mobile-menu-btn {
+                display: block;
+            }
+            
+            .desktop-only {
+                display: none !important;
+            }
+            
+            .mobile-bottom-nav {
+                display: flex;
+            }
+        }
+        
+        @media (min-width: 769px) {
+            .mobile-bottom-nav {
+                display: none !important;
+            }
+        }
     </style>
 </head>
 <body class="bg-gray-50">
+    <!-- Mobile Overlay -->
+    <div class="overlay md:hidden" id="mobileOverlay"></div>
+    
     <!-- Desktop Sidebar -->
     <div class="sidebar hidden md:flex md:flex-col md:w-64 h-screen fixed">
         <!-- Logo -->
@@ -428,6 +479,7 @@ function getModuleTitle($module) {
                 </div>
                 <div>
                     <h1 class="text-xl font-bold text-white">LEIR</h1>
+                    <p class="text-xs text-blue-300">Local Emergency & Incident Reporting</p>
                 </div>
             </div>
         </div>
@@ -489,7 +541,7 @@ function getModuleTitle($module) {
                         <i class="fas fa-file-alt mr-3 text-lg"></i>
                         <span class="font-medium">My Reports</span>
                         <?php if ($report_counts['total'] > 0): ?>
-                            <span class="ml-auto bg-red-500 text-white text-xs font-semibold px-2 py-1 rounded-full">
+                            <span class="ml-auto bg-blue-500 text-white text-xs font-semibold px-2 py-1 rounded-full">
                                 <?php echo $report_counts['total']; ?>
                             </span>
                         <?php endif; ?>
@@ -501,7 +553,7 @@ function getModuleTitle($module) {
                         <span class="font-medium">Announcements</span>
                         <?php if (count($announcements) > 0): ?>
                             <span class="ml-auto bg-red-500 text-white text-xs font-semibold px-2 py-1 rounded-full">
-                                <?php echo count($announcements); ?>
+                                <?php echo min(count($announcements), 9); ?>
                             </span>
                         <?php endif; ?>
                     </a>
@@ -527,6 +579,12 @@ function getModuleTitle($module) {
                         </button>
                     </form>
                 </li>
+                <li class="pt-4">
+                    <a href="../logout.php" class="sidebar-link flex items-center p-3 rounded-lg text-white hover:bg-red-500/20 hover:text-red-200 transition-colors">
+                        <i class="fas fa-sign-out-alt mr-3 text-lg"></i>
+                        <span class="font-medium">Logout</span>
+                    </a>
+                </li>
             </ul>
         </nav>
         
@@ -536,35 +594,142 @@ function getModuleTitle($module) {
                 <i class="fas fa-shield-alt mr-1"></i>
                 Secure Incident Reporting
             </p>
+            <p class="text-xs text-blue-400 mt-1">v1.0.0</p>
         </div>
     </div>
-    
-    <!-- Mobile Overlay -->
-    <div class="overlay md:hidden" id="mobileOverlay"></div>
     
     <!-- Main Content -->
     <div class="md:ml-64">
         <!-- Top Navigation Bar -->
         <header class="bg-white shadow-sm sticky top-0 z-30">
             <div class="px-4 sm:px-6 lg:px-8">
-                <div class="flex justify-between items-center py-4">
+                <div class="flex items-center justify-between py-4">
+                    <!-- Left: Mobile menu button -->
+                    <div class="flex items-center">
+                        <button id="mobileMenuButton" class="mobile-menu-btn p-2 rounded-md text-gray-600 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <i class="fas fa-bars text-xl"></i>
+                        </button>
+                        <div class="ml-3 md:hidden">
+                            <h1 class="text-lg font-bold text-gray-800">LEIR</h1>
+                        </div>
+                    </div>
                     
                     <!-- Center: Page Title -->
-                    <div class="flex-1 text-center md:text-left">
+                    <div class="flex-1 text-center md:text-left px-4">
                         <h2 class="text-xl font-bold text-gray-800" id="pageTitle"><?php echo getModuleTitle($current_module); ?></h2>
                         <p class="text-sm text-gray-600 hidden md:block">Welcome back, <?php echo htmlspecialchars($_SESSION['first_name']); ?>!</p>
                     </div>
                     
+                    <!-- Right: User Menu -->
+                    <div class="flex items-center space-x-4">
+                        <!-- Notifications -->
+                        <div class="relative">
+                            <button id="notificationButton" class="p-2 rounded-full text-gray-600 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                <i class="fas fa-bell text-lg"></i>
+                                <?php if (count($announcements) > 0): ?>
+                                    <span class="absolute top-1 right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                                        <?php echo min(count($announcements), 9); ?>
+                                    </span>
+                                <?php endif; ?>
+                            </button>
+                            <!-- Notification Dropdown -->
+                            <div id="notificationDropdown" class="hidden absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-lg border border-gray-200 z-50 dropdown-menu">
+                                <div class="p-4 border-b border-gray-200">
+                                    <h3 class="font-semibold text-gray-800">Notifications</h3>
+                                    <p class="text-sm text-gray-600">Latest announcements and updates</p>
+                                </div>
+                                <div class="max-h-96 overflow-y-auto">
+                                    <?php if (count($announcements) > 0): ?>
+                                        <?php foreach ($announcements as $announcement): ?>
+                                            <a href="?module=announcements" class="block p-4 border-b border-gray-100 hover:bg-gray-50">
+                                                <div class="flex items-start">
+                                                    <div class="flex-shrink-0">
+                                                        <div class="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
+                                                            <i class="fas fa-bullhorn text-blue-600 text-sm"></i>
+                                                        </div>
+                                                    </div>
+                                                    <div class="ml-3">
+                                                        <p class="text-sm font-medium text-gray-800"><?php echo htmlspecialchars($announcement['title']); ?></p>
+                                                        <p class="text-xs text-gray-500 mt-1"><?php echo date('M d, Y', strtotime($announcement['created_at'])); ?></p>
+                                                    </div>
+                                                </div>
+                                            </a>
+                                        <?php endforeach; ?>
+                                    <?php else: ?>
+                                        <div class="p-4 text-center">
+                                            <i class="fas fa-bell-slash text-gray-400 text-2xl mb-2"></i>
+                                            <p class="text-gray-500 text-sm">No new notifications</p>
+                                        </div>
+                                    <?php endif; ?>
+                                </div>
+                                <div class="p-3 border-t border-gray-200">
+                                    <a href="?module=announcements" class="block text-center text-blue-600 hover:text-blue-700 font-medium">
+                                        View All Notifications
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- User Dropdown -->
+                        <div class="relative">
+                            <button id="userMenuButton" class="flex items-center space-x-2 p-2 rounded-lg hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                <div class="relative">
+                                    <?php 
+                                    $profile_pic_path = "uploads/profile_pictures/" . ($_SESSION['profile_picture'] ?? $profile_picture ?? '');
+                                    $full_path = __DIR__ . "/../" . $profile_pic_path;
+                                    $timestamp = file_exists($full_path) ? filemtime($full_path) : time();
+                                    if (!empty($_SESSION['profile_picture'] ?? $profile_picture) && file_exists($full_path)): 
+                                    ?>
+                                        <img id="headerProfileImage" src="<?php echo $profile_pic_path . '?t=' . $timestamp; ?>" 
+                                             alt="Profile" class="w-8 h-8 rounded-full object-cover border-2 border-white shadow-sm">
+                                    <?php else: ?>
+                                        <div id="headerProfileDefault" class="w-8 h-8 rounded-full bg-gradient-to-r from-blue-600 to-blue-500 flex items-center justify-center text-white font-bold">
+                                            <?php echo strtoupper(substr($full_name, 0, 1)); ?>
+                                        </div>
+                                    <?php endif; ?>
+                                    <div class="absolute bottom-0 right-0 w-2 h-2 rounded-full border border-white <?php echo $is_active ? 'bg-green-500' : 'bg-red-500'; ?>"></div>
+                                </div>
+                                <span class="hidden md:block font-medium text-gray-700"><?php echo htmlspecialchars($_SESSION['first_name']); ?></span>
+                                <i class="fas fa-chevron-down text-gray-500 text-sm"></i>
+                            </button>
+                            
+                            <div id="userDropdown" class="hidden absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-50 dropdown-menu">
+                                <div class="p-4 border-b border-gray-200">
+                                    <p class="font-semibold text-gray-800 truncate"><?php echo htmlspecialchars($full_name); ?></p>
+                                    <p class="text-sm text-gray-600">Citizen</p>
+                                    <p class="text-xs text-gray-500 mt-1 truncate">
+                                        <i class="fas fa-map-marker-alt mr-1"></i>
+                                        <?php echo htmlspecialchars($barangay); ?>
+                                    </p>
+                                </div>
+                                <div class="p-2">
+                                    <a href="?module=profile" class="flex items-center px-4 py-2 text-gray-700 hover:bg-gray-100 rounded transition-colors">
+                                        <i class="fas fa-user mr-3 text-gray-500"></i>
+                                        Profile Settings
+                                    </a>
+                                    <a href="?module=dashboard" class="flex items-center px-4 py-2 text-gray-700 hover:bg-gray-100 rounded transition-colors">
+                                        <i class="fas fa-home mr-3 text-gray-500"></i>
+                                        Dashboard
+                                    </a>
+                                    <div class="border-t border-gray-200 mt-2 pt-2">
+                                        <a href="../logout.php" class="flex items-center px-4 py-2 text-red-600 hover:bg-red-50 rounded transition-colors">
+                                            <i class="fas fa-sign-out-alt mr-3"></i>
+                                            Logout
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
         </header>
         
         <!-- Main Content Area -->
-        <main class="p-4 sm:p-6 lg:p-8">
+        <main class="p-4 sm:p-6 lg:p-8 min-h-screen pb-20 md:pb-8">
             <!-- Alerts -->
             <?php if (isset($_SESSION['success'])): ?>
-                <div class="mb-6 bg-green-50 border-l-4 border-green-500 p-4 rounded">
+                <div class="mb-6 bg-green-50 border-l-4 border-green-500 p-4 rounded animate-fade-in">
                     <div class="flex items-center">
                         <i class="fas fa-check-circle text-green-500 mr-3"></i>
                         <div class="flex-1">
@@ -579,7 +744,7 @@ function getModuleTitle($module) {
             <?php endif; ?>
             
             <?php if (isset($_SESSION['error'])): ?>
-                <div class="mb-6 bg-red-50 border-l-4 border-red-500 p-4 rounded">
+                <div class="mb-6 bg-red-50 border-l-4 border-red-500 p-4 rounded animate-fade-in">
                     <div class="flex items-center">
                         <i class="fas fa-exclamation-circle text-red-500 mr-3"></i>
                         <div class="flex-1">
@@ -598,12 +763,10 @@ function getModuleTitle($module) {
             $module_file = '';
             switch($current_module) {
                 case 'dashboard':
-                    // Show dashboard content directly
+                    // Dashboard content is already included in this file
                     ?>
                     <!-- Dashboard Module -->
                     <div id="dashboard-module">
-    
-                        
                         <!-- Rate Limit Warning -->
                         <?php if ($rate_limit_info && $rate_limit_info['count'] >= 5): ?>
                             <div class="warning p-4 mb-6 rounded-lg">
@@ -667,7 +830,7 @@ function getModuleTitle($module) {
                                 <div class="flex items-center justify-between">
                                     <div>
                                         <p class="text-sm text-gray-500">Pending Actions</p>
-                                        <h3 class="text-2xl font-bold text-yellow-600"><?php echo ($report_counts['pending'] ?? 0) + ($report_counts['verification'] ?? 0); ?></h3>
+                                        <h3 class="text-2xl font-bold text-yellow-600"><?php echo ($report_counts['pending'] ?? 0) + ($report_counts['verification'] ?? 0) + ($report_counts['mediation'] ?? 0); ?></h3>
                                     </div>
                                     <div class="module-icon">
                                         <i class="fas fa-clock"></i>
@@ -710,7 +873,7 @@ function getModuleTitle($module) {
                             <div class="card rounded-xl p-6">
                                 <div class="flex items-center justify-between mb-6">
                                     <h3 class="text-lg font-semibold text-gray-800">Recent Reports</h3>
-                                    <a href="?module=my-reports" class="text-sm text-blue-600 hover:text-blue-700 font-medium">
+                                    <a href="?module=my-reports" class="text-sm text-blue-600 hover:text-blue-700 font-medium flex items-center">
                                         View All <i class="fas fa-arrow-right ml-1"></i>
                                     </a>
                                 </div>
@@ -721,7 +884,7 @@ function getModuleTitle($module) {
                                             <div class="report-card p-4 border rounded-lg hover:shadow-md transition-shadow report-<?php echo $report['jurisdiction'] == 'police' ? 'police' : 'barangay'; ?>">
                                                 <div class="flex items-start justify-between">
                                                     <div class="flex-1">
-                                                        <h4 class="font-medium text-gray-800"><?php echo htmlspecialchars($report['title']); ?></h4>
+                                                        <h4 class="font-medium text-gray-800 truncate"><?php echo htmlspecialchars($report['title']); ?></h4>
                                                         <div class="flex items-center mt-2 space-x-4">
                                                             <span class="text-xs px-2 py-1 rounded-full bg-gray-100 text-gray-600">
                                                                 <?php echo htmlspecialchars($report['type_name']); ?>
@@ -737,12 +900,12 @@ function getModuleTitle($module) {
                                                     </div>
                                                     <div class="ml-4">
                                                         <?php if ($report['jurisdiction'] == 'police'): ?>
-                                                            <span class="text-red-500 text-sm font-medium">
-                                                                <i class="fas fa-shield-alt"></i> Police
+                                                            <span class="text-red-500 text-sm font-medium flex items-center">
+                                                                <i class="fas fa-shield-alt mr-1"></i> Police
                                                             </span>
                                                         <?php else: ?>
-                                                            <span class="text-blue-500 text-sm font-medium">
-                                                                <i class="fas fa-home"></i> Barangay
+                                                            <span class="text-blue-500 text-sm font-medium flex items-center">
+                                                                <i class="fas fa-home mr-1"></i> Barangay
                                                             </span>
                                                         <?php endif; ?>
                                                     </div>
@@ -756,7 +919,7 @@ function getModuleTitle($module) {
                                             <i class="fas fa-file-alt text-gray-400 text-2xl"></i>
                                         </div>
                                         <p class="text-gray-500 mb-3">No reports submitted yet</p>
-                                        <a href="?module=new-report" class="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                                        <a href="?module=new-report" class="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
                                             <i class="fas fa-plus mr-2"></i>
                                             Create Your First Report
                                         </a>
@@ -768,7 +931,7 @@ function getModuleTitle($module) {
                             <div class="card rounded-xl p-6">
                                 <div class="flex items-center justify-between mb-6">
                                     <h3 class="text-lg font-semibold text-gray-800">Latest Announcements</h3>
-                                    <a href="?module=announcements" class="text-sm text-blue-600 hover:text-blue-700 font-medium">
+                                    <a href="?module=announcements" class="text-sm text-blue-600 hover:text-blue-700 font-medium flex items-center">
                                         View All <i class="fas fa-arrow-right ml-1"></i>
                                     </a>
                                 </div>
@@ -813,25 +976,44 @@ function getModuleTitle($module) {
                                 <?php endif; ?>
                             </div>
                         </div>
-                        
-                        
+                    </div>
                     <?php
                     break;
                     
                 case 'new-report':
                     $module_file = 'modules/citizen_new_report.php';
+                    if (file_exists($module_file)) {
+                        include $module_file;
+                    } else {
+                        echo '<div class="alert alert-danger">Module file not found: ' . $module_file . '</div>';
+                    }
                     break;
                     
                 case 'my-reports':
                     $module_file = 'modules/citizen_my_reports.php';
+                    if (file_exists($module_file)) {
+                        include $module_file;
+                    } else {
+                        echo '<div class="alert alert-danger">Module file not found: ' . $module_file . '</div>';
+                    }
                     break;
                     
                 case 'announcements':
                     $module_file = 'modules/citizen_announcements.php';
+                    if (file_exists($module_file)) {
+                        include $module_file;
+                    } else {
+                        echo '<div class="alert alert-danger">Module file not found: ' . $module_file . '</div>';
+                    }
                     break;
                     
                 case 'profile':
                     $module_file = 'modules/citizen_profile.php';
+                    if (file_exists($module_file)) {
+                        include $module_file;
+                    } else {
+                        echo '<div class="alert alert-danger">Module file not found: ' . $module_file . '</div>';
+                    }
                     break;
                                     
                 default:
@@ -839,53 +1021,51 @@ function getModuleTitle($module) {
                     header("Location: ?module=dashboard");
                     exit;
             }
-            
-            // Load module file if not dashboard
-            if ($module_file && file_exists($module_file)) {
-                include $module_file;
-            }
             ?>
         </main>
     </div>
     
     <!-- Mobile Bottom Navigation -->
-    <div class="mobile-bottom-nav md:hidden">
-        <div class="flex justify-around items-center py-3">
-            <a href="?module=dashboard" class="flex flex-col items-center text-gray-600 <?php echo $current_module == 'dashboard' ? 'mobile-nav-active' : ''; ?>">
-                <i class="fas fa-home text-xl"></i>
-                <span class="text-xs mt-1">Home</span>
-            </a>
-            
-            <a href="?module=new-report" class="flex flex-col items-center text-gray-600 <?php echo $current_module == 'new-report' ? 'mobile-nav-active' : ''; ?>">
-                <i class="fas fa-plus-circle text-xl"></i>
-                <span class="text-xs mt-1">New</span>
-            </a>
-            
-            <a href="?module=my-reports" class="flex flex-col items-center text-gray-600 <?php echo $current_module == 'my-reports' ? 'mobile-nav-active' : ''; ?>">
-                <i class="fas fa-file-alt text-xl"></i>
-                <span class="text-xs mt-1">Reports</span>
-                <?php if ($report_counts['total'] > 0): ?>
-                    <span class="absolute mt-[-5px] ml-6 bg-blue-600 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
-                        <?php echo min($report_counts['total'], 9); ?>
-                    </span>
-                <?php endif; ?>
-            </a>
-            
-            <a href="?module=announcements" class="flex flex-col items-center text-gray-600 <?php echo $current_module == 'announcements' ? 'mobile-nav-active' : ''; ?>">
-                <i class="fas fa-bullhorn text-xl"></i>
-                <span class="text-xs mt-1">News</span>
-                <?php if (count($announcements) > 0): ?>
-                    <span class="absolute mt-[-5px] ml-6 bg-red-600 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
-                        <?php echo min(count($announcements), 9); ?>
-                    </span>
-                <?php endif; ?>
-            </a>
-            
-            <a href="?module=profile" class="flex flex-col items-center text-gray-600 <?php echo $current_module == 'profile' ? 'mobile-nav-active' : ''; ?>">
-                <i class="fas fa-user text-xl"></i>
-                <span class="text-xs mt-1">Profile</span>
-            </a>
-        </div>
+    <div class="mobile-bottom-nav md:hidden flex justify-around items-center">
+        <a href="?module=dashboard" class="flex flex-col items-center text-gray-600 py-2 px-3 <?php echo $current_module == 'dashboard' ? 'mobile-nav-active' : ''; ?>">
+            <i class="fas fa-home text-xl"></i>
+            <span class="text-xs mt-1">Home</span>
+        </a>
+        
+        <a href="?module=new-report" class="flex flex-col items-center text-gray-600 py-2 px-3 <?php echo $current_module == 'new-report' ? 'mobile-nav-active' : ''; ?>">
+            <i class="fas fa-plus-circle text-xl"></i>
+            <span class="text-xs mt-1">New</span>
+            <?php if ($rate_limit_info && $rate_limit_info['count'] >= 5): ?>
+                <span class="absolute mt-[-5px] ml-6 bg-red-600 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                    <i class="fas fa-clock"></i>
+                </span>
+            <?php endif; ?>
+        </a>
+        
+        <a href="?module=my-reports" class="flex flex-col items-center text-gray-600 py-2 px-3 <?php echo $current_module == 'my-reports' ? 'mobile-nav-active' : ''; ?>">
+            <i class="fas fa-file-alt text-xl"></i>
+            <span class="text-xs mt-1">Reports</span>
+            <?php if ($report_counts['total'] > 0): ?>
+                <span class="absolute mt-[-5px] ml-6 bg-blue-600 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                    <?php echo min($report_counts['total'], 9); ?>
+                </span>
+            <?php endif; ?>
+        </a>
+        
+        <a href="?module=announcements" class="flex flex-col items-center text-gray-600 py-2 px-3 <?php echo $current_module == 'announcements' ? 'mobile-nav-active' : ''; ?>">
+            <i class="fas fa-bullhorn text-xl"></i>
+            <span class="text-xs mt-1">News</span>
+            <?php if (count($announcements) > 0): ?>
+                <span class="absolute mt-[-5px] ml-6 bg-red-600 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                    <?php echo min(count($announcements), 9); ?>
+                </span>
+            <?php endif; ?>
+        </a>
+        
+        <a href="?module=profile" class="flex flex-col items-center text-gray-600 py-2 px-3 <?php echo $current_module == 'profile' ? 'mobile-nav-active' : ''; ?>">
+            <i class="fas fa-user text-xl"></i>
+            <span class="text-xs mt-1">Profile</span>
+        </a>
     </div>
 
     <script>
@@ -912,12 +1092,28 @@ function getModuleTitle($module) {
             userMenuButton.addEventListener('click', function(e) {
                 e.stopPropagation();
                 userDropdown.classList.toggle('hidden');
+                // Close other dropdowns
+                notificationDropdown.classList.add('hidden');
             });
         }
 
-        // Close dropdown when clicking outside
+        // Notification dropdown
+        const notificationButton = document.getElementById('notificationButton');
+        const notificationDropdown = document.getElementById('notificationDropdown');
+        
+        if (notificationButton && notificationDropdown) {
+            notificationButton.addEventListener('click', function(e) {
+                e.stopPropagation();
+                notificationDropdown.classList.toggle('hidden');
+                // Close other dropdowns
+                userDropdown.classList.add('hidden');
+            });
+        }
+
+        // Close dropdowns when clicking outside
         document.addEventListener('click', function() {
             if (userDropdown) userDropdown.classList.add('hidden');
+            if (notificationDropdown) notificationDropdown.classList.add('hidden');
         });
 
         // Auto-hide success/error messages after 5 seconds
@@ -965,17 +1161,6 @@ function getModuleTitle($module) {
             if (headerDefault) {
                 headerDefault.style.display = 'none';
             }
-            
-            // Update dropdown image
-            const dropdownImg = document.getElementById('dropdownProfileImage');
-            const dropdownDefault = document.getElementById('dropdownProfileDefault');
-            if (dropdownImg) {
-                dropdownImg.src = imageUrlWithTimestamp;
-                dropdownImg.style.display = 'block';
-            }
-            if (dropdownDefault) {
-                dropdownDefault.style.display = 'none';
-            }
         }
         
         // Listen for profile picture updates from the profile module
@@ -991,10 +1176,38 @@ function getModuleTitle($module) {
                 updateProfileImages(event.data.imageUrl);
             }
         });
+        
+        // Update page title when module changes
+        function updatePageTitle(title) {
+            const pageTitle = document.getElementById('pageTitle');
+            if (pageTitle) {
+                pageTitle.textContent = title;
+            }
+            // Update browser tab title
+            document.title = 'LEIR | ' + title;
+        }
+        
+        // Update title when navigating
+        const navLinks = document.querySelectorAll('a[href*="module="]');
+        navLinks.forEach(link => {
+            link.addEventListener('click', function() {
+                const moduleName = this.getAttribute('href').split('module=')[1];
+                const titles = {
+                    'dashboard': 'Dashboard',
+                    'new-report': 'New Report',
+                    'my-reports': 'My Reports',
+                    'announcements': 'Barangay Announcements',
+                    'profile': 'Profile Settings'
+                };
+                updatePageTitle(titles[moduleName] || 'Dashboard');
+            });
+        });
     </script>
 </body>
 </html>
 <?php
 // Close database connection
-$conn = null;
+if (isset($conn)) {
+    $conn = null;
+}
 ?>
