@@ -4,19 +4,10 @@ require_once '../config/database.php';
 $type = $_GET['type'] ?? '';
 $case_id = $_GET['case_id'] ?? 0;
 
-// Check if database connection exists
-if (!isset($conn)) {
-    echo '<div class="text-center py-4">';
-    echo '<i class="fas fa-database text-red-500 text-2xl mb-2"></i>';
-    echo '<p class="text-red-600">Database connection error</p>';
-    echo '</div>';
-    exit;
-}
-
 if (empty($type) || empty($case_id)) {
     echo '<div class="text-center py-4">';
     echo '<i class="fas fa-exclamation-triangle text-red-500 text-2xl mb-2"></i>';
-    echo '<p class="text-red-600">Invalid parameters: Type=' . htmlspecialchars($type) . ', Case=' . htmlspecialchars($case_id) . '</p>';
+    echo '<p class="text-red-600">Invalid parameters</p>';
     echo '</div>';
     exit;
 }
@@ -26,35 +17,54 @@ try {
     $role = '';
     $role_name = '';
     $badge_class = '';
-    $assigned_column = '';
     
-    if ($type === 'lupon') {
+    if ($type === 'lupon_member') {
         $role = 'lupon';
         $role_name = 'Lupon Member';
         $badge_class = 'role-badge lupon';
-        $assigned_column = 'assigned_lupon';
+        // Fetch active lupon members (non-chairman)
+        $officers_query = "SELECT u.id, u.first_name, u.last_name, u.contact_number, 
+                           u.barangay, u.status, u.is_online,
+                           (SELECT COUNT(*) FROM reports WHERE assigned_lupon = u.id AND status != 'closed') as assigned_cases
+                           FROM users u 
+                           WHERE u.role = :role 
+                           AND u.status = 'active'
+                           AND u.is_active = 1
+                           AND u.is_chairman = 0
+                           ORDER BY u.first_name, u.last_name";
+    } elseif ($type === 'lupon_chairman') {
+        $role = 'lupon_chairman';
+        $role_name = 'Lupon Chairman';
+        $badge_class = 'role-badge lupon';
+        // Fetch active lupon chairman
+        $officers_query = "SELECT u.id, u.first_name, u.last_name, u.contact_number, 
+                           u.barangay, u.status, u.is_online,
+                           (SELECT COUNT(*) FROM reports WHERE assigned_lupon_chairman = u.id AND status != 'closed') as assigned_cases
+                           FROM users u 
+                           WHERE u.role = :role 
+                           AND u.status = 'active'
+                           AND u.is_active = 1
+                           ORDER BY u.first_name, u.last_name";
     } elseif ($type === 'tanod') {
         $role = 'tanod';
         $role_name = 'Tanod';
         $badge_class = 'role-badge tanod';
-        $assigned_column = 'assigned_tanod';
+        // Fetch active tanod
+        $officers_query = "SELECT u.id, u.first_name, u.last_name, u.contact_number, 
+                           u.barangay, u.status, u.is_online,
+                           (SELECT COUNT(*) FROM reports WHERE assigned_tanod = u.id AND status != 'closed') as assigned_cases
+                           FROM users u 
+                           WHERE u.role = :role 
+                           AND u.status = 'active'
+                           AND u.is_active = 1
+                           ORDER BY u.first_name, u.last_name";
     } else {
         echo '<div class="text-center py-4">';
         echo '<i class="fas fa-exclamation-triangle text-red-500 text-2xl mb-2"></i>';
-        echo '<p class="text-red-600">Invalid officer type: ' . htmlspecialchars($type) . '</p>';
+        echo '<p class="text-red-600">Invalid officer type</p>';
         echo '</div>';
         exit;
     }
-    
-    // Fetch active officers with the specified role
-    $officers_query = "SELECT u.id, u.first_name, u.last_name, u.contact_number, 
-                       u.barangay, u.status, u.is_online,
-                       (SELECT COUNT(*) FROM reports WHERE $assigned_column = u.id AND status != 'closed') as assigned_cases
-                       FROM users u 
-                       WHERE u.role = :role 
-                       AND u.status = 'active'
-                       AND u.is_active = 1
-                       ORDER BY u.first_name, u.last_name";
     
     $officers_stmt = $conn->prepare($officers_query);
     $officers_stmt->bindParam(':role', $role);
@@ -93,11 +103,6 @@ try {
     echo '<div class="text-center py-4">';
     echo '<i class="fas fa-exclamation-triangle text-red-500 text-2xl mb-2"></i>';
     echo '<p class="text-red-600">Database error: ' . htmlspecialchars($e->getMessage()) . '</p>';
-    echo '</div>';
-} catch (Exception $e) {
-    echo '<div class="text-center py-4">';
-    echo '<i class="fas fa-exclamation-triangle text-red-500 text-2xl mb-2"></i>';
-    echo '<p class="text-red-600">Error: ' . htmlspecialchars($e->getMessage()) . '</p>';
     echo '</div>';
 }
 ?>

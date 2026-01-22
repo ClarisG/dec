@@ -1,15 +1,8 @@
 <?php
 require_once '../config/database.php';
 
-// Debug: Check if connection exists
-if (!isset($conn) || !$conn) {
-    echo '<div class="text-center py-8"><p class="text-red-600">Database connection failed</p></div>';
-    exit;
-}
-
 $case_id = $_GET['case_id'] ?? 0;
 
-// Fetch case details
 try {
     $case_query = "SELECT r.*, u.first_name, u.last_name FROM reports r 
                    LEFT JOIN users u ON r.user_id = u.id 
@@ -42,7 +35,7 @@ try {
 <div class="mb-6">
     <h4 class="font-bold text-gray-700 mb-2">Select Assignment Type</h4>
     <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div class="assignment-option" data-type="lupon">
+        <div class="assignment-option" data-type="lupon_member">
             <div class="text-center p-4">
                 <div class="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
                     <i class="fas fa-users text-green-600 text-xl"></i>
@@ -52,7 +45,7 @@ try {
             </div>
         </div>
         
-        <div class="assignment-option" data-type="lupon">
+        <div class="assignment-option" data-type="lupon_chairman">
             <div class="text-center p-4">
                 <div class="w-12 h-12 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-3">
                     <i class="fas fa-user-tie text-yellow-600 text-xl"></i>
