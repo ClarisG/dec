@@ -1,19 +1,35 @@
 <?php
-// Fixed path: from modules folder to config folder
-require_once __DIR__ . '/../../config/database.php';
+// Start session at the very beginning
+session_start();
 
-// Check if user is logged in - adjust based on your actual session structure
+// Check if user is logged in
 if (!isset($_SESSION['user_id'])) {
-    header('Location: ../login.php'); // Adjust login page location
+    header('Location: ../login.php');
     exit();
 }
 
-// Database connection - adjust the path based on your project structure
-// If evidence_handover.php is in /tanod/modules/, then config is at ../../config/
+// Include database connection
 require_once __DIR__ . '/../../config/database.php';
 
+// If database.php doesn't set $pdo, create the connection here
+if (!isset($pdo)) {
+    try {
+        // IMPORTANT: Update these with your actual database credentials
+        $host = 'localhost';
+        $dbname = 'your_database_name';
+        $username = 'your_username';
+        $password = 'your_password';
+        
+        $pdo = new PDO("mysql:host=$host;dbname=$dbname;charset=utf8mb4", $username, $password);
+        $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+        $pdo->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
+    } catch (PDOException $e) {
+        die("Database connection failed: " . $e->getMessage());
+    }
+}
+
 $user_id = $_SESSION['user_id'];
-$user_role = $_SESSION['role'] ?? 'citizen'; // Adjust based on your session
+$user_role = $_SESSION['role'] ?? 'citizen';
 
 // Initialize variables
 $success_message = '';
@@ -74,7 +90,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['acknowledge_handover'
         try {
             $stmt = $pdo->prepare("
                 UPDATE evidence_handovers 
-                SET recipient_acknowledged = 1 
+                SET recipient_acknowledged = 1, acknowledged_at = NOW()
                 WHERE id = ? AND handover_to = ?
             ");
             $stmt->execute([$handover_id, $user_id]);
@@ -136,8 +152,8 @@ try {
         ");
         $stmt->execute([$user_id]);
         $handovers = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    } elseif (in_array($user_role, ['captain', 'lupon'])) {
-        // Admin/captain/lupon can see all
+    } elseif (in_array($user_role, ['captain', 'lupon', 'admin'])) {
+        // Captain, Lupon, and Admin can see all
         $stmt = $pdo->prepare("
             SELECT eh.*, 
                    u_tanod.first_name as tanod_first, u_tanod.last_name as tanod_last,
@@ -320,6 +336,7 @@ if ($user_role === 'tanod') {
         .badge-admin { background-color: #dc3545; color: white; }
         .badge-captain { background-color: #ffc107; color: black; }
         .badge-lupon { background-color: #6610f2; color: white; }
+        .badge-citizen { background-color: #6c757d; color: white; }
         .action-buttons {
             white-space: nowrap;
         }
@@ -347,6 +364,32 @@ if ($user_role === 'tanod') {
             padding: 40px;
             color: #6c757d;
             font-style: italic;
+        }
+        .print-only {
+            display: none;
+        }
+        @media print {
+            .no-print {
+                display: none;
+            }
+            .print-only {
+                display: block;
+            }
+            body {
+                background: white;
+                padding: 0;
+            }
+            .container {
+                box-shadow: none;
+                padding: 0;
+            }
+            .section {
+                border: none;
+                padding: 0;
+            }
+            table {
+                font-size: 12px;
+            }
         }
     </style>
 </head>
@@ -475,7 +518,7 @@ if ($user_role === 'tanod') {
                                 <th>To (Recipient)</th>
                                 <th>Date/Time</th>
                                 <th>Status</th>
-                                <th>Actions</th>
+                                <th class="no-print">Actions</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -505,11 +548,14 @@ if ($user_role === 'tanod') {
                                 <td>
                                     <?php if ($handover['recipient_acknowledged']): ?>
                                         <span class="status-acknowledged">✓ Acknowledged</span>
+                                        <?php if (isset($handover['acknowledged_at'])): ?>
+                                            <br><small><?php echo date('M d, H:i', strtotime($handover['acknowledged_at'])); ?></small>
+                                        <?php endif; ?>
                                     <?php else: ?>
                                         <span class="status-pending">⏳ Pending</span>
                                     <?php endif; ?>
                                 </td>
-                                <td class="action-buttons">
+                                <td class="action-buttons no-print">
                                     <button onclick="viewDetails(<?php echo $handover['id']; ?>)" class="btn">
                                         👁️ View
                                     </button>
@@ -574,7 +620,7 @@ if ($user_role === 'tanod') {
                                             <strong>Status:</strong> 
                                             <?php if ($handover['recipient_acknowledged']): ?>
                                                 <span style="color: #155724;">✓ RECEIPT ACKNOWLEDGED</span><br>
-                                                <small>Evidence physically received by recipient</small>
+                                                <small>Acknowledged on: <?php echo date('F j, Y, g:i a', strtotime($handover['acknowledged_at'])); ?></small>
                                             <?php else: ?>
                                                 <span style="color: #856404;">⏳ PENDING ACKNOWLEDGEMENT</span><br>
                                                 <small>Waiting for recipient to confirm physical receipt</small>
@@ -589,9 +635,9 @@ if ($user_role === 'tanod') {
                 </div>
                 
                 <!-- Print/Export Options -->
-                <div style="margin-top: 20px; text-align: right;">
+                <div style="margin-top: 20px; text-align: right;" class="no-print">
                     <button onclick="window.print()" class="btn">🖨️ Print Records</button>
-                    <a href="?export=csv" class="btn">📥 Export as CSV</a>
+                    <button onclick="exportToCSV()" class="btn">📥 Export as CSV</button>
                 </div>
             <?php endif; ?>
         </div>
@@ -665,9 +711,29 @@ if ($user_role === 'tanod') {
             }
         }
         
-        // Print functionality
-        function printEvidenceRecord(id) {
-            window.open('print_evidence.php?id=' + id, '_blank');
+        // Export to CSV function
+        function exportToCSV() {
+            let csv = [];
+            let rows = document.querySelectorAll("table tr");
+            
+            for (let i = 0; i < rows.length; i++) {
+                let row = [], cols = rows[i].querySelectorAll("td, th");
+                
+                for (let j = 0; j < cols.length - 1; j++) { // -1 to exclude actions column
+                    let data = cols[j].innerText.replace(/(\r\n|\n|\r)/gm, " ").replace(/(\s\s)/gm, " ");
+                    data = data.replace(/"/g, '""');
+                    row.push('"' + data + '"');
+                }
+                csv.push(row.join(","));        
+            }
+            
+            let csvContent = "data:text/csv;charset=utf-8," + csv.join("\n");
+            let encodedUri = encodeURI(csvContent);
+            let link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", "evidence_handovers_" + new Date().toISOString().slice(0,10) + ".csv");
+            document.body.appendChild(link);
+            link.click();
         }
         
         // Auto-expand textareas
@@ -687,6 +753,12 @@ if ($user_role === 'tanod') {
                         e.preventDefault();
                     }
                 });
+            });
+            
+            // Initialize textarea heights
+            document.querySelectorAll('textarea').forEach(textarea => {
+                textarea.style.height = 'auto';
+                textarea.style.height = (textarea.scrollHeight) + 'px';
             });
         });
     </script>
