@@ -536,7 +536,7 @@ function viewCaseDetails(caseId) {
     modal.classList.add('flex');
     
     // Fetch case details via AJAX
-    fetch(`../handlers/get_case_details.php?id=${caseId}`)
+    fetch(`dec/handlers/get_case_details.php?id=${caseId}`)
         .then(response => response.text())
         .then(data => {
             content.innerHTML = data;
@@ -568,7 +568,7 @@ function viewAttachments(caseId) {
     modal.classList.add('flex');
     
     // Fetch attachments via AJAX
-    fetch(`../handlers/get_attachments.php?report_id=${caseId}`)
+    fetch(`dec/handlers/get_attachments.php?report_id=${caseId}`)
         .then(response => response.text())
         .then(data => {
             content.innerHTML = data;
@@ -608,7 +608,7 @@ function openAssignmentModal(caseId) {
     modal.classList.add('flex');
     
     // Fetch assignment options via AJAX
-    fetch(`../handlers/get_assignment_options.php?case_id=${caseId}`)
+    fetch(`dec/handlers/get_assignment_options.php?case_id=${caseId}`)
         .then(response => response.text())
         .then(data => {
             content.innerHTML = data;
@@ -687,7 +687,7 @@ function loadOfficersForType(type) {
     `;
     
     // Fetch officers for the selected type
-    fetch(`../handlers/get_officers.php?type=${type}&case_id=${selectedCaseId}`)
+    fetch(`dec/handlers/get_officers.php?type=${type}&case_id=${selectedCaseId}`)
         .then(response => response.text())
         .then(data => {
             officerList.innerHTML = data;
