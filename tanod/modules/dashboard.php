@@ -1,5 +1,5 @@
 <?php
-// dashboard.php - Tanod Dashboard
+// tanod/modules/dashboard.php - Tanod Dashboard
 session_start();
 require_once __DIR__ . '/../../config/database.php';
 
@@ -16,9 +16,13 @@ try {
     
     // Fetch current duty status
     $duty_stmt = $pdo->prepare("
-        SELECT * FROM tanod_duty_logs 
-        WHERE user_id = ? AND clock_out IS NULL 
-        ORDER BY clock_in DESC LIMIT 1
+        SELECT dl.*, ts.schedule_date, ts.shift_start, ts.shift_end, 
+               ts.patrol_route, a.area_name, ts.shift_type
+        FROM tanod_duty_logs dl
+        LEFT JOIN tanod_schedules ts ON dl.schedule_id = ts.id
+        LEFT JOIN patrol_areas a ON ts.patrol_area_id = a.id
+        WHERE dl.user_id = ? AND dl.clock_out IS NULL 
+        ORDER BY dl.clock_in DESC LIMIT 1
     ");
     $duty_stmt->execute([$tanod_id]);
     $current_duty = $duty_stmt->fetch();
@@ -33,32 +37,29 @@ try {
         'verified_reports' => 0
     ];
     
-    // Get all stats in one optimized query where possible
+    // Today's incidents
     $stmt = $pdo->prepare("
-        SELECT 
-            COUNT(CASE WHEN DATE(reported_at) = CURDATE() THEN 1 END) as incidents_today,
-            COUNT(CASE WHEN status IN ('pending_field_verification', 'assigned_for_verification') 
-                  AND assigned_tanod = ? THEN 1 END) as pending_vetting,
-            COUNT(CASE WHEN recipient_acknowledged = 0 AND tanod_id = ? THEN 1 END) as evidence_pending,
-            COUNT(CASE WHEN status IN ('verified', 'verified_approved', 'verified_rejected') 
-                  AND verified_by = ? THEN 1 END) as verified_reports
-        FROM (
-            (SELECT id, reported_at FROM tanod_incidents WHERE user_id = ?) 
-            UNION ALL 
-            (SELECT id, NULL as reported_at FROM reports WHERE assigned_tanod = ? OR verified_by = ?)
-            UNION ALL
-            (SELECT id, NULL as reported_at FROM evidence_handovers WHERE tanod_id = ?)
-        ) as combined
+        SELECT COUNT(*) as count FROM tanod_incidents 
+        WHERE user_id = ? AND DATE(reported_at) = CURDATE()
     ");
-    $stmt->execute([$tanod_id, $tanod_id, $tanod_id, $tanod_id, $tanod_id, $tanod_id, $tanod_id]);
-    $combined_stats = $stmt->fetch();
+    $stmt->execute([$tanod_id]);
+    $stats['incidents_today'] = $stmt->fetchColumn() ?: 0;
     
-    if ($combined_stats) {
-        $stats['incidents_today'] = $combined_stats['incidents_today'] ?: 0;
-        $stats['pending_vetting'] = $combined_stats['pending_vetting'] ?: 0;
-        $stats['evidence_pending'] = $combined_stats['evidence_pending'] ?: 0;
-        $stats['verified_reports'] = $combined_stats['verified_reports'] ?: 0;
-    }
+    // Reports pending vetting
+    $stmt = $pdo->prepare("
+        SELECT COUNT(*) as count FROM reports 
+        WHERE assigned_tanod = ? AND status IN ('pending_field_verification', 'assigned_for_verification')
+    ");
+    $stmt->execute([$tanod_id]);
+    $stats['pending_vetting'] = $stmt->fetchColumn() ?: 0;
+    
+    // Evidence pending acknowledgement
+    $stmt = $pdo->prepare("
+        SELECT COUNT(*) as count FROM evidence_handovers 
+        WHERE tanod_id = ? AND recipient_acknowledged = 0
+    ");
+    $stmt->execute([$tanod_id]);
+    $stats['evidence_pending'] = $stmt->fetchColumn() ?: 0;
     
     // Patrol hours this week
     $stmt = $pdo->prepare("
@@ -70,7 +71,15 @@ try {
     $patrol_stats = $stmt->fetch();
     $stats['patrol_hours'] = $patrol_stats['total_hours'] ?: 0;
     
-    // Recent assignments (last 5) - Optimized
+    // Verified reports count
+    $stmt = $pdo->prepare("
+        SELECT COUNT(*) as count FROM reports 
+        WHERE verified_by = ? AND status IN ('verified', 'verified_approved')
+    ");
+    $stmt->execute([$tanod_id]);
+    $stats['verified_reports'] = $stmt->fetchColumn() ?: 0;
+    
+    // Recent assignments (last 5)
     $stmt = $pdo->prepare("
         SELECT r.id, r.title, r.location, r.status, 
                CONCAT(u.first_name, ' ', u.last_name) as reporter_name,
@@ -86,37 +95,36 @@ try {
     $stmt->execute([$tanod_id]);
     $recent_assignments = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
-    // Active patrol details if on duty
-    $patrol_info = null;
-    if ($current_duty) {
-        $stmt = $pdo->prepare("
-            SELECT ts.*, a.area_name 
-            FROM tanod_schedules ts
-            LEFT JOIN patrol_areas a ON ts.patrol_area_id = a.id
-            WHERE ts.id = ? AND ts.active = 1
-        ");
-        $stmt->execute([$current_duty['schedule_id'] ?? 0]);
-        $patrol_info = $stmt->fetch();
-    }
-    
-    // System alerts for Tanod
+    // Recent incidents (last 5)
     $stmt = $pdo->prepare("
-        SELECT n.* 
-        FROM notifications n
-        WHERE n.user_id = ? AND n.is_read = 0
-        ORDER BY n.created_at DESC 
+        SELECT * FROM tanod_incidents 
+        WHERE user_id = ? 
+        ORDER BY reported_at DESC 
         LIMIT 5
     ");
     $stmt->execute([$tanod_id]);
-    $alerts = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    $recent_incidents = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+    // System announcements
+    $stmt = $pdo->prepare("
+        SELECT * FROM announcements 
+        WHERE (target_role = 'tanod' OR target_role = 'all')
+        AND status = 'active'
+        AND (expires_at IS NULL OR expires_at > NOW())
+        ORDER BY created_at DESC 
+        LIMIT 3
+    ");
+    $stmt->execute();
+    $announcements = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
 } catch (PDOException $e) {
     error_log("Dashboard Error: " . $e->getMessage());
     $stats = ['active_duty' => 0, 'incidents_today' => 0, 'pending_vetting' => 0, 
               'evidence_pending' => 0, 'patrol_hours' => 0, 'verified_reports' => 0];
     $recent_assignments = [];
-    $patrol_info = null;
-    $alerts = [];
+    $recent_incidents = [];
+    $announcements = [];
+    $current_duty = null;
 }
 ?>
 
@@ -129,25 +137,26 @@ try {
         </div>
         <div class="flex items-center space-x-2">
             <span class="px-3 py-1.5 <?php echo $stats['active_duty'] ? 'bg-green-100 text-green-800 border border-green-200' : 'bg-gray-100 text-gray-800 border border-gray-200'; ?> rounded-full text-sm font-medium flex items-center">
-                <span class="w-2 h-2 rounded-full <?php echo $stats['active_duty'] ? 'bg-green-500' : 'bg-gray-400'; ?> mr-2"></span>
+                <span class="w-2 h-2 rounded-full <?php echo $stats['active_duty'] ? 'bg-green-500 pulse-dot' : 'bg-gray-400'; ?> mr-2"></span>
                 <?php echo $stats['active_duty'] ? 'ON DUTY' : 'OFF DUTY'; ?>
             </span>
-            <button onclick="window.location.href='?module=profile'" class="p-2 hover:bg-gray-100 rounded-lg">
-                <i class="fas fa-user-circle text-gray-600"></i>
-            </button>
         </div>
     </div>
     
-    <!-- System Alerts -->
-    <?php if (!empty($alerts)): ?>
-    <div class="bg-gradient-to-r from-yellow-50 to-yellow-100 border-l-4 border-yellow-500 p-4 rounded-lg mb-4">
+    <!-- System Announcements -->
+    <?php if (!empty($announcements)): ?>
+    <div class="bg-gradient-to-r from-blue-50 to-indigo-50 border-l-4 border-blue-500 rounded-lg p-4 mb-4">
         <div class="flex items-start">
-            <i class="fas fa-bell text-yellow-600 mt-1 mr-3"></i>
+            <i class="fas fa-bullhorn text-blue-500 mt-1 mr-3"></i>
             <div class="flex-1">
-                <h3 class="font-bold text-yellow-800 text-sm">System Alerts</h3>
-                <div class="mt-1 space-y-2">
-                    <?php foreach ($alerts as $alert): ?>
-                    <p class="text-xs text-yellow-700"><?php echo htmlspecialchars($alert['message']); ?></p>
+                <h3 class="font-bold text-blue-800 text-sm mb-2">System Announcements</h3>
+                <div class="space-y-3">
+                    <?php foreach ($announcements as $announcement): ?>
+                    <div class="pb-3 <?php echo !$loop['last'] ? 'border-b border-blue-100' : ''; ?>">
+                        <p class="text-sm font-medium text-blue-900"><?php echo htmlspecialchars($announcement['title']); ?></p>
+                        <p class="text-xs text-blue-700 mt-1"><?php echo htmlspecialchars($announcement['content']); ?></p>
+                        <p class="text-xs text-blue-600 mt-2"><?php echo date('M d, Y - h:i A', strtotime($announcement['created_at'])); ?></p>
+                    </div>
                     <?php endforeach; ?>
                 </div>
             </div>
@@ -156,7 +165,7 @@ try {
     <?php endif; ?>
     
     <!-- Active Patrol Banner -->
-    <?php if ($current_duty && $patrol_info): ?>
+    <?php if ($current_duty): ?>
     <div class="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-4 mb-4">
         <div class="flex items-center justify-between">
             <div class="flex items-center space-x-3">
@@ -166,15 +175,15 @@ try {
                 <div>
                     <p class="text-sm font-bold text-blue-800">Active Patrol</p>
                     <p class="text-xs text-blue-700">
-                        <span class="font-medium"><?php echo $patrol_info['area_name'] ?? $patrol_info['patrol_route'] ?? 'General Patrol'; ?></span>
+                        <span class="font-medium"><?php echo $current_duty['area_name'] ?? $current_duty['patrol_route'] ?? 'General Patrol'; ?></span>
                         • Since <?php echo date('h:i A', strtotime($current_duty['clock_in'])); ?>
                     </p>
                 </div>
             </div>
             <div class="text-right">
                 <p class="text-xs text-blue-600 font-medium">
-                    <?php echo date('h:i A', strtotime($patrol_info['shift_start'] ?? '')); ?> - 
-                    <?php echo date('h:i A', strtotime($patrol_info['shift_end'] ?? '')); ?>
+                    <?php echo date('h:i A', strtotime($current_duty['shift_start'] ?? '')); ?> - 
+                    <?php echo date('h:i A', strtotime($current_duty['shift_end'] ?? '')); ?>
                 </p>
                 <a href="?module=duty_schedule" class="text-xs text-blue-600 hover:text-blue-800 mt-1 inline-block">
                     <i class="fas fa-external-link-alt mr-1"></i>Manage
@@ -185,7 +194,7 @@ try {
     <?php endif; ?>
     
     <!-- Stats Grid -->
-    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
         <!-- Duty Status -->
         <a href="?module=duty_schedule" class="bg-white rounded-xl shadow-sm p-4 border border-gray-200 hover:border-blue-300 hover:shadow-md transition-all duration-200">
             <div class="flex flex-col items-center text-center">
@@ -327,7 +336,7 @@ try {
             <?php endif; ?>
         </div>
         
-        <!-- Quick Actions & System Status -->
+        <!-- Quick Actions & Recent Incidents -->
         <div class="space-y-6">
             <!-- Quick Actions -->
             <div class="bg-white rounded-xl shadow-sm p-5 border border-gray-200">
@@ -367,43 +376,48 @@ try {
                 </div>
             </div>
             
-            <!-- System Status -->
+            <!-- Recent Incidents -->
             <div class="bg-white rounded-xl shadow-sm p-5 border border-gray-200">
-                <h3 class="font-bold text-gray-800 text-lg mb-4">System Status</h3>
+                <h3 class="font-bold text-gray-800 text-lg mb-4">Recent Incidents</h3>
+                
+                <?php if (!empty($recent_incidents)): ?>
                 <div class="space-y-3">
-                    <div class="flex items-center justify-between p-3 bg-blue-50 rounded-lg border border-blue-100">
-                        <div class="flex items-center">
-                            <i class="fas fa-satellite text-blue-500 mr-3"></i>
-                            <div>
-                                <p class="text-sm font-medium text-blue-800">GPS Tracking</p>
-                                <p class="text-xs text-blue-700">Location services active</p>
+                    <?php foreach ($recent_incidents as $incident): ?>
+                    <div class="p-3 bg-gradient-to-r from-gray-50 to-gray-100 rounded-lg border border-gray-200">
+                        <div class="flex justify-between items-start">
+                            <div class="flex-1">
+                                <div class="flex items-center mb-2">
+                                    <span class="text-sm font-medium text-gray-800">
+                                        INC-<?php echo str_pad($incident['id'], 5, '0', STR_PAD_LEFT); ?>
+                                    </span>
+                                    <span class="ml-3 px-2 py-1 text-xs rounded-full 
+                                        <?php echo $incident['status'] === 'pending' ? 'bg-yellow-100 text-yellow-800' : 
+                                               ($incident['status'] === 'processed' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'); ?>">
+                                        <?php echo ucfirst($incident['status']); ?>
+                                    </span>
+                                </div>
+                                <p class="text-sm text-gray-700"><?php echo htmlspecialchars(ucwords(str_replace('_', ' ', $incident['incident_type']))); ?></p>
+                                <p class="text-xs text-gray-500 mt-1">
+                                    <?php echo htmlspecialchars(substr($incident['location'], 0, 30)); ?>...
+                                </p>
+                            </div>
+                            <div class="text-right">
+                                <p class="text-xs text-gray-500">
+                                    <?php echo date('M d', strtotime($incident['reported_at'])); ?>
+                                </p>
+                                <p class="text-xs text-gray-400">
+                                    <?php echo date('h:i A', strtotime($incident['reported_at'])); ?>
+                                </p>
                             </div>
                         </div>
-                        <span class="h-2 w-2 rounded-full bg-green-500"></span>
                     </div>
-                    
-                    <div class="flex items-center justify-between p-3 bg-green-50 rounded-lg border border-green-100">
-                        <div class="flex items-center">
-                            <i class="fas fa-shield-alt text-green-500 mr-3"></i>
-                            <div>
-                                <p class="text-sm font-medium text-green-800">Evidence Encryption</p>
-                                <p class="text-xs text-green-700">Auto-encryption active</p>
-                            </div>
-                        </div>
-                        <span class="h-2 w-2 rounded-full bg-green-500"></span>
-                    </div>
-                    
-                    <div class="flex items-center justify-between p-3 bg-purple-50 rounded-lg border border-purple-100">
-                        <div class="flex items-center">
-                            <i class="fas fa-database text-purple-500 mr-3"></i>
-                            <div>
-                                <p class="text-sm font-medium text-purple-800">Chain of Custody</p>
-                                <p class="text-xs text-purple-700">All transfers logged</p>
-                            </div>
-                        </div>
-                        <span class="h-2 w-2 rounded-full bg-green-500"></span>
-                    </div>
+                    <?php endforeach; ?>
                 </div>
+                <?php else: ?>
+                <div class="text-center py-8">
+                    <p class="text-gray-500 text-sm">No incidents logged today</p>
+                </div>
+                <?php endif; ?>
             </div>
         </div>
     </div>
@@ -411,11 +425,30 @@ try {
     <!-- Data Security Notice -->
     <div class="mt-6 p-4 bg-gradient-to-r from-gray-50 to-gray-100 border border-gray-200 rounded-lg">
         <div class="flex items-center">
-            <i class="fas fa-info-circle text-blue-500 mr-3"></i>
+            <i class="fas fa-shield-alt text-blue-500 mr-3"></i>
             <div>
-                <p class="text-sm font-medium text-gray-800">Field Operations Data</p>
+                <p class="text-sm font-medium text-gray-800">Field Operations Data Protection</p>
                 <p class="text-xs text-gray-600">All operations are logged with timestamp, GPS location, and encrypted evidence files. Data integrity is maintained through automated audit trails.</p>
             </div>
         </div>
     </div>
 </div>
+
+<script>
+// Update duty status indicator
+function updateDutyStatus() {
+    const statusElement = document.querySelector('[class*="bg-green-100"], [class*="bg-gray-100"]');
+    if (statusElement && statusElement.textContent.includes('ON DUTY')) {
+        // Update time since clock in
+        const sinceText = statusElement.querySelector('.text-xs.text-gray-500');
+        if (sinceText && sinceText.textContent.includes('Since')) {
+            // In a real implementation, you would calculate the elapsed time
+            // For now, we'll just update the display every minute
+            setTimeout(updateDutyStatus, 60000);
+        }
+    }
+}
+
+// Start updating duty status
+updateDutyStatus();
+</script>

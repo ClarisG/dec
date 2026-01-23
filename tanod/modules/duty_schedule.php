@@ -1,5 +1,5 @@
 <?php
-// duty_schedule.php - Professional and Minimal Design
+// tanod/modules/duty_schedule.php - Professional Duty Schedule
 session_start();
 require_once __DIR__ . '/../../config/database.php';
 
@@ -160,7 +160,7 @@ try {
         LEFT JOIN patrol_areas a ON ts.patrol_area_id = a.id
         WHERE ts.user_id = ? AND ts.schedule_date > CURDATE() AND ts.active = 1
         ORDER BY ts.schedule_date ASC, ts.shift_start ASC
-        LIMIT 5
+        LIMIT 10
     ");
     $stmt->execute([$tanod_id]);
     $upcoming_schedules = $stmt->fetchAll();
@@ -186,11 +186,25 @@ try {
     $stmt->execute([$tanod_id]);
     $week_stats = $stmt->fetch();
     
+    // Recent duty logs
+    $stmt = $pdo->prepare("
+        SELECT dl.*, ts.shift_type, a.area_name 
+        FROM tanod_duty_logs dl
+        LEFT JOIN tanod_schedules ts ON dl.schedule_id = ts.id
+        LEFT JOIN patrol_areas a ON ts.patrol_area_id = a.id
+        WHERE dl.user_id = ? 
+        ORDER BY dl.clock_in DESC 
+        LIMIT 10
+    ");
+    $stmt->execute([$tanod_id]);
+    $duty_history = $stmt->fetchAll();
+    
 } catch (PDOException $e) {
     error_log("Duty Schedule Error: " . $e->getMessage());
     $current_duty = null;
     $today_schedule = [];
     $upcoming_schedules = [];
+    $duty_history = [];
     $stats = ['total_shifts' => 0, 'total_hours' => 0, 'avg_hours' => 0];
     $week_stats = ['week_hours' => 0];
 }
@@ -215,7 +229,7 @@ try {
             <div class="mb-4 md:mb-0">
                 <h3 class="text-lg font-bold text-gray-800 mb-3">Current Duty Status</h3>
                 <div class="flex items-center">
-                    <span class="w-3 h-3 rounded-full <?php echo $current_duty ? 'bg-green-500' : 'bg-gray-400'; ?> mr-3"></span>
+                    <span class="w-3 h-3 rounded-full <?php echo $current_duty ? 'bg-green-500 pulse-dot' : 'bg-gray-400'; ?> mr-3"></span>
                     <span class="text-xl font-bold <?php echo $current_duty ? 'text-green-600' : 'text-gray-600'; ?>">
                         <?php echo $current_duty ? 'ON DUTY' : 'OFF DUTY'; ?>
                     </span>
@@ -272,7 +286,7 @@ try {
     <!-- Stats and Schedule Grid -->
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <!-- Statistics -->
-        <div class="lg:col-span-1">
+        <div class="lg:col-span-1 space-y-6">
             <div class="bg-white rounded-xl shadow-sm p-5 border border-gray-200">
                 <h3 class="text-lg font-bold text-gray-800 mb-5">Performance Stats</h3>
                 <div class="space-y-5">
@@ -295,6 +309,40 @@ try {
                         </p>
                     </div>
                 </div>
+            </div>
+            
+            <!-- Duty History -->
+            <div class="bg-white rounded-xl shadow-sm p-5 border border-gray-200">
+                <h3 class="text-lg font-bold text-gray-800 mb-4">Recent Duty Logs</h3>
+                <?php if (!empty($duty_history)): ?>
+                <div class="space-y-3">
+                    <?php foreach ($duty_history as $log): ?>
+                    <div class="p-3 bg-gray-50 rounded-lg border border-gray-200">
+                        <div class="flex justify-between items-center">
+                            <div>
+                                <p class="text-sm font-medium text-gray-800">
+                                    <?php echo date('M d', strtotime($log['clock_in'])); ?>
+                                </p>
+                                <p class="text-xs text-gray-500">
+                                    <?php echo date('h:i A', strtotime($log['clock_in'])); ?> - 
+                                    <?php echo $log['clock_out'] ? date('h:i A', strtotime($log['clock_out'])) : 'Present'; ?>
+                                </p>
+                            </div>
+                            <div class="text-right">
+                                <p class="text-sm font-bold text-blue-600">
+                                    <?php echo $log['total_hours'] ? number_format($log['total_hours'], 1) . 'h' : 'Active'; ?>
+                                </p>
+                                <p class="text-xs text-gray-500"><?php echo $log['shift_type'] ?? 'Shift'; ?></p>
+                            </div>
+                        </div>
+                    </div>
+                    <?php endforeach; ?>
+                </div>
+                <?php else: ?>
+                <div class="text-center py-4">
+                    <p class="text-gray-500 text-sm">No duty logs found</p>
+                </div>
+                <?php endif; ?>
             </div>
         </div>
         
@@ -377,67 +425,67 @@ try {
                     </div>
                 <?php endif; ?>
             </div>
-        </div>
-    </div>
-    
-    <!-- Upcoming Schedule -->
-    <div class="bg-white rounded-xl shadow-sm p-5 border border-gray-200">
-        <div class="flex justify-between items-center mb-5">
-            <h3 class="text-lg font-bold text-gray-800">Upcoming Schedule</h3>
-            <span class="px-3 py-1 bg-gray-100 text-gray-700 text-sm font-medium rounded-full">
-                Next 5 Days
-            </span>
-        </div>
-        
-        <?php if(count($upcoming_schedules) > 0): ?>
-            <div class="overflow-x-auto">
-                <table class="min-w-full">
-                    <thead>
-                        <tr class="border-b border-gray-200">
-                            <th class="py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
-                            <th class="py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Shift</th>
-                            <th class="py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Time</th>
-                            <th class="py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Area</th>
-                            <th class="py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Route</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-gray-200">
-                        <?php foreach($upcoming_schedules as $schedule): ?>
-                            <tr class="hover:bg-gray-50">
-                                <td class="py-3 text-sm text-gray-700">
-                                    <?php echo date('D, M d', strtotime($schedule['schedule_date'])); ?>
-                                </td>
-                                <td class="py-3 text-sm font-medium text-gray-800">
-                                    <?php echo htmlspecialchars($schedule['shift_type']); ?>
-                                </td>
-                                <td class="py-3 text-sm text-gray-600">
-                                    <?php echo date('h:i A', strtotime($schedule['shift_start'])) . ' - ' . date('h:i A', strtotime($schedule['shift_end'])); ?>
-                                </td>
-                                <td class="py-3 text-sm text-gray-600">
-                                    <?php echo htmlspecialchars($schedule['area_name'] ?? 'TBA'); ?>
-                                </td>
-                                <td class="py-3 text-sm text-gray-600">
-                                    <?php echo htmlspecialchars($schedule['patrol_route'] ?? 'General'); ?>
-                                </td>
-                            </tr>
-                        <?php endforeach; ?>
-                    </tbody>
-                </table>
+            
+            <!-- Upcoming Schedule -->
+            <div class="bg-white rounded-xl shadow-sm p-5 border border-gray-200 mt-6">
+                <div class="flex justify-between items-center mb-5">
+                    <h3 class="text-lg font-bold text-gray-800">Upcoming Schedule</h3>
+                    <span class="px-3 py-1 bg-gray-100 text-gray-700 text-sm font-medium rounded-full">
+                        Next 10 Days
+                    </span>
+                </div>
+                
+                <?php if(count($upcoming_schedules) > 0): ?>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full">
+                            <thead>
+                                <tr class="border-b border-gray-200">
+                                    <th class="py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                                    <th class="py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Shift</th>
+                                    <th class="py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Time</th>
+                                    <th class="py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Area</th>
+                                    <th class="py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Route</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-200">
+                                <?php foreach($upcoming_schedules as $schedule): ?>
+                                    <tr class="hover:bg-gray-50">
+                                        <td class="py-3 text-sm text-gray-700">
+                                            <?php echo date('D, M d', strtotime($schedule['schedule_date'])); ?>
+                                        </td>
+                                        <td class="py-3 text-sm font-medium text-gray-800">
+                                            <?php echo htmlspecialchars($schedule['shift_type']); ?>
+                                        </td>
+                                        <td class="py-3 text-sm text-gray-600">
+                                            <?php echo date('h:i A', strtotime($schedule['shift_start'])) . ' - ' . date('h:i A', strtotime($schedule['shift_end'])); ?>
+                                        </td>
+                                        <td class="py-3 text-sm text-gray-600">
+                                            <?php echo htmlspecialchars($schedule['area_name'] ?? 'TBA'); ?>
+                                        </td>
+                                        <td class="py-3 text-sm text-gray-600">
+                                            <?php echo htmlspecialchars($schedule['patrol_route'] ?? 'General'); ?>
+                                        </td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                <?php else: ?>
+                    <div class="text-center py-8">
+                        <p class="text-gray-500 text-sm">No upcoming shifts scheduled</p>
+                    </div>
+                <?php endif; ?>
             </div>
-        <?php else: ?>
-            <div class="text-center py-8">
-                <p class="text-gray-500 text-sm">No upcoming shifts scheduled</p>
-            </div>
-        <?php endif; ?>
+        </div>
     </div>
     
     <!-- Data Protection Notice -->
-    <div class="p-4 bg-gradient-to-r from-gray-50 to-gray-100 border border-gray-200 rounded-lg">
+    <div class="mt-6 p-4 bg-gradient-to-r from-gray-50 to-gray-100 border border-gray-200 rounded-lg">
         <div class="flex items-center">
             <i class="fas fa-shield-alt text-blue-500 mr-3"></i>
             <div>
                 <p class="text-sm font-medium text-gray-800">Duty Data Protection</p>
-                <p class="text-xs text-gray-600">All duty logs include GPS coordinates, timestamps, and shift details for audit compliance.</p>
+                <p class="text-xs text-gray-600">All duty logs include GPS coordinates, timestamps, and shift details for audit compliance and real-time monitoring.</p>
             </div>
         </div>
     </div>

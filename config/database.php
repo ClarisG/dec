@@ -20,10 +20,8 @@ function getDbConnection() {
             $conn->setAttribute(PDO::ATTR_PERSISTENT, false);
             
         } catch(PDOException $e) {
-            // Log error
             error_log("[" . date('Y-m-d H:i:s') . "] Database Connection Error: " . $e->getMessage());
             
-            // Show user-friendly message with debug info if enabled
             if (defined('DEBUG_MODE') && DEBUG_MODE) {
                 die("Database connection failed: " . $e->getMessage() . 
                     "<br>Host: " . DB_HOST . 
@@ -41,7 +39,6 @@ function getDbConnection() {
 try {
     $conn = getDbConnection();
 } catch(Exception $e) {
-    // Handle initialization error
     if (defined('DEBUG_MODE') && DEBUG_MODE) {
         die("Application initialization failed: " . $e->getMessage());
     } else {
@@ -49,6 +46,5 @@ try {
     }
 }
 
-// Make connection globally available
 return $conn;
 ?>
