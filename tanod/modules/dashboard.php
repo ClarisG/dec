@@ -91,6 +91,7 @@ try {
     
 } catch (PDOException $e) {
     error_log("Dashboard Error: " . $e->getMessage());
+        $duty_status = 'off_duty'; 
     $pending_reports = $assigned_reports = $today_incidents = $active_patrols = 0;
     $announcements = $recent_incidents = [];
 }
