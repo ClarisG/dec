@@ -16,10 +16,16 @@ $barangay_id = $_SESSION['barangay_id'] ?? null;
 
 $pdo = getDbConnection();
 
-// Handle clock in/out
+// Initialize variables with default values
+$week_start = date('Y-m-d', strtotime('monday this week'));
+$week_end = date('Y-m-d', strtotime('sunday this week'));
+$current_duty = null;
+$weekly_schedule = [];
+$duty_stats = ['total_shifts' => 0, 'total_hours' => 0, 'avg_duration' => 0];
 $message = '';
 $message_type = '';
 
+// Handle clock in/out
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (isset($_POST['clock_in'])) {
         try {
@@ -150,9 +156,6 @@ try {
     $current_duty = $status_stmt->fetch(PDO::FETCH_ASSOC);
     
     // Get this week's schedule
-    $week_start = date('Y-m-d', strtotime('monday this week'));
-    $week_end = date('Y-m-d', strtotime('sunday this week'));
-    
     $schedule_stmt = $pdo->prepare("
         SELECT pa.*, pr.route_name, pr.checkpoints,
                s.shift_start, s.shift_end, s.shift_name
@@ -181,9 +184,7 @@ try {
     
 } catch (PDOException $e) {
     error_log("Duty Schedule Error: " . $e->getMessage());
-    $current_duty = null;
-    $weekly_schedule = [];
-    $duty_stats = ['total_shifts' => 0, 'total_hours' => 0, 'avg_duration' => 0];
+    // Variables already have default values from initialization above
 }
 ?>
 
