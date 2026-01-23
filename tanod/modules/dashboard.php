@@ -197,44 +197,7 @@ try {
     </style>
 </head>
 <body class="bg-gradient-to-br from-blue-50 to-indigo-50 min-h-screen">
-    <div class="max-w-7xl mx-auto p-4">
-        <!-- Header -->
-        <div class="glass-card rounded-2xl shadow-xl mb-6 overflow-hidden">
-            <div class="bg-gradient-to-r from-blue-700 to-indigo-800 p-6">
-                <div class="flex flex-col md:flex-row justify-between items-start md:items-center">
-                    <div>
-                        <h1 class="text-2xl md:text-3xl font-bold text-white">
-                            <i class="fas fa-shield-alt mr-3"></i>
-                            Tanod / Law Enforcement Dashboard
-                        </h1>
-                        <p class="text-blue-100 mt-2">Field operations, evidence collection, and initial report verification</p>
-                    </div>
-                    <div class="mt-4 md:mt-0">
-                        <div class="flex items-center space-x-4">
-                            <div class="relative">
-                                <div class="w-16 h-16 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center text-white text-xl font-bold">
-                                    <?php echo strtoupper(substr($tanod_name, 0, 2)); ?>
-                                </div>
-                                <?php if ($duty_status === 'on_duty'): ?>
-                                <span class="absolute -bottom-1 -right-1 w-6 h-6 bg-green-500 rounded-full border-2 border-white"></span>
-                                <?php endif; ?>
-                            </div>
-                            <div class="text-right">
-                                <p class="text-white text-sm">Tanod Officer</p>
-                                <p class="text-white font-bold text-lg"><?php echo htmlspecialchars($tanod_name); ?></p>
-                                <div class="mt-2">
-                                    <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium <?php echo $duty_status === 'on_duty' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'; ?>">
-                                        <span class="w-2 h-2 mr-2 rounded-full <?php echo $duty_status === 'on_duty' ? 'bg-green-500' : 'bg-gray-500'; ?>"></span>
-                                        <?php echo $duty_status === 'on_duty' ? 'ON DUTY' : 'OFF DUTY'; ?>
-                                    </span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
+    <div class="max-w-7xl mx-auto p-4">        
         <!-- Critical Data Handled -->
         <div class="mb-6 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border-l-4 border-blue-500 rounded-lg">
             <div class="flex items-center">
