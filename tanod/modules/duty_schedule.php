@@ -260,30 +260,6 @@ try {
 </head>
 <body class="bg-gradient-to-br from-blue-50 to-indigo-50 min-h-screen">
     <div class="max-w-7xl mx-auto p-4">
-        <!-- Header -->
-        <div class="glass-card rounded-2xl shadow-xl mb-6 overflow-hidden">
-            <div class="bg-gradient-to-r from-blue-700 to-indigo-800 p-6">
-                <div class="flex flex-col md:flex-row justify-between items-start md:items-center">
-                    <div>
-                        <h1 class="text-2xl md:text-3xl font-bold text-white">
-                            <i class="fas fa-calendar-alt mr-3"></i>
-                            My Duty & Patrol Schedule
-                        </h1>
-                        <p class="text-blue-100 mt-2">View assigned shifts and designated patrol routes</p>
-                    </div>
-                    <div class="mt-4 md:mt-0">
-                        <div class="flex items-center space-x-4">
-                            <div class="text-right">
-                                <p class="text-white text-sm">Tanod Officer</p>
-                                <p class="text-white font-bold"><?php echo htmlspecialchars($tanod_name); ?></p>
-                                <p class="text-white text-xs mt-1">ID: TAN-<?php echo str_pad($tanod_id, 4, '0', STR_PAD_LEFT); ?></p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
         <!-- Alerts -->
         <?php if ($message): ?>
         <div class="mb-6 p-4 rounded-lg border-l-4 
@@ -297,16 +273,6 @@ try {
             </div>
         </div>
         <?php endif; ?>
-        
-        <!-- Critical Data Handled -->
-        <div class="mb-6 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border-l-4 border-blue-500 rounded-lg">
-            <div class="flex items-center">
-                <i class="fas fa-shield-alt text-blue-500 text-xl mr-3"></i>
-                <div>
-                    <p class="text-sm font-bold text-blue-800">Critical Data Handled: Shift times, Assigned patrol routes, Real-time status (On-Duty/Off-Duty)</p>
-                </div>
-            </div>
-        </div>
         
         <!-- Main Content Grid -->
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">

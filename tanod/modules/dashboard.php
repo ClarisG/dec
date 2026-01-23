@@ -198,15 +198,7 @@ try {
 </head>
 <body class="bg-gradient-to-br from-blue-50 to-indigo-50 min-h-screen">
     <div class="max-w-7xl mx-auto p-4">        
-        <!-- Critical Data Handled -->
-        <div class="mb-6 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border-l-4 border-blue-500 rounded-lg">
-            <div class="flex items-center">
-                <i class="fas fa-database text-blue-500 text-xl mr-3"></i>
-                <div>
-                    <p class="text-sm font-bold text-blue-800">Critical Data Handled: Field-observed incident details, GPS location, Evidence chain of custody, Verification notes</p>
-                </div>
-            </div>
-        </div>
+    
         
         <!-- Quick Stats -->
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
@@ -269,17 +261,7 @@ try {
             <div class="lg:col-span-2">
                 <!-- Tanod Modules Grid -->
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                    <!-- Module 1: My Duty & Patrol Schedule -->
-                    <a href="?module=duty_schedule" class="module-card bg-white rounded-xl shadow-lg p-6 hover:shadow-xl transition-all duration-300">
-                        <div class="flex items-center mb-4">
-                            <div class="w-12 h-12 bg-gradient-to-r from-blue-500 to-blue-600 rounded-lg flex items-center justify-center">
-                                <i class="fas fa-calendar-alt text-white text-xl"></i>
-                            </div>
-                            <div class="ml-4">
-                                <h3 class="text-lg font-bold text-gray-800">My Duty & Patrol Schedule</h3>
-                                <p class="text-sm text-gray-600">View assigned shifts and routes</p>
-                            </div>
-                        </div>
+    
                         <div class="mt-4">
                             <div class="flex items-center text-sm text-gray-500">
                                 <i class="fas fa-clock mr-2"></i>

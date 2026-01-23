@@ -515,34 +515,7 @@ function addActivityLog($pdo, $user_id, $action, $description) {
 </head>
 <body class="bg-gradient-to-br from-gray-50 to-blue-50 min-h-screen p-4">
     <div class="max-w-7xl mx-auto">
-        <!-- Header -->
-        <div class="glass-card rounded-2xl shadow-xl mb-6 overflow-hidden">
-            <div class="bg-gradient-to-r from-blue-700 to-indigo-800 p-6">
-                <div class="flex flex-col md:flex-row justify-between items-start md:items-center">
-                    <div>
-                        <h1 class="text-2xl md:text-3xl font-bold text-white">
-                            <i class="fas fa-boxes mr-3"></i>
-                            Evidence Handover Log
-                        </h1>
-                        <p class="text-blue-100 mt-2">Formal log for transferring physical evidence ensuring clean Chain of Custody</p>
-                    </div>
-                    <div class="mt-4 md:mt-0">
-                        <div class="flex items-center space-x-4">
-                            <div class="text-right">
-                                <p class="text-white text-sm">Logged in as:</p>
-                                <p class="text-white font-bold">
-                                    <?php echo htmlspecialchars($tanod_name); ?>
-                                    <span class="role-badge badge-tanod ml-2">Tanod</span>
-                                </p>
-                                <p class="text-white text-xs mt-1">
-                                    ID: TAN-<?php echo str_pad($tanod_id, 4, '0', STR_PAD_LEFT); ?>
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            
+    
             <!-- Stats Bar -->
             <div class="bg-white p-4 border-b">
                 <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -596,17 +569,6 @@ function addActivityLog($pdo, $user_id, $action, $description) {
         </div>
         <?php endif; ?>
         
-        <!-- Critical Data Handled Info -->
-        <div class="mb-6 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border-l-4 border-indigo-500 rounded-lg">
-            <div class="flex items-center">
-                <i class="fas fa-shield-alt text-indigo-500 text-xl mr-3"></i>
-                <div>
-                    <p class="text-sm font-bold text-indigo-800">Critical Data Handled</p>
-                    <p class="text-xs text-indigo-700">Item description, Date/Time of handover, Recipient's acknowledgement, Chain of Custody</p>
-                </div>
-            </div>
-        </div>
-
         <!-- Main Content Grid -->
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <!-- Left Column: New Handover Form -->
