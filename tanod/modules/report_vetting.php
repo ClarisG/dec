@@ -538,34 +538,6 @@ function addActivityLog($pdo, $user_id, $action, $description) {
 </head>
 <body class="bg-gradient-to-br from-gray-50 to-green-50 min-h-screen p-4">
     <div class="max-w-7xl mx-auto">
-        <!-- Header -->
-        <div class="glass-card rounded-2xl shadow-xl mb-6 overflow-hidden">
-            <div class="bg-gradient-to-r from-green-600 to-emerald-700 p-6">
-                <div class="flex flex-col md:flex-row justify-between items-start md:items-center">
-                    <div>
-                        <h1 class="text-2xl md:text-3xl font-bold text-white">
-                            <i class="fas fa-user-check mr-3"></i>
-                            Witness & Report Vetting Queue
-                        </h1>
-                        <p class="text-green-100 mt-2">Review incoming Citizen Reports flagged for field verification</p>
-                    </div>
-                    <div class="mt-4 md:mt-0">
-                        <div class="flex items-center space-x-4">
-                            <div class="text-right">
-                                <p class="text-white text-sm">Logged in as:</p>
-                                <p class="text-white font-bold">
-                                    <?php echo htmlspecialchars($tanod_name); ?>
-                                    <span class="bg-white/20 px-2 py-1 rounded-full text-xs ml-2">Tanod</span>
-                                </p>
-                                <p class="text-white text-xs mt-1">
-                                    ID: TAN-<?php echo str_pad($tanod_id, 4, '0', STR_PAD_LEFT); ?>
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            
             <!-- Stats Bar -->
             <div class="bg-white p-4 border-b">
                 <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
