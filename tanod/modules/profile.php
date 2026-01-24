@@ -16,17 +16,32 @@ $barangay_id = $_SESSION['barangay_id'] ?? null;
 
 $pdo = getDbConnection();
 
-// Get tanod details
+// Get tanod details - REMOVED barangays JOIN since table doesn't exist
 $stmt = $pdo->prepare("
-    SELECT u.*, b.name as barangay_name,
+    SELECT u.*,
            (SELECT COUNT(*) FROM tanod_duty_logs WHERE user_id = u.id AND MONTH(clock_in) = MONTH(CURDATE())) as monthly_shifts,
            (SELECT AVG(TIMESTAMPDIFF(HOUR, clock_in, COALESCE(clock_out, NOW()))) FROM tanod_duty_logs WHERE user_id = u.id) as avg_duty_hours
     FROM users u
-    LEFT JOIN barangays b ON u.barangay_id = b.id
     WHERE u.id = ?
 ");
 $stmt->execute([$tanod_id]);
 $tanod = $stmt->fetch(PDO::FETCH_ASSOC);
+
+// Get barangay name separately if needed (optional)
+$barangay_name = 'Not assigned';
+if ($barangay_id) {
+    try {
+        // Check if barangays table exists before querying
+        $barangay_stmt = $pdo->prepare("SELECT name FROM barangays WHERE id = ?");
+        $barangay_stmt->execute([$barangay_id]);
+        if ($barangay_data = $barangay_stmt->fetch(PDO::FETCH_ASSOC)) {
+            $barangay_name = $barangay_data['name'];
+        }
+    } catch (Exception $e) {
+        // Table doesn't exist, keep default value
+        error_log("Barangay table not accessible: " . $e->getMessage());
+    }
+}
 
 $message = '';
 $message_type = '';
@@ -158,7 +173,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 // Get performance statistics
 try {
-    // Monthly performance
+    // Monthly performance - REMOVED barangays reference
     $perf_stmt = $pdo->prepare("
         SELECT 
             COUNT(DISTINCT r.id) as reports_vetted,
@@ -473,8 +488,8 @@ try {
                         
                         <div class="grid grid-cols-2 gap-4">
                             <div class="p-3 bg-gray-50 rounded-lg">
-                                <p class="text-xs text-gray-500">Barangay</p>
-                                <p class="font-medium text-gray-800"><?php echo htmlspecialchars($tanod['barangay_name'] ?? 'Not assigned'); ?></p>
+                                <p class="text-xs text-gray-500">Barangay ID</p>
+                                <p class="font-medium text-gray-800"><?php echo htmlspecialchars($tanod['barangay_id'] ?? 'Not assigned'); ?></p>
                             </div>
                             
                             <div class="p-3 bg-gray-50 rounded-lg">
