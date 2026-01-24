@@ -479,7 +479,6 @@ function getModuleTitle($module) {
                 </div>
                 <div>
                     <h1 class="text-xl font-bold text-white">LEIR</h1>
-                    <p class="text-xs text-blue-300">Local Emergency & Incident Reporting</p>
                 </div>
             </div>
         </div>
