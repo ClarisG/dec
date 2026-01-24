@@ -259,25 +259,7 @@ try {
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <!-- Left Column: Tanod Modules -->
             <div class="lg:col-span-2">
-                <!-- Tanod Modules Grid -->
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-    
-                        <div class="mt-4">
-                            <div class="flex items-center text-sm text-gray-500">
-                                <i class="fas fa-clock mr-2"></i>
-                                <span>Real-time status tracker</span>
-                            </div>
-                            <div class="flex items-center text-sm text-gray-500 mt-2">
-                                <i class="fas fa-map-marked-alt mr-2"></i>
-                                <span>Assigned patrol routes</span>
-                            </div>
-                        </div>
-                        <div class="mt-6">
-                            <span class="inline-flex items-center text-blue-600 font-medium">
-                                Open Module <i class="fas fa-arrow-right ml-2"></i>
-                            </span>
-                        </div>
-                    </a>
+
                     
                     <!-- Module 2: Incident Logging -->
                     <a href="?module=incident_logging" class="module-card bg-white rounded-xl shadow-lg p-6 hover:shadow-xl transition-all duration-300">
