@@ -470,34 +470,6 @@ try {
                         </div>
                     <?php endif; ?>
                 </div>
-                
-                <!-- System Status -->
-                <div class="bg-gradient-to-r from-blue-600 to-indigo-700 rounded-xl shadow-lg p-6 text-white">
-                    <h3 class="text-lg font-bold mb-4">System Status</h3>
-                    <div class="space-y-3">
-                        <div class="flex items-center">
-                            <i class="fas fa-wifi mr-3 text-green-300"></i>
-                            <div>
-                                <p class="text-sm font-medium">Connection</p>
-                                <p class="text-xs text-blue-100">Online & Secure</p>
-                            </div>
-                        </div>
-                        <div class="flex items-center">
-                            <i class="fas fa-database mr-3 text-green-300"></i>
-                            <div>
-                                <p class="text-sm font-medium">Data Sync</p>
-                                <p class="text-xs text-blue-100">Real-time updates</p>
-                            </div>
-                        </div>
-                        <div class="flex items-center">
-                            <i class="fas fa-shield-alt mr-3 text-green-300"></i>
-                            <div>
-                                <p class="text-sm font-medium">Security</p>
-                                <p class="text-xs text-blue-100">Encryption Active</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
             </div>
         </div>
         
