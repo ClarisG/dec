@@ -1,6 +1,11 @@
 <?php
 // incident_logging.php - Professional Field Incident Reporting
-session_start();
+
+// Check if session is already started before starting it
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
 require_once __DIR__ . '/../../config/database.php';
 
 if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'tanod') {
@@ -94,7 +99,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         // Encrypt if PIN provided
                         $encryption_key = $_POST['pin'] ?? null;
                         if ($encryption_key && strlen($encryption_key) === 4) {
-                            // Encryption logic here
+                            // Encryption logic here (you'll need to implement this)
                         }
                         
                         $file_stmt = $pdo->prepare("
