@@ -127,17 +127,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 ?>
 
 <div class="space-y-6">
-    <!-- Header -->
-    <div class="flex justify-between items-start mb-2">
-        <div>
-            <h2 class="text-xl font-bold text-gray-800">Incident Logging</h2>
-            <p class="text-gray-600 text-sm mt-1">Quick field form for incidents witnessed during patrol</p>
-        </div>
-        <div class="text-right">
-            <p class="text-sm font-medium text-gray-800"><?php echo htmlspecialchars($tanod_name); ?></p>
-            <p class="text-xs text-gray-500">ID: TAN-<?php echo str_pad($tanod_id, 4, '0', STR_PAD_LEFT); ?></p>
-        </div>
-    </div>
     
     <!-- Alerts -->
     <?php if (isset($success)): ?>
