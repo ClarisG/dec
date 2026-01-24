@@ -17,6 +17,6 @@ session_destroy();
 setcookie('remember_token', '', time()-3600, '/');
 
 // Redirect to login page
-header("Location: index.php");
+header("Location: login.php");
 exit();
 ?>
