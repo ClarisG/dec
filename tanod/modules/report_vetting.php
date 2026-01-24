@@ -591,16 +591,6 @@ function addActivityLog($pdo, $user_id, $action, $description) {
         </div>
         <?php endif; ?>
         
-        <!-- Critical Data Handled Info -->
-        <div class="mb-6 p-4 bg-gradient-to-r from-green-50 to-emerald-50 border-l-4 border-emerald-500 rounded-lg">
-            <div class="flex items-center">
-                <i class="fas fa-shield-alt text-emerald-500 text-xl mr-3"></i>
-                <div>
-                    <p class="text-sm font-bold text-emerald-800">Critical Data Handled</p>
-                    <p class="text-xs text-emerald-700">Citizen report details, Tanod verification notes, Recommendation status, GPS location verification</p>
-                </div>
-            </div>
-        </div>
 
         <!-- Main Content Grid -->
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
