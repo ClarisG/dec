@@ -11,34 +11,87 @@ if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'secretary') {
 $db_error = null;
 $conn = null;
 
+// Try multiple paths to find the database configuration
+$possible_paths = [
+    dirname(dirname(dirname(__DIR__))) . '/config/database.php', // public_html/config/database.php
+    dirname(dirname(__DIR__)) . '/config/database.php', // sec/config/database.php
+    $_SERVER['DOCUMENT_ROOT'] . '/config/database.php',
+    $_SERVER['DOCUMENT_ROOT'] . '/../config/database.php',
+    __DIR__ . '/../../../config/database.php',
+    __DIR__ . '/../../../../config/database.php'
+];
+
+$config_found = false;
+$db_config_path = '';
+
+foreach ($possible_paths as $path) {
+    if (file_exists($path)) {
+        $config_found = true;
+        $db_config_path = $path;
+        break;
+    }
+}
+
 try {
-    // Include database configuration using correct relative path
-    require_once __DIR__ . '/../../../config/database.php';
-    
-    // Test connection
-    if ($conn) {
+    if ($config_found) {
+        require_once $db_config_path;
+        
+        // Test connection
+        if ($conn) {
+            $test_query = "SELECT 1 as test";
+            $test_stmt = $conn->query($test_query);
+            $test_result = $test_stmt->fetch();
+            
+            if (!$test_result || $test_result['test'] != 1) {
+                throw new Exception("Database test query failed");
+            }
+            
+            // Check if required tables exist
+            $tables = ['reports', 'users'];
+            foreach ($tables as $table) {
+                $check_stmt = $conn->query("SHOW TABLES LIKE '$table'");
+                if ($check_stmt->rowCount() == 0) {
+                    throw new Exception("Required table '$table' not found in database");
+                }
+            }
+        } else {
+            // Try to create connection directly if database.php didn't create it
+            require_once dirname(dirname(dirname(__DIR__))) . '/config/config.php';
+            
+            $dsn = "mysql:host=" . DB_HOST . ";port=" . DB_PORT . ";dbname=" . DB_NAME . ";charset=utf8mb4";
+            $conn = new PDO($dsn, DB_USER, DB_PASS);
+            
+            // Set PDO attributes
+            $conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+            $conn->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
+            $conn->setAttribute(PDO::ATTR_EMULATE_PREPARES, false);
+            $conn->setAttribute(PDO::ATTR_PERSISTENT, false);
+        }
+    } else {
+        // If no config file found, try to connect directly using hardcoded credentials
+        // WARNING: This is not secure for production - only for debugging
+        $dsn = "mysql:host=153.92.15.81;port=3306;dbname=u514031374_leir;charset=utf8mb4";
+        $conn = new PDO($dsn, 'u514031374_leir', 'leirP@55w0rd');
+        
+        // Set PDO attributes
+        $conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+        $conn->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
+        $conn->setAttribute(PDO::ATTR_EMULATE_PREPARES, false);
+        $conn->setAttribute(PDO::ATTR_PERSISTENT, false);
+        
+        // Test the direct connection
         $test_query = "SELECT 1 as test";
         $test_stmt = $conn->query($test_query);
         $test_result = $test_stmt->fetch();
         
         if (!$test_result || $test_result['test'] != 1) {
-            throw new Exception("Database test query failed");
+            throw new Exception("Database test query failed with direct connection");
         }
-        
-        // Check if required tables exist
-        $tables = ['reports', 'users'];
-        foreach ($tables as $table) {
-            $check_stmt = $conn->query("SHOW TABLES LIKE '$table'");
-            if ($check_stmt->rowCount() == 0) {
-                throw new Exception("Required table '$table' not found in database");
-            }
-        }
-    } else {
-        throw new Exception("Database connection is null");
     }
     
 } catch (Exception $e) {
     $db_error = $e->getMessage();
+    error_log("Database connection error in case.php: " . $e->getMessage());
 }
 
 // Set current filter values from GET parameters
@@ -74,6 +127,9 @@ $total_records = 0;
                         <li>Database <code class="bg-red-100 px-1">u514031374_leir</code> exists</li>
                     </ul>
                     <p class="mt-3 text-red-600 font-medium">Error: <?php echo htmlspecialchars($db_error); ?></p>
+                    <?php if (!$config_found && $db_config_path): ?>
+                    <p class="mt-2 text-red-600">Config path tried: <?php echo htmlspecialchars($db_config_path); ?></p>
+                    <?php endif; ?>
                 </div>
                 <div class="mt-4">
                     <button onclick="retryConnection()" 
