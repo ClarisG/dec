@@ -1,6 +1,5 @@
 <?php
 // sec/modules/case.php - Fixed Database Connection with better error handling
-session_start();
 
 // Check if user is logged in
 if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'secretary') {
@@ -13,8 +12,8 @@ $db_error = null;
 $conn = null;
 
 try {
-    // Include database configuration
-    require_once '../../config/database.php';
+    // Include database configuration using correct relative path
+    require_once __DIR__ . '/../../../config/database.php';
     
     // Test connection
     if ($conn) {
