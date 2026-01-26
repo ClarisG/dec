@@ -250,16 +250,6 @@ $total_records = 0;
     <div class="glass-card rounded-xl p-6">
         <div class="flex justify-between items-center mb-4">
             <h3 class="text-xl font-bold text-gray-800">Filter Reports</h3>
-            <div class="flex space-x-2">
-                <button id="filterAll" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
-                    All Reports
-                </button>
-                <button id="filterBarangay" class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors">
-                    Barangay Matters
-                </button>
-                <button id="filterPolice" class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors">
-                    Police Matters
-                </button>
             </div>
         </div>
         
@@ -1494,4 +1484,3 @@ function getCategoryClass($category) {
     }
 }
 ?>
-[file content end]
