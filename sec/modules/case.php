@@ -323,10 +323,10 @@ $availableOfficers = $conn ? getAvailableOfficers($conn) : [];
                        class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
             </div>
             <div class="flex items-end space-x-2">
-                <button type="button" id="clearFilter" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors">
+                <button type="button" onclick="resetFilters()" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors">
                     <i class="fas fa-times mr-1"></i> Clear
                 </button>
-                <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+                <button type="button" onclick="applyFilters()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
                     <i class="fas fa-filter mr-1"></i> Filter
                 </button>
             </div>
@@ -604,7 +604,7 @@ $availableOfficers = $conn ? getAvailableOfficers($conn) : [];
                 <div class="mb-6">
                     <h4 class="font-medium text-gray-800 mb-3">Select Officer Type</h4>
                     <div class="grid grid-cols-2 gap-3 mb-6" id="officerTypeSelection">
-                        <div class="assignment-option active" data-type="lupon">
+                        <div class="assignment-option active" data-type="lupon" onclick="updateOfficerTypeSelection(this, 'lupon')">
                             <div class="flex items-center">
                                 <div class="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center mr-3">
                                     <i class="fas fa-user-tie text-green-600"></i>
@@ -615,7 +615,7 @@ $availableOfficers = $conn ? getAvailableOfficers($conn) : [];
                                 </div>
                             </div>
                         </div>
-                        <div class="assignment-option" data-type="tanod">
+                        <div class="assignment-option" data-type="tanod" onclick="updateOfficerTypeSelection(this, 'tanod')">
                             <div class="flex items-center">
                                 <div class="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center mr-3">
                                     <i class="fas fa-shield-alt text-blue-600"></i>
@@ -685,7 +685,8 @@ $availableOfficers = $conn ? getAvailableOfficers($conn) : [];
                              data-officer-id="<?php echo $officer['id']; ?>" 
                              data-officer-type="<?php echo $officerType; ?>"
                              data-officer-role="<?php echo $role; ?>"
-                             style="<?php echo $officerType == 'tanod' ? 'display: none;' : ''; ?>">
+                             style="<?php echo $officerType == 'tanod' ? 'display: none;' : ''; ?>"
+                             onclick="selectOfficer(this)">
                             <div class="flex items-center justify-between">
                                 <div>
                                     <h5 class="font-medium officer-name"><?php echo $officerName; ?></h5>
@@ -921,7 +922,6 @@ let selectedOfficerRole = null;
 
 // Initialize when page loads
 document.addEventListener('DOMContentLoaded', function() {
-    setupFilterListeners();
     
     // Update page indicators
     document.getElementById('currentPage').textContent = currentPage;
@@ -935,26 +935,6 @@ document.addEventListener('DOMContentLoaded', function() {
         selectedOfficerRole = firstOfficer.getAttribute('data-officer-role');
     }
 });
-
-// Setup filter listeners - FIXED
-function setupFilterListeners() {
-    // Filter form submission
-    const filterForm = document.getElementById('filterForm');
-    if (filterForm) {
-        filterForm.addEventListener('submit', function(e) {
-            e.preventDefault();
-            applyFilters();
-        });
-    }
-
-    // Clear filter button - FIXED
-    const clearFilterBtn = document.getElementById('clearFilter');
-    if (clearFilterBtn) {
-        clearFilterBtn.addEventListener('click', function() {
-            resetFilters();
-        });
-    }
-}
 
 function applyFilters() {
     const form = document.getElementById('filterForm');
@@ -1075,9 +1055,6 @@ function openAssignmentModal(caseId) {
     const modal = document.getElementById('assignmentModal');
     modal.classList.remove('hidden');
     modal.classList.add('flex');
-    
-    // Setup event listeners
-    setupAssignmentListeners();
 }
 
 function closeAssignmentModal() {
@@ -1089,46 +1066,37 @@ function closeAssignmentModal() {
     selectedOfficerType = null;
 }
 
-function setupAssignmentListeners() {
-    // Officer type selection - FIXED
-    document.querySelectorAll('.assignment-option').forEach(option => {
-        option.addEventListener('click', function() {
-            const type = this.getAttribute('data-type');
-            
-            // Update active class
-            document.querySelectorAll('.assignment-option').forEach(opt => {
-                opt.classList.remove('active');
-            });
-            this.classList.add('active');
-            
-            // Filter officers by type
-            updateOfficerListForType(type);
-        });
+function updateOfficerTypeSelection(element, type) {
+    // Update active class for officer type
+    document.querySelectorAll('.assignment-option').forEach(opt => {
+        opt.classList.remove('active');
     });
-    
-    // Officer selection - FIXED
-    document.querySelectorAll('.officer-item').forEach(item => {
-        item.addEventListener('click', function() {
-            const officerId = this.getAttribute('data-officer-id');
-            const officerType = this.getAttribute('data-officer-type');
-            const officerRole = this.getAttribute('data-officer-role');
-            
-            // Update active class
-            document.querySelectorAll('.officer-item').forEach(officer => {
-                officer.classList.remove('active');
-            });
-            this.classList.add('active');
-            
-            // Update selection
-            selectedOfficerId = officerId;
-            selectedOfficerType = officerType;
-            selectedOfficerRole = officerRole;
-            
-            // Update selection info
-            updateSelectionInfo();
-        });
-    });
+    element.classList.add('active');
+
+    // Filter officers by type
+    updateOfficerListForType(type);
 }
+
+function selectOfficer(element) {
+    const officerId = element.getAttribute('data-officer-id');
+    const officerType = element.getAttribute('data-officer-type');
+    const officerRole = element.getAttribute('data-officer-role');
+
+    // Update active class for officer item
+    document.querySelectorAll('.officer-item').forEach(officer => {
+        officer.classList.remove('active');
+    });
+    element.classList.add('active');
+
+    // Update selection
+    selectedOfficerId = officerId;
+    selectedOfficerType = officerType;
+    selectedOfficerRole = officerRole;
+
+    // Update selection info
+    updateSelectionInfo();
+}
+
 
 function updateOfficerListForType(type) {
     // Show/hide officers based on type

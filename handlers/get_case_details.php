@@ -12,7 +12,7 @@ try {
                u.last_name,
                u.contact_number,
                u.email,
-               u.address,
+               u.permanent_address as address,
                r.created_at as report_date
         FROM reports r 
         LEFT JOIN users u ON r.user_id = u.id 
