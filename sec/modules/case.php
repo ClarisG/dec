@@ -154,7 +154,11 @@ $total_records = 0;
     </div>
     <?php endif; ?>
     
-   
+    <!-- Header Section -->
+    <div class="glass-card rounded-xl p-6">
+        <div class="flex justify-between items-center mb-6">
+            </div>
+        
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
             <div class="bg-blue-50 p-4 rounded-lg">
                 <div class="flex items-center">
