@@ -203,7 +203,8 @@ $availableOfficers = $conn ? getAvailableOfficers($conn) : [];
                             <?php
                             if (!$db_error && $conn) {
                                 try {
-                                    $query = "SELECT COUNT(*) as count FROM reports WHERE status != 'closed'";
+                                    // FIXED: Include all non-closed cases including pending, assigned, in_progress, resolved
+                                    $query = "SELECT COUNT(*) as count FROM reports WHERE status NOT IN ('closed', 'referred')";
                                     $stmt = $conn->prepare($query);
                                     $stmt->execute();
                                     $result = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -231,7 +232,8 @@ $availableOfficers = $conn ? getAvailableOfficers($conn) : [];
                             <?php
                             if (!$db_error && $conn) {
                                 try {
-                                    $query = "SELECT COUNT(*) as count FROM reports WHERE status = 'pending'";
+                                    // FIXED: Include all pending statuses
+                                    $query = "SELECT COUNT(*) as count FROM reports WHERE status IN ('pending', 'pending_field_verification')";
                                     $stmt = $conn->prepare($query);
                                     $stmt->execute();
                                     $result = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -290,9 +292,11 @@ $availableOfficers = $conn ? getAvailableOfficers($conn) : [];
                 <select name="status" class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
                     <option value="">All Status</option>
                     <option value="pending" <?php echo ($currentFilter['status'] ?? '') === 'pending' ? 'selected' : ''; ?>>Pending</option>
+                    <option value="pending_field_verification" <?php echo ($currentFilter['status'] ?? '') === 'pending_field_verification' ? 'selected' : ''; ?>>Pending Verification</option>
                     <option value="assigned" <?php echo ($currentFilter['status'] ?? '') === 'assigned' ? 'selected' : ''; ?>>Assigned</option>
-                    <option value="in_progress" <?php echo ($currentFilter['status'] ?? '') === 'in_progress' ? 'selected' : ''; ?>>In Progress</option>
+                    <option value="investigating" <?php echo ($currentFilter['status'] ?? '') === 'investigating' ? 'selected' : ''; ?>>Investigating</option>
                     <option value="resolved" <?php echo ($currentFilter['status'] ?? '') === 'resolved' ? 'selected' : ''; ?>>Resolved</option>
+                    <option value="referred" <?php echo ($currentFilter['status'] ?? '') === 'referred' ? 'selected' : ''; ?>>Referred</option>
                     <option value="closed" <?php echo ($currentFilter['status'] ?? '') === 'closed' ? 'selected' : ''; ?>>Closed</option>
                 </select>
             </div>
@@ -305,6 +309,7 @@ $availableOfficers = $conn ? getAvailableOfficers($conn) : [];
                     <option value="Criminal" <?php echo ($currentFilter['category'] ?? '') === 'Criminal' ? 'selected' : ''; ?>>Criminal</option>
                     <option value="Civil" <?php echo ($currentFilter['category'] ?? '') === 'Civil' ? 'selected' : ''; ?>>Civil</option>
                     <option value="VAWC" <?php echo ($currentFilter['category'] ?? '') === 'VAWC' ? 'selected' : ''; ?>>VAWC</option>
+                    <option value="Minor" <?php echo ($currentFilter['category'] ?? '') === 'Minor' ? 'selected' : ''; ?>>Minor</option>
                 </select>
             </div>
             <div>
@@ -393,10 +398,9 @@ $availableOfficers = $conn ? getAvailableOfficers($conn) : [];
                             $params[':to_date'] = $to_date;
                         }
                         
-                        // Default: show pending cases
-                        if (empty($where_clauses)) {
-                            $where_clauses[] = "r.status = 'pending'";
-                        }
+                        // REMOVED: Default filter showing only pending cases
+                        // This was causing pending cases to "disappear"
+                        // Now shows all cases when no filters are applied
                         
                         $where_sql = !empty($where_clauses) ? "WHERE " . implode(" AND ", $where_clauses) : "";
                         
@@ -434,8 +438,8 @@ $availableOfficers = $conn ? getAvailableOfficers($conn) : [];
                         if (count($cases) > 0) {
                             foreach ($cases as $case) {
                                 $status_class = getStatusClass($case['status']);
-                                $status_text = strtoupper(str_replace('_', ' ', $case['status']));
-                                $category_class = getCategoryClass($case['category']);
+                                $status_text = ucwords(str_replace('_', ' ', $case['status']));
+                                $category_class = getCategoryClass($case['category'] ?? '');
                                 
                                 echo '<tr class="hover:bg-gray-50 transition-colors">';
                                 echo '<td class="py-3 px-4">';
@@ -466,14 +470,14 @@ $availableOfficers = $conn ? getAvailableOfficers($conn) : [];
                                 }
                                 echo '</td>';
                                 echo '<td class="py-3 px-4">';
-                                echo '<span class="' . $status_class . '">' . $status_text . '</span>';
+                                echo '<span class="status-badge ' . $status_class . '">' . $status_text . '</span>';
                                 echo '</td>';
                                 echo '<td class="py-3 px-4">';
                                 echo '<div class="flex space-x-2">';
                                 echo '<button onclick="viewCaseDetails(' . $case['id'] . ')" class="px-3 py-1 bg-blue-100 text-blue-700 rounded-lg text-sm hover:bg-blue-200 transition-colors" title="View full report">';
                                 echo '<i class="fas fa-eye mr-1"></i> View';
                                 echo '</button>';
-                                if ($case['status'] === 'pending') {
+                                if ($case['status'] === 'pending' || $case['status'] === 'pending_field_verification') {
                                     echo '<button onclick="openAssignmentModal(' . $case['id'] . ')" class="px-3 py-1 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700 transition-colors" title="Assign to officer">';
                                     echo '<i class="fas fa-user-check mr-1"></i> Assign';
                                     echo '</button>';
@@ -599,14 +603,14 @@ $availableOfficers = $conn ? getAvailableOfficers($conn) : [];
                 <?php if (!$db_error && $conn): ?>
                 <div class="mb-6">
                     <h4 class="font-medium text-gray-800 mb-3">Select Officer Type</h4>
-                    <div class="grid grid-cols-2 gap-3 mb-6">
+                    <div class="grid grid-cols-2 gap-3 mb-6" id="officerTypeSelection">
                         <div class="assignment-option active" data-type="lupon">
                             <div class="flex items-center">
                                 <div class="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center mr-3">
                                     <i class="fas fa-user-tie text-green-600"></i>
                                 </div>
                                 <div>
-                                    <h5 class="font-medium">Lupon Member</h5>
+                                    <h5 class="font-medium">Lupon Members</h5>
                                     <p class="text-sm text-gray-600">Assign to barangay lupon</p>
                                 </div>
                             </div>
@@ -641,28 +645,33 @@ $availableOfficers = $conn ? getAvailableOfficers($conn) : [];
                                     case 'lupon':
                                         $roleClass .= 'lupon';
                                         $roleDisplay = 'Lupon Member';
+                                        $officerType = 'lupon';
                                         break;
                                     case 'lupon_chairman':
                                         $roleClass .= 'lupon';
                                         $roleDisplay = 'Lupon Chairman';
+                                        $officerType = 'lupon';
                                         break;
                                     case 'tanod':
                                         $roleClass .= 'tanod';
                                         $roleDisplay = 'Tanod';
+                                        $officerType = 'tanod';
                                         break;
                                     case 'barangay_captain':
                                         $roleClass .= 'lupon';
                                         $roleDisplay = 'Barangay Captain';
+                                        $officerType = 'lupon';
                                         break;
                                     default:
                                         $roleClass .= 'lupon';
                                         $roleDisplay = $role;
+                                        $officerType = 'lupon';
                                 }
                                 
                                 // Get assigned case count for this officer
                                 $assignedCount = 0;
                                 try {
-                                    $countQuery = "SELECT COUNT(*) as count FROM reports WHERE assigned_officer_id = :officer_id AND status != 'closed'";
+                                    $countQuery = "SELECT COUNT(*) as count FROM reports WHERE assigned_officer_id = :officer_id AND status NOT IN ('closed', 'resolved')";
                                     $countStmt = $conn->prepare($countQuery);
                                     $countStmt->bindValue(':officer_id', $officer['id']);
                                     $countStmt->execute();
@@ -672,9 +681,11 @@ $availableOfficers = $conn ? getAvailableOfficers($conn) : [];
                                     // Silently continue
                                 }
                         ?>
-                        <div class="officer-item <?php echo $firstOfficer ? 'active' : ''; ?>" 
+                        <div class="officer-item <?php echo $firstOfficer && $officerType == 'lupon' ? 'active' : ''; ?>" 
                              data-officer-id="<?php echo $officer['id']; ?>" 
-                             data-officer-type="<?php echo $role; ?>">
+                             data-officer-type="<?php echo $officerType; ?>"
+                             data-officer-role="<?php echo $role; ?>"
+                             style="<?php echo $officerType == 'tanod' ? 'display: none;' : ''; ?>">
                             <div class="flex items-center justify-between">
                                 <div>
                                     <h5 class="font-medium officer-name"><?php echo $officerName; ?></h5>
@@ -704,17 +715,31 @@ $availableOfficers = $conn ? getAvailableOfficers($conn) : [];
                 </div>
                 
                 <div id="selectionInfo">
-                    <?php if (count($availableOfficers) > 0): ?>
+                    <?php if (count($availableOfficers) > 0): 
+                        // Find first lupon officer for default selection
+                        $defaultOfficer = null;
+                        foreach ($availableOfficers as $officer) {
+                            $role = $officer['role'];
+                            if ($role == 'lupon' || $role == 'lupon_chairman' || $role == 'barangay_captain') {
+                                $defaultOfficer = $officer;
+                                break;
+                            }
+                        }
+                        if (!$defaultOfficer && count($availableOfficers) > 0) {
+                            $defaultOfficer = $availableOfficers[0];
+                        }
+                        if ($defaultOfficer):
+                    ?>
                     <div class="bg-green-50 p-4 rounded-lg mb-4">
                         <div class="flex items-center">
                             <i class="fas fa-check-circle text-green-600 mr-2"></i>
                             <span class="font-medium">Selected:</span>
                             <span class="ml-2" id="selectedOfficerName">
-                                <?php echo htmlspecialchars($availableOfficers[0]['first_name'] . ' ' . $availableOfficers[0]['last_name']); ?>
+                                <?php echo htmlspecialchars($defaultOfficer['first_name'] . ' ' . $defaultOfficer['last_name']); ?>
                             </span>
-                            <span class="ml-2 px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                            <span class="ml-2 px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800" id="selectedOfficerRole">
                                 <?php 
-                                $role = $availableOfficers[0]['role'];
+                                $role = $defaultOfficer['role'];
                                 echo $role === 'lupon_chairman' ? 'Lupon Chairman' : 
                                      ($role === 'tanod' ? 'Tanod' : 
                                      ($role === 'barangay_captain' ? 'Barangay Captain' : 'Lupon Member'));
@@ -722,6 +747,7 @@ $availableOfficers = $conn ? getAvailableOfficers($conn) : [];
                             </span>
                         </div>
                     </div>
+                    <?php endif; ?>
                     <?php endif; ?>
                 </div>
                 <?php else: ?>
@@ -748,7 +774,131 @@ $availableOfficers = $conn ? getAvailableOfficers($conn) : [];
 </div>
 
 <style>
-    /* ... keep all existing CSS styles ... */
+    /* Pagination Styles */
+    .pagination-btn {
+        @apply w-10 h-10 flex items-center justify-center rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 transition-colors;
+    }
+    
+    .pagination-btn.active {
+        @apply bg-blue-600 text-white border-blue-600;
+    }
+    
+    /* Status Badges */
+    .status-badge {
+        @apply px-3 py-1 rounded-full text-xs font-medium;
+    }
+    
+    .status-pending {
+        @apply bg-yellow-100 text-yellow-800;
+    }
+    
+    .status-pending_field_verification {
+        @apply bg-orange-100 text-orange-800;
+    }
+    
+    .status-assigned {
+        @apply bg-blue-100 text-blue-800;
+    }
+    
+    .status-investigating {
+        @apply bg-purple-100 text-purple-800;
+    }
+    
+    .status-resolved {
+        @apply bg-green-100 text-green-800;
+    }
+    
+    .status-referred {
+        @apply bg-indigo-100 text-indigo-800;
+    }
+    
+    .status-closed {
+        @apply bg-gray-100 text-gray-800;
+    }
+    
+    /* Category Badges */
+    .category-badge {
+        @apply px-3 py-1 rounded-full text-xs font-medium;
+    }
+    
+    .category-barangay {
+        @apply bg-blue-100 text-blue-800;
+    }
+    
+    .category-police {
+        @apply bg-red-100 text-red-800;
+    }
+    
+    .category-criminal {
+        @apply bg-purple-100 text-purple-800;
+    }
+    
+    .category-civil {
+        @apply bg-green-100 text-green-800;
+    }
+    
+    .category-vawc {
+        @apply bg-pink-100 text-pink-800;
+    }
+    
+    .category-minor {
+        @apply bg-yellow-100 text-yellow-800;
+    }
+    
+    .category-other {
+        @apply bg-gray-100 text-gray-800;
+    }
+    
+    /* Assignment Modal Styles */
+    .assignment-option {
+        @apply border-2 border-gray-200 rounded-xl p-4 cursor-pointer transition-all hover:border-blue-300;
+    }
+    
+    .assignment-option.active {
+        @apply border-blue-500 bg-blue-50;
+    }
+    
+    .officer-item {
+        @apply border border-gray-200 rounded-xl p-4 cursor-pointer transition-all hover:border-blue-300 hover:bg-blue-50;
+    }
+    
+    .officer-item.active {
+        @apply border-blue-500 bg-blue-50;
+    }
+    
+    .role-badge {
+        @apply px-2 py-1 rounded-full text-xs font-medium;
+    }
+    
+    .role-badge.lupon {
+        @apply bg-green-100 text-green-800;
+    }
+    
+    .role-badge.tanod {
+        @apply bg-blue-100 text-blue-800;
+    }
+    
+    /* Glass Card Effect */
+    .glass-card {
+        @apply bg-white bg-opacity-80 backdrop-blur-sm border border-gray-200;
+    }
+    
+    /* Table Styles */
+    .case-table {
+        @apply min-w-full divide-y divide-gray-200;
+    }
+    
+    .case-table thead tr th {
+        @apply text-left text-xs font-medium text-gray-500 uppercase tracking-wider;
+    }
+    
+    .case-table tbody tr {
+        @apply hover:bg-gray-50;
+    }
+    
+    .case-table tbody tr td {
+        @apply px-6 py-4 whitespace-nowrap text-sm text-gray-900;
+    }
 </style>
 
 <script>
@@ -767,6 +917,7 @@ let currentFilter = {
 let selectedCaseId = null;
 let selectedOfficerId = null;
 let selectedOfficerType = null;
+let selectedOfficerRole = null;
 
 // Initialize when page loads
 document.addEventListener('DOMContentLoaded', function() {
@@ -781,43 +932,58 @@ document.addEventListener('DOMContentLoaded', function() {
     if (firstOfficer) {
         selectedOfficerId = firstOfficer.getAttribute('data-officer-id');
         selectedOfficerType = firstOfficer.getAttribute('data-officer-type');
+        selectedOfficerRole = firstOfficer.getAttribute('data-officer-role');
     }
 });
 
-// Setup filter listeners
+// Setup filter listeners - FIXED
 function setupFilterListeners() {
     // Filter form submission
-    document.getElementById('filterForm').addEventListener('submit', function(e) {
-        e.preventDefault();
-        currentFilter = {
-            status: document.querySelector('select[name="status"]').value || '',
-            category: document.querySelector('select[name="category"]').value || '',
-            from_date: document.querySelector('input[name="from_date"]').value || '',
-            to_date: document.querySelector('input[name="to_date"]').value || ''
-        };
-        currentPage = 1;
-        reloadWithFilters();
-    });
+    const filterForm = document.getElementById('filterForm');
+    if (filterForm) {
+        filterForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            applyFilters();
+        });
+    }
 
-    // Clear filter button
-    document.getElementById('clearFilter').addEventListener('click', function() {
-        resetFilters();
-        currentFilter = {
-            status: '',
-            category: '',
-            from_date: '',
-            to_date: ''
-        };
-        currentPage = 1;
-        reloadWithFilters();
+    // Clear filter button - FIXED
+    const clearFilterBtn = document.getElementById('clearFilter');
+    if (clearFilterBtn) {
+        clearFilterBtn.addEventListener('click', function() {
+            resetFilters();
+        });
+    }
+}
+
+function applyFilters() {
+    const form = document.getElementById('filterForm');
+    const formData = new FormData(form);
+    const params = new URLSearchParams();
+    
+    // Add all form data to params
+    formData.forEach((value, key) => {
+        if (value) params.append(key, value);
     });
+    
+    // Add page if not present
+    if (!params.has('page')) {
+        params.append('page', '1');
+    }
+    
+    // Reload page with filters
+    window.location.href = window.location.pathname + '?' + params.toString();
 }
 
 function resetFilters() {
+    // Reset form values
     document.querySelector('select[name="status"]').value = '';
     document.querySelector('select[name="category"]').value = '';
     document.querySelector('input[name="from_date"]').value = '';
     document.querySelector('input[name="to_date"]').value = '';
+    
+    // Reload without filters
+    window.location.href = window.location.pathname;
 }
 
 function reloadWithFilters() {
@@ -844,7 +1010,7 @@ function changePage(page) {
     reloadWithFilters();
 }
 
-// View case details
+// View case details - FIXED SQL QUERY
 function viewCaseDetails(caseId) {
     const modal = document.getElementById('caseDetailsModal');
     const content = document.getElementById('caseDetailsContent');
@@ -859,6 +1025,7 @@ function viewCaseDetails(caseId) {
     modal.classList.remove('hidden');
     modal.classList.add('flex');
     
+    // Use the correct handler path
     fetch(`../../handlers/get_case_details.php?id=${caseId}`)
         .then(response => {
             if (!response.ok) {
@@ -875,26 +1042,30 @@ function viewCaseDetails(caseId) {
                 <div class="text-center py-8">
                     <i class="fas fa-exclamation-triangle text-red-500 text-4xl mb-4"></i>
                     <p class="text-red-600">Error loading case details</p>
-                    <p class="text-sm text-gray-500 mt-2">Handler file not found or error occurred.</p>
+                    <p class="text-sm text-gray-500 mt-2">${error.message}</p>
                     <div class="mt-6 text-left bg-gray-50 p-4 rounded-lg">
                         <p class="font-medium">Case ID: #${caseId}</p>
-                        <p class="text-sm text-gray-600 mt-2">Please check if the handler file exists at: <code>../../handlers/get_case_details.php</code></p>
+                        <p class="text-sm text-gray-600 mt-2">Please check the console for more details.</p>
                     </div>
                 </div>
             `;
         });
 }
 
-// Assignment functionality
+// Assignment functionality - FIXED
 function openAssignmentModal(caseId) {
     selectedCaseId = caseId;
     
-    // Reset selection to first officer
-    const firstOfficer = document.querySelector('.officer-item');
-    if (firstOfficer) {
-        firstOfficer.classList.add('active');
-        selectedOfficerId = firstOfficer.getAttribute('data-officer-id');
-        selectedOfficerType = firstOfficer.getAttribute('data-officer-type');
+    // Reset selection to first visible officer
+    const firstVisibleOfficer = document.querySelector('.officer-item:not([style*="none"])');
+    if (firstVisibleOfficer) {
+        document.querySelectorAll('.officer-item').forEach(officer => {
+            officer.classList.remove('active');
+        });
+        firstVisibleOfficer.classList.add('active');
+        selectedOfficerId = firstVisibleOfficer.getAttribute('data-officer-id');
+        selectedOfficerType = firstVisibleOfficer.getAttribute('data-officer-type');
+        selectedOfficerRole = firstVisibleOfficer.getAttribute('data-officer-role');
         
         // Update selection info
         updateSelectionInfo();
@@ -914,10 +1085,12 @@ function closeAssignmentModal() {
     modal.classList.add('hidden');
     modal.classList.remove('flex');
     selectedCaseId = null;
+    selectedOfficerId = null;
+    selectedOfficerType = null;
 }
 
 function setupAssignmentListeners() {
-    // Officer type selection
+    // Officer type selection - FIXED
     document.querySelectorAll('.assignment-option').forEach(option => {
         option.addEventListener('click', function() {
             const type = this.getAttribute('data-type');
@@ -933,11 +1106,12 @@ function setupAssignmentListeners() {
         });
     });
     
-    // Officer selection
+    // Officer selection - FIXED
     document.querySelectorAll('.officer-item').forEach(item => {
         item.addEventListener('click', function() {
             const officerId = this.getAttribute('data-officer-id');
             const officerType = this.getAttribute('data-officer-type');
+            const officerRole = this.getAttribute('data-officer-role');
             
             // Update active class
             document.querySelectorAll('.officer-item').forEach(officer => {
@@ -948,6 +1122,7 @@ function setupAssignmentListeners() {
             // Update selection
             selectedOfficerId = officerId;
             selectedOfficerType = officerType;
+            selectedOfficerRole = officerRole;
             
             // Update selection info
             updateSelectionInfo();
@@ -961,7 +1136,7 @@ function updateOfficerListForType(type) {
         const officerType = officer.getAttribute('data-officer-type');
         if (type === 'lupon') {
             // Show lupon and chairman
-            officer.style.display = (officerType === 'lupon' || officerType === 'lupon_chairman' || officerType === 'barangay_captain') ? 'block' : 'none';
+            officer.style.display = officerType === 'lupon' ? 'block' : 'none';
         } else if (type === 'tanod') {
             // Show tanod only
             officer.style.display = officerType === 'tanod' ? 'block' : 'none';
@@ -969,12 +1144,13 @@ function updateOfficerListForType(type) {
     });
     
     // Select first visible officer
-    const firstVisible = document.querySelector('.officer-item[style*="block"], .officer-item:not([style*="none"])');
+    const firstVisible = document.querySelector('.officer-item:not([style*="none"])');
     if (firstVisible) {
         document.querySelectorAll('.officer-item').forEach(o => o.classList.remove('active'));
         firstVisible.classList.add('active');
         selectedOfficerId = firstVisible.getAttribute('data-officer-id');
         selectedOfficerType = firstVisible.getAttribute('data-officer-type');
+        selectedOfficerRole = firstVisible.getAttribute('data-officer-role');
     }
     
     updateSelectionInfo();
@@ -984,24 +1160,30 @@ function updateSelectionInfo() {
     const selectedOfficer = document.querySelector('.officer-item.active');
     if (selectedOfficer && selectedOfficerId) {
         const officerName = selectedOfficer.querySelector('.officer-name')?.textContent || 'Selected Officer';
-        const officerType = selectedOfficer.getAttribute('data-officer-type');
+        const officerRole = selectedOfficer.getAttribute('data-officer-role');
         let roleDisplay = '';
+        let roleClass = '';
         
-        switch(officerType) {
+        switch(officerRole) {
             case 'lupon':
                 roleDisplay = 'Lupon Member';
+                roleClass = 'bg-green-100 text-green-800';
                 break;
             case 'lupon_chairman':
                 roleDisplay = 'Lupon Chairman';
+                roleClass = 'bg-green-100 text-green-800';
                 break;
             case 'tanod':
                 roleDisplay = 'Tanod';
+                roleClass = 'bg-blue-100 text-blue-800';
                 break;
             case 'barangay_captain':
                 roleDisplay = 'Barangay Captain';
+                roleClass = 'bg-green-100 text-green-800';
                 break;
             default:
-                roleDisplay = officerType;
+                roleDisplay = officerRole;
+                roleClass = 'bg-gray-100 text-gray-800';
         }
         
         const selectionInfo = document.getElementById('selectionInfo');
@@ -1011,7 +1193,7 @@ function updateSelectionInfo() {
                     <i class="fas fa-check-circle text-green-600 mr-2"></i>
                     <span class="font-medium">Selected:</span>
                     <span class="ml-2">${officerName}</span>
-                    <span class="ml-2 px-2 py-1 rounded-full text-xs font-medium ${officerType === 'tanod' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'}">
+                    <span class="ml-2 px-2 py-1 rounded-full text-xs font-medium ${roleClass}">
                         ${roleDisplay}
                     </span>
                 </div>
@@ -1040,7 +1222,7 @@ function submitAssignment() {
     formData.append('officer_id', selectedOfficerId);
     formData.append('officer_type', selectedOfficerType);
     
-    fetch('assign_case.php', {
+    fetch('../../handlers/assign_case.php', {
         method: 'POST',
         body: formData
     })
@@ -1062,38 +1244,8 @@ function submitAssignment() {
     })
     .catch(error => {
         console.error('Error:', error);
-        // Fallback to direct form submission if AJAX fails
-        const fallbackForm = document.createElement('form');
-        fallbackForm.method = 'POST';
-        fallbackForm.action = 'assign_case.php';
-        
-        const caseIdInput = document.createElement('input');
-        caseIdInput.type = 'hidden';
-        caseIdInput.name = 'case_id';
-        caseIdInput.value = selectedCaseId;
-        
-        const officerIdInput = document.createElement('input');
-        officerIdInput.type = 'hidden';
-        officerIdInput.name = 'officer_id';
-        officerIdInput.value = selectedOfficerId;
-        
-        const officerTypeInput = document.createElement('input');
-        officerTypeInput.type = 'hidden';
-        officerTypeInput.name = 'officer_type';
-        officerTypeInput.value = selectedOfficerType;
-        
-        fallbackForm.appendChild(caseIdInput);
-        fallbackForm.appendChild(officerIdInput);
-        fallbackForm.appendChild(officerTypeInput);
-        document.body.appendChild(fallbackForm);
-        fallbackForm.submit();
+        alert('Error assigning case. Please try again.');
     });
-}
-
-// Create assign_case.php handler
-function createAssignCaseHandler() {
-    // This would create the actual PHP file, but for now we'll use inline assignment
-    alert('Assignment functionality ready. The system will now assign the case.');
 }
 
 // Modal control functions
@@ -1172,6 +1324,12 @@ function printCaseDetails() {
     printWindow.document.close();
 }
 
+// View attachments
+function viewAttachments(reportId) {
+    alert('View attachments for report #' + reportId);
+    // Implement attachment viewing functionality here
+}
+
 // Close modals when clicking outside
 window.onclick = function(event) {
     const modals = [
@@ -1200,12 +1358,14 @@ document.addEventListener('keydown', function(e) {
 // Helper functions
 function getStatusClass($status) {
     switch($status) {
-        case 'pending': return 'badge-pending';
-        case 'assigned': return 'badge-assigned';
-        case 'in_progress': return 'badge-in-progress';
-        case 'resolved': return 'badge-resolved';
-        case 'closed': return 'badge-closed';
-        default: return 'badge-pending';
+        case 'pending': return 'status-pending';
+        case 'pending_field_verification': return 'status-pending_field_verification';
+        case 'assigned': return 'status-assigned';
+        case 'investigating': return 'status-investigating';
+        case 'resolved': return 'status-resolved';
+        case 'referred': return 'status-referred';
+        case 'closed': return 'status-closed';
+        default: return 'status-pending';
     }
 }
 

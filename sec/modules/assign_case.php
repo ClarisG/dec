@@ -1,5 +1,3 @@
-[file name]: assign_case.php
-[file content begin]
 <?php
 session_start();
 
