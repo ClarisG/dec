@@ -1,5 +1,7 @@
+[file name]: case.php
+[file content begin]
 <?php
-// sec/modules/case.php - Fixed Database Connection with better error handling
+// sec/modules/case.php - Fixed Database Connection
 
 // Check if user is logged in
 if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'secretary') {
@@ -36,6 +38,24 @@ try {
     if ($config_found) {
         require_once $db_config_path;
         
+        // Check if connection was established by database.php
+        if (!isset($conn) || !$conn) {
+            // If database.php didn't create connection, try to create it
+            if (function_exists('getDbConnection')) {
+                $conn = getDbConnection();
+            } else {
+                // Try to create connection using constants if they exist
+                if (defined('DB_HOST') && defined('DB_USER') && defined('DB_PASS') && defined('DB_NAME')) {
+                    $dsn = "mysql:host=" . DB_HOST . ";port=" . (defined('DB_PORT') ? DB_PORT : '3306') . ";dbname=" . DB_NAME . ";charset=utf8mb4";
+                    $conn = new PDO($dsn, DB_USER, DB_PASS);
+                    $conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+                    $conn->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
+                } else {
+                    throw new Exception("Database configuration loaded but connection not established and constants not defined");
+                }
+            }
+        }
+        
         // Test connection
         if ($conn) {
             $test_query = "SELECT 1 as test";
@@ -50,23 +70,17 @@ try {
             $tables = ['reports', 'users'];
             foreach ($tables as $table) {
                 $check_stmt = $conn->query("SHOW TABLES LIKE '$table'");
+                if (!$check_stmt) {
+                    throw new Exception("Failed to check for table '$table'");
+                }
                 if ($check_stmt->rowCount() == 0) {
                     throw new Exception("Required table '$table' not found in database");
                 }
             }
         } else {
-            // Try to create connection directly if database.php didn't create it
-            require_once dirname(dirname(dirname(__DIR__))) . '/config/config.php';
-            
-            $dsn = "mysql:host=" . DB_HOST . ";port=" . DB_PORT . ";dbname=" . DB_NAME . ";charset=utf8mb4";
-            $conn = new PDO($dsn, DB_USER, DB_PASS);
-            
-            // Set PDO attributes
-            $conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-            $conn->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
-            $conn->setAttribute(PDO::ATTR_EMULATE_PREPARES, false);
-            $conn->setAttribute(PDO::ATTR_PERSISTENT, false);
+            throw new Exception("Database connection not established");
         }
+        
     } else {
         // If no config file found, try to connect directly using hardcoded credentials
         // WARNING: This is not secure for production - only for debugging
@@ -391,7 +405,7 @@ $total_records = 0;
                                      FROM reports r 
                                      LEFT JOIN users u ON r.user_id = u.id 
                                      $where_sql
-                                     ORDER BY r.created_at ASC 
+                                     ORDER BY r.created_at DESC 
                                      LIMIT :limit OFFSET :offset";
                         
                         $cases_stmt = $conn->prepare($cases_sql);
@@ -1326,8 +1340,7 @@ function closeAttachmentsModal() {
 }
 
 function openNewBlotterModal() {
-    document.getElementById('newBlotterModal').classList.remove('hidden');
-    document.getElementById('newBlotterModal').classList.add('flex');
+    alert('This feature is under development.');
 }
 
 function closeNewBlotterModal() {
@@ -1490,3 +1503,4 @@ function getCategoryClass($category) {
     }
 }
 ?>
+[file content end]
