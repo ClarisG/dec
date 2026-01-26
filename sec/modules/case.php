@@ -903,419 +903,256 @@ $availableOfficers = $conn ? getAvailableOfficers($conn) : [];
 </style>
 
 <script>
-// Current page state - will be set by PHP
+// Page state variables, initialized by PHP
 let currentPage = <?php echo isset($page) ? $page : 1; ?>;
 let totalPages = <?php echo isset($total_pages) ? $total_pages : 1; ?>;
-let totalRecords = <?php echo isset($total_records) ? $total_records : 0; ?>;
-let currentFilter = {
-    status: '<?php echo $_GET['status'] ?? ''; ?>',
-    category: '<?php echo $_GET['category'] ?? ''; ?>',
-    from_date: '<?php echo $_GET['from_date'] ?? ''; ?>',
-    to_date: '<?php echo $_GET['to_date'] ?? ''; ?>'
-};
 
-// Assignment variables
+// Assignment-related variables
 let selectedCaseId = null;
 let selectedOfficerId = null;
-let selectedOfficerType = null;
+let selectedOfficerType = 'lupon'; // Default to lupon
 let selectedOfficerRole = null;
 
-// Initialize when page loads
 document.addEventListener('DOMContentLoaded', function() {
-    
-    // Update page indicators
+    // Update pagination display
     document.getElementById('currentPage').textContent = currentPage;
     document.getElementById('totalPages').textContent = totalPages;
     
-    // Initialize officer selection
-    const firstOfficer = document.querySelector('.officer-item.active');
-    if (firstOfficer) {
-        selectedOfficerId = firstOfficer.getAttribute('data-officer-id');
-        selectedOfficerType = firstOfficer.getAttribute('data-officer-type');
-        selectedOfficerRole = firstOfficer.getAttribute('data-officer-role');
-    }
+    // Set initial officer selection based on what's visible
+    updateOfficerTypeSelection(document.querySelector('.assignment-option.active'), 'lupon');
 });
+
+// --- Major Page Navigation and Filtering ---
 
 function applyFilters() {
     const form = document.getElementById('filterForm');
     const formData = new FormData(form);
-    const params = new URLSearchParams();
-    
-    // Add all form data to params
+    const params = new URLSearchParams(window.location.search);
+
+    // Update params with form data
     formData.forEach((value, key) => {
-        if (value) params.append(key, value);
+        if (value) {
+            params.set(key, value);
+        } else {
+            params.delete(key);
+        }
     });
     
-    // Add page if not present
-    if (!params.has('page')) {
-        params.append('page', '1');
-    }
+    // Always reset to page 1 when applying a new filter
+    params.set('page', '1');
     
-    // Reload page with filters
-    window.location.href = window.location.pathname + '?' + params.toString();
+    // Reload the page with the new query string
+    window.location.search = params.toString();
 }
 
 function resetFilters() {
-    // Reset form values
-    document.querySelector('select[name="status"]').value = '';
-    document.querySelector('select[name="category"]').value = '';
-    document.querySelector('input[name="from_date"]').value = '';
-    document.querySelector('input[name="to_date"]').value = '';
+    const params = new URLSearchParams(window.location.search);
     
-    // Reload without filters
-    window.location.href = window.location.pathname;
+    // Keep essential parameters like 'module', remove filter-related ones
+    params.delete('status');
+    params.delete('category');
+    params.delete('from_date');
+    params.delete('to_date');
+    params.delete('page');
+    
+    // Reload the page
+    window.location.search = params.toString();
 }
 
-function reloadWithFilters() {
-    const params = new URLSearchParams({
-        page: currentPage,
-        ...currentFilter
-    });
-    
-    // Remove empty values
-    params.forEach((value, key) => {
-        if (!value) params.delete(key);
-    });
-    
-    window.location.href = window.location.pathname + '?' + params.toString();
+function changePage(page) {
+    if (page < 1 || page > totalPages) return;
+    const params = new URLSearchParams(window.location.search);
+    params.set('page', page);
+    window.location.search = params.toString();
 }
 
 function retryConnection() {
     location.reload();
 }
 
-function changePage(page) {
-    if (page < 1 || page > totalPages) return;
-    currentPage = page;
-    reloadWithFilters();
-}
+// --- Modals and Details ---
 
-// View case details - FIXED SQL QUERY
 function viewCaseDetails(caseId) {
     const modal = document.getElementById('caseDetailsModal');
     const content = document.getElementById('caseDetailsContent');
     
-    content.innerHTML = `
-        <div class="text-center py-8">
-            <div class="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
-            <p class="text-gray-600">Loading case details...</p>
-        </div>
-    `;
-    
+    content.innerHTML = '<div class="text-center py-8"><div class="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div><p class="mt-4">Loading case details...</p></div>';
     modal.classList.remove('hidden');
     modal.classList.add('flex');
     
-    // Use the correct handler path
+    // Fetch details from the corrected handler
     fetch(`../../handlers/get_case_details.php?id=${caseId}`)
-        .then(response => {
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            return response.text();
-        })
+        .then(response => response.text())
         .then(data => {
             content.innerHTML = data;
         })
         .catch(error => {
             console.error('Error loading case details:', error);
-            content.innerHTML = `
-                <div class="text-center py-8">
-                    <i class="fas fa-exclamation-triangle text-red-500 text-4xl mb-4"></i>
-                    <p class="text-red-600">Error loading case details</p>
-                    <p class="text-sm text-gray-500 mt-2">${error.message}</p>
-                    <div class="mt-6 text-left bg-gray-50 p-4 rounded-lg">
-                        <p class="font-medium">Case ID: #${caseId}</p>
-                        <p class="text-sm text-gray-600 mt-2">Please check the console for more details.</p>
-                    </div>
-                </div>
-            `;
+            content.innerHTML = `<div class="text-center py-8 text-red-600"><i class="fas fa-exclamation-triangle text-4xl mb-4"></i><p>Error loading details.</p><p class="text-sm">${error.message}</p></div>`;
         });
 }
 
-// Assignment functionality - FIXED
+function closeCaseDetailsModal() {
+    document.getElementById('caseDetailsModal').classList.add('hidden');
+}
+
+// --- Case Assignment Logic ---
+
 function openAssignmentModal(caseId) {
     selectedCaseId = caseId;
     
-    // Reset selection to first visible officer
-    const firstVisibleOfficer = document.querySelector('.officer-item:not([style*="none"])');
-    if (firstVisibleOfficer) {
-        document.querySelectorAll('.officer-item').forEach(officer => {
-            officer.classList.remove('active');
-        });
-        firstVisibleOfficer.classList.add('active');
-        selectedOfficerId = firstVisibleOfficer.getAttribute('data-officer-id');
-        selectedOfficerType = firstVisibleOfficer.getAttribute('data-officer-type');
-        selectedOfficerRole = firstVisibleOfficer.getAttribute('data-officer-role');
-        
-        // Update selection info
-        updateSelectionInfo();
-    }
+    // Set default selection to 'lupon' and update the list
+    updateOfficerTypeSelection(document.querySelector('.assignment-option[data-type="lupon"]'), 'lupon');
     
-    // Show modal
     const modal = document.getElementById('assignmentModal');
     modal.classList.remove('hidden');
     modal.classList.add('flex');
 }
 
 function closeAssignmentModal() {
-    const modal = document.getElementById('assignmentModal');
-    modal.classList.add('hidden');
-    modal.classList.remove('flex');
+    document.getElementById('assignmentModal').classList.add('hidden');
     selectedCaseId = null;
     selectedOfficerId = null;
-    selectedOfficerType = null;
 }
 
 function updateOfficerTypeSelection(element, type) {
-    // Update active class for officer type
-    document.querySelectorAll('.assignment-option').forEach(opt => {
-        opt.classList.remove('active');
-    });
+    // Update active style on type selector
+    document.querySelectorAll('.assignment-option').forEach(opt => opt.classList.remove('active'));
     element.classList.add('active');
-
-    // Filter officers by type
+    
+    selectedOfficerType = type;
     updateOfficerListForType(type);
 }
 
-function selectOfficer(element) {
-    const officerId = element.getAttribute('data-officer-id');
-    const officerType = element.getAttribute('data-officer-type');
-    const officerRole = element.getAttribute('data-officer-role');
-
-    // Update active class for officer item
-    document.querySelectorAll('.officer-item').forEach(officer => {
-        officer.classList.remove('active');
+function updateOfficerListForType(type) {
+    const officerList = document.getElementById('officerList');
+    const items = officerList.querySelectorAll('.officer-item');
+    let visibleCount = 0;
+    
+    // Hide or show officers based on the selected type
+    items.forEach(item => {
+        if (item.getAttribute('data-officer-type') === type) {
+            item.style.display = 'block';
+            visibleCount++;
+        } else {
+            item.style.display = 'none';
+        }
     });
-    element.classList.add('active');
 
-    // Update selection
-    selectedOfficerId = officerId;
-    selectedOfficerType = officerType;
-    selectedOfficerRole = officerRole;
+    // Remove any existing "empty" message
+    const emptyMsg = officerList.querySelector('.empty-list-message');
+    if (emptyMsg) emptyMsg.remove();
 
-    // Update selection info
+    // If no officers for this type, show a message
+    if (visibleCount === 0) {
+        const msgDiv = document.createElement('div');
+        msgDiv.className = 'empty-list-message text-center py-4 text-gray-500';
+        msgDiv.innerHTML = `<i class="fas fa-user-slash text-3xl mb-2"></i><p>No available officers of type '${type}'.</p>`;
+        officerList.appendChild(msgDiv);
+        selectedOfficerId = null; // Clear selection
+    } else {
+        // Auto-select the first visible officer in the list
+        const firstVisible = officerList.querySelector('.officer-item:not([style*="display: none"])');
+        if (firstVisible) {
+            selectOfficer(firstVisible);
+        }
+    }
+    
     updateSelectionInfo();
 }
 
+function selectOfficer(element) {
+    // Update active style for the selected officer
+    document.querySelectorAll('.officer-item').forEach(item => item.classList.remove('active'));
+    element.classList.add('active');
 
-function updateOfficerListForType(type) {
-    // Show/hide officers based on type
-    document.querySelectorAll('.officer-item').forEach(officer => {
-        const officerType = officer.getAttribute('data-officer-type');
-        if (type === 'lupon') {
-            // Show lupon and chairman
-            officer.style.display = officerType === 'lupon' ? 'block' : 'none';
-        } else if (type === 'tanod') {
-            // Show tanod only
-            officer.style.display = officerType === 'tanod' ? 'block' : 'none';
-        }
-    });
-    
-    // Select first visible officer
-    const firstVisible = document.querySelector('.officer-item:not([style*="none"])');
-    if (firstVisible) {
-        document.querySelectorAll('.officer-item').forEach(o => o.classList.remove('active'));
-        firstVisible.classList.add('active');
-        selectedOfficerId = firstVisible.getAttribute('data-officer-id');
-        selectedOfficerType = firstVisible.getAttribute('data-officer-type');
-        selectedOfficerRole = firstVisible.getAttribute('data-officer-role');
-    }
-    
+    // Store selected officer's data
+    selectedOfficerId = element.getAttribute('data-officer-id');
+    selectedOfficerRole = element.getAttribute('data-officer-role');
+
     updateSelectionInfo();
 }
 
 function updateSelectionInfo() {
-    const selectedOfficer = document.querySelector('.officer-item.active');
-    if (selectedOfficer && selectedOfficerId) {
-        const officerName = selectedOfficer.querySelector('.officer-name')?.textContent || 'Selected Officer';
-        const officerRole = selectedOfficer.getAttribute('data-officer-role');
-        let roleDisplay = '';
-        let roleClass = '';
-        
-        switch(officerRole) {
-            case 'lupon':
-                roleDisplay = 'Lupon Member';
-                roleClass = 'bg-green-100 text-green-800';
-                break;
-            case 'lupon_chairman':
-                roleDisplay = 'Lupon Chairman';
-                roleClass = 'bg-green-100 text-green-800';
-                break;
-            case 'tanod':
-                roleDisplay = 'Tanod';
-                roleClass = 'bg-blue-100 text-blue-800';
-                break;
-            case 'barangay_captain':
-                roleDisplay = 'Barangay Captain';
-                roleClass = 'bg-green-100 text-green-800';
-                break;
-            default:
-                roleDisplay = officerRole;
-                roleClass = 'bg-gray-100 text-gray-800';
-        }
-        
-        const selectionInfo = document.getElementById('selectionInfo');
-        selectionInfo.innerHTML = `
-            <div class="bg-green-50 p-4 rounded-lg mb-4">
-                <div class="flex items-center">
+    const infoDiv = document.getElementById('selectionInfo');
+    const selectedOfficerElement = document.querySelector('.officer-item.active');
+
+    if (selectedOfficerId && selectedOfficerElement) {
+        const officerName = selectedOfficerElement.querySelector('.officer-name').textContent;
+        const roleDisplay = selectedOfficerElement.querySelector('.role-badge').textContent;
+        const roleClass = selectedOfficerElement.querySelector('.role-badge').className.replace('role-badge', '');
+
+        infoDiv.innerHTML = `
+            <div class="bg-green-50 p-4 rounded-lg">
+                <div class="flex items-center flex-wrap">
                     <i class="fas fa-check-circle text-green-600 mr-2"></i>
                     <span class="font-medium">Selected:</span>
-                    <span class="ml-2">${officerName}</span>
+                    <span class="ml-2 font-semibold">${officerName}</span>
                     <span class="ml-2 px-2 py-1 rounded-full text-xs font-medium ${roleClass}">
                         ${roleDisplay}
                     </span>
                 </div>
-            </div>
-        `;
+            </div>`;
+    } else {
+        infoDiv.innerHTML = '<div class="bg-yellow-50 p-4 rounded-lg text-center text-yellow-800">Please select an officer from the list.</div>';
     }
 }
 
 function submitAssignment() {
-    if (!selectedCaseId) {
-        alert('No case selected.');
+    if (!selectedCaseId || !selectedOfficerId) {
+        alert('Please select a case and an officer before assigning.');
         return;
     }
-    
-    if (!selectedOfficerId || !selectedOfficerType) {
-        alert('Please select an officer to assign this case to.');
-        return;
-    }
-    
-    const confirmMessage = `Are you sure you want to assign Case #${selectedCaseId} to the selected officer?`;
-    if (!confirm(confirmMessage)) return;
-    
-    // Submit assignment via AJAX
+
+    if (!confirm(`Assign Case #${selectedCaseId} to the selected officer?`)) return;
+
     const formData = new FormData();
     formData.append('case_id', selectedCaseId);
     formData.append('officer_id', selectedOfficerId);
     formData.append('officer_type', selectedOfficerType);
-    
-    fetch('../../handlers/assign_case.php', {
-        method: 'POST',
-        body: formData
-    })
-    .then(response => {
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        return response.json();
-    })
-    .then(data => {
-        if (data.success) {
-            alert('Case assigned successfully!');
-            closeAssignmentModal();
-            // Reload page to update status
-            location.reload();
-        } else {
-            alert('Error assigning case: ' + (data.message || 'Unknown error'));
-        }
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        alert('Error assigning case. Please try again.');
-    });
+
+    fetch('../../handlers/assign_case.php', { method: 'POST', body: formData })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('Case assigned successfully!');
+                location.reload();
+            } else {
+                alert('Assignment failed: ' + (data.message || 'Unknown error.'));
+            }
+        })
+        .catch(error => {
+            console.error('Assignment error:', error);
+            alert('An error occurred during assignment. See console for details.');
+        });
 }
 
-// Modal control functions
-function closeCaseDetailsModal() {
-    document.getElementById('caseDetailsModal').classList.add('hidden');
-    document.getElementById('caseDetailsModal').classList.remove('flex');
-}
+// --- Utility and Event Handlers ---
 
 function printCaseDetails() {
     const content = document.getElementById('caseDetailsContent').innerHTML;
     const printWindow = window.open('', '_blank');
-    printWindow.document.write(`
-        <!DOCTYPE html>
-        <html>
-            <head>
-                <title>Case Report - Print</title>
-                <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-                <style>
-                    body { 
-                        font-family: Arial, sans-serif; 
-                        padding: 20px;
-                        color: #333;
-                    }
-                    .header { 
-                        text-align: center; 
-                        border-bottom: 2px solid #333; 
-                        padding-bottom: 20px; 
-                        margin-bottom: 30px; 
-                    }
-                    .section { 
-                        margin-bottom: 25px; 
-                        padding: 15px;
-                        border: 1px solid #ddd;
-                        border-radius: 5px;
-                    }
-                    .section-title {
-                        color: #2c3e50;
-                        border-bottom: 1px solid #eee;
-                        padding-bottom: 10px;
-                        margin-bottom: 15px;
-                        font-weight: bold;
-                    }
-                    @media print {
-                        button { display: none !important; }
-                        .no-print { display: none !important; }
-                        body { padding: 0; }
-                    }
-                    @page {
-                        margin: 0.5in;
-                    }
-                </style>
-            </head>
-            <body>
-                <div class="header">
-                    <h1>Barangay Case Report</h1>
-                    <p>Printed on ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}</p>
-                </div>
-                ${content}
-                <div class="no-print" style="margin-top: 30px; text-align: center;">
-                    <button onclick="window.print()" style="padding: 10px 20px; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; margin-right: 10px;">
-                        <i class="fas fa-print"></i> Print Report
-                    </button>
-                    <button onclick="window.close()" style="padding: 10px 20px; background: #6c757d; color: white; border: none; border-radius: 5px; cursor: pointer;">
-                        Close Window
-                    </button>
-                </div>
-                <script>
-                    // Auto-print after loading
-                    setTimeout(function() {
-                        window.print();
-                    }, 500);
-                <\/script>
-            </body>
-        </html>
-    `);
+    printWindow.document.write('<html><head><title>Print Case</title><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"></head><body>' + content + '</body></html>');
     printWindow.document.close();
+    setTimeout(() => printWindow.print(), 500);
 }
 
-// View attachments
 function viewAttachments(reportId) {
-    alert('View attachments for report #' + reportId);
-    // Implement attachment viewing functionality here
+    alert('Attachment viewing for report #' + reportId + ' needs to be implemented.');
 }
 
-// Close modals when clicking outside
-window.onclick = function(event) {
-    const modals = [
-        { id: 'caseDetailsModal', close: closeCaseDetailsModal },
-        { id: 'assignmentModal', close: closeAssignmentModal }
-    ];
-    
-    modals.forEach(modal => {
-        const modalElement = document.getElementById(modal.id);
-        if (event.target === modalElement) {
-            modal.close();
-        }
-    });
-}
+// Global event listeners for closing modals
+window.addEventListener('click', function(event) {
+    if (event.target == document.getElementById('caseDetailsModal')) {
+        closeCaseDetailsModal();
+    }
+    if (event.target == document.getElementById('assignmentModal')) {
+        closeAssignmentModal();
+    }
+});
 
-// Keyboard shortcuts
-document.addEventListener('keydown', function(e) {
-    if (e.key === 'Escape') {
+document.addEventListener('keydown', function(event) {
+    if (event.key === "Escape") {
         closeCaseDetailsModal();
         closeAssignmentModal();
     }
@@ -1323,29 +1160,29 @@ document.addEventListener('keydown', function(e) {
 </script>
 
 <?php
-// Helper functions
+// Helper functions for styling badges
 function getStatusClass($status) {
-    switch($status) {
-        case 'pending': return 'status-pending';
-        case 'pending_field_verification': return 'status-pending_field_verification';
-        case 'assigned': return 'status-assigned';
-        case 'investigating': return 'status-investigating';
-        case 'resolved': return 'status-resolved';
-        case 'referred': return 'status-referred';
-        case 'closed': return 'status-closed';
-        default: return 'status-pending';
-    }
+    $classes = [
+        'pending' => 'status-pending',
+        'pending_field_verification' => 'status-pending_field_verification',
+        'assigned' => 'status-assigned',
+        'investigating' => 'status-investigating',
+        'resolved' => 'status-resolved',
+        'referred' => 'status-referred',
+        'closed' => 'status-closed',
+    ];
+    return $classes[$status] ?? 'status-pending';
 }
 
 function getCategoryClass($category) {
-    switch($category) {
-        case 'Barangay Matter': return 'category-barangay';
-        case 'Police Matter': return 'category-police';
-        case 'Criminal': return 'category-criminal';
-        case 'Civil': return 'category-civil';
-        case 'VAWC': return 'category-vawc';
-        case 'Minor': return 'category-minor';
-        default: return 'category-other';
-    }
+    $classes = [
+        'Barangay Matter' => 'category-barangay',
+        'Police Matter' => 'category-police',
+        'Criminal' => 'category-criminal',
+        'Civil' => 'category-civil',
+        'VAWC' => 'category-vawc',
+        'Minor' => 'category-minor',
+    ];
+    return $classes[$category] ?? 'category-other';
 }
 ?>
