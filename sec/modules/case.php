@@ -1,5 +1,3 @@
-[file name]: case.php
-[file content begin]
 <?php
 // sec/modules/case.php - Fixed Database Connection
 
