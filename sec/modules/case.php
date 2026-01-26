@@ -154,18 +154,7 @@ $total_records = 0;
     </div>
     <?php endif; ?>
     
-    <!-- Header Section -->
-    <div class="glass-card rounded-xl p-6">
-        <div class="flex justify-between items-center mb-6">
-            <h2 class="text-2xl font-bold text-gray-800 flex items-center">
-                <i class="fas fa-gavel mr-3 text-blue-600"></i>
-                Case & Blotter Management
-            </h2>
-            <button onclick="openNewBlotterModal()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center transition-colors">
-                <i class="fas fa-plus mr-2"></i> New Blotter Entry
-            </button>
-        </div>
-        
+   
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
             <div class="bg-blue-50 p-4 rounded-lg">
                 <div class="flex items-center">
