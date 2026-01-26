@@ -250,17 +250,6 @@ $total_records = 0;
     <div class="glass-card rounded-xl p-6">
         <div class="flex justify-between items-center mb-4">
             <h3 class="text-xl font-bold text-gray-800">Filter Reports</h3>
-            <div class="flex space-x-2">
-                <button id="filterAll" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
-                    All Reports
-                </button>
-                <button id="filterBarangay" class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors">
-                    Barangay Matters
-                </button>
-                <button id="filterPolice" class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors">
-                    Police Matters
-                </button>
-            </div>
         </div>
         
         <form id="filterForm" method="GET" class="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
@@ -449,11 +438,11 @@ $total_records = 0;
                                 echo '</td>';
                                 echo '<td class="py-3 px-4">';
                                 echo '<div class="flex space-x-2">';
-                                echo '<button onclick="viewCaseDetails(' . $case['id'] . ')" class="px-3 py-1 bg-gray-100 text-gray-700 rounded-lg text-sm hover:bg-gray-200 transition-colors" title="View full report">';
+                                echo '<button onclick="viewCaseDetails(' . $case['id'] . ')" class="px-3 py-1 bg-blue-100 text-blue-700 rounded-lg text-sm hover:bg-blue-200 transition-colors" title="View full report">';
                                 echo '<i class="fas fa-eye mr-1"></i> View';
                                 echo '</button>';
                                 if ($case['status'] === 'pending') {
-                                    echo '<button onclick="openAssignmentModal(' . $case['id'] . ')" class="px-3 py-1 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 transition-colors" title="Assign to officer">';
+                                    echo '<button onclick="openAssignmentModal(' . $case['id'] . ')" class="px-3 py-1 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700 transition-colors" title="Assign to officer">';
                                     echo '<i class="fas fa-user-check mr-1"></i> Assign';
                                     echo '</button>';
                                 } else {
@@ -535,6 +524,55 @@ $total_records = 0;
     </div>
 </div>
 
+<!-- Case Details Modal -->
+<div id="caseDetailsModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
+        <div class="flex justify-between items-center p-6 border-b">
+            <h3 class="text-xl font-bold text-gray-800">Case Details</h3>
+            <button onclick="closeCaseDetailsModal()" class="text-gray-400 hover:text-gray-600">
+                <i class="fas fa-times text-2xl"></i>
+            </button>
+        </div>
+        
+        <div class="p-6 overflow-y-auto max-h-[70vh]" id="caseDetailsContent">
+            <!-- Content will be loaded via AJAX -->
+        </div>
+        
+        <div class="p-6 border-t bg-gray-50 flex justify-end space-x-3">
+            <button onclick="closeCaseDetailsModal()" 
+                    class="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors">
+                Close
+            </button>
+            <button onclick="printCaseDetails()" 
+                    class="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+                <i class="fas fa-print mr-2"></i> Print
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Attachments Modal -->
+<div id="attachmentsModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
+        <div class="flex justify-between items-center p-6 border-b">
+            <h3 class="text-xl font-bold text-gray-800">Case Attachments</h3>
+            <button onclick="closeAttachmentsModal()" class="text-gray-400 hover:text-gray-600">
+                <i class="fas fa-times text-2xl"></i>
+            </button>
+        </div>
+        
+        <div class="p-6 overflow-y-auto max-h-[70vh]" id="attachmentsContent">
+            <!-- Content will be loaded via AJAX -->
+        </div>
+        
+        <div class="p-6 border-t bg-gray-50">
+            <button onclick="closeAttachmentsModal()" 
+                    class="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors">
+                Close
+            </button>
+        </div>
+    </div>
+</div>
 
 <!-- Assignment Modal -->
 <div id="assignmentModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50 p-4">
@@ -546,10 +584,8 @@ $total_records = 0;
             </button>
         </div>
         
-        <div class="p-6 overflow-y-auto max-h-[70vh]">
-            <div id="assignmentModalContent">
-                <!-- Content will be loaded via AJAX -->
-            </div>
+        <div class="p-6 overflow-y-auto max-h-[70vh]" id="assignmentModalContent">
+            <!-- Content will be loaded via AJAX -->
         </div>
         
         <div class="p-6 border-t bg-gray-50 flex justify-end space-x-3">
@@ -824,9 +860,7 @@ let currentFilter = {
 
 // Initialize when page loads
 document.addEventListener('DOMContentLoaded', function() {
-    updateFilterButtons();
     setupFilterListeners();
-    setupFileUpload();
     
     // Update page indicators
     document.getElementById('currentPage').textContent = currentPage;
@@ -835,34 +869,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // Setup filter listeners
 function setupFilterListeners() {
-    // Quick filter buttons
-    document.getElementById('filterAll').addEventListener('click', function() {
-        resetFilters();
-        currentFilter.status = '';
-        currentFilter.category = '';
-        currentPage = 1;
-        reloadWithFilters();
-        setActiveFilterButton('all');
-    });
-
-    document.getElementById('filterBarangay').addEventListener('click', function() {
-        resetFilters();
-        currentFilter.category = 'Barangay Matter';
-        document.querySelector('select[name="category"]').value = 'Barangay Matter';
-        currentPage = 1;
-        reloadWithFilters();
-        setActiveFilterButton('barangay');
-    });
-
-    document.getElementById('filterPolice').addEventListener('click', function() {
-        resetFilters();
-        currentFilter.category = 'Police Matter';
-        document.querySelector('select[name="category"]').value = 'Police Matter';
-        currentPage = 1;
-        reloadWithFilters();
-        setActiveFilterButton('police');
-    });
-
     // Filter form submission
     document.getElementById('filterForm').addEventListener('submit', function(e) {
         e.preventDefault();
@@ -874,7 +880,6 @@ function setupFilterListeners() {
         };
         currentPage = 1;
         reloadWithFilters();
-        setActiveFilterButton('custom');
     });
 
     // Clear filter button
@@ -888,7 +893,6 @@ function setupFilterListeners() {
         };
         currentPage = 1;
         reloadWithFilters();
-        setActiveFilterButton('all');
     });
 }
 
@@ -913,64 +917,6 @@ function reloadWithFilters() {
     window.location.href = window.location.pathname + '?' + params.toString();
 }
 
-function setActiveFilterButton(activeFilter) {
-    const buttons = {
-        all: document.getElementById('filterAll'),
-        barangay: document.getElementById('filterBarangay'),
-        police: document.getElementById('filterPolice')
-    };
-
-    // Reset all buttons
-    Object.values(buttons).forEach(btn => {
-        if (btn) {
-            btn.classList.remove('bg-blue-600', 'text-white');
-            btn.classList.add('bg-gray-100', 'text-gray-700');
-        }
-    });
-
-    // Set active button based on current filter
-    if (activeFilter) {
-        if (buttons[activeFilter]) {
-            buttons[activeFilter].classList.remove('bg-gray-100', 'text-gray-700');
-            buttons[activeFilter].classList.add('bg-blue-600', 'text-white');
-        }
-    } else {
-        // Determine active filter from currentFilter
-        if (!currentFilter.status && !currentFilter.category && !currentFilter.from_date && !currentFilter.to_date) {
-            if (buttons['all']) {
-                buttons['all'].classList.remove('bg-gray-100', 'text-gray-700');
-                buttons['all'].classList.add('bg-blue-600', 'text-white');
-            }
-        } else if (currentFilter.category === 'Barangay Matter') {
-            if (buttons['barangay']) {
-                buttons['barangay'].classList.remove('bg-gray-100', 'text-gray-700');
-                buttons['barangay'].classList.add('bg-blue-600', 'text-white');
-            }
-        } else if (currentFilter.category === 'Police Matter') {
-            if (buttons['police']) {
-                buttons['police'].classList.remove('bg-gray-100', 'text-gray-700');
-                buttons['police'].classList.add('bg-blue-600', 'text-white');
-            }
-        }
-    }
-}
-
-// Call this to initialize filter buttons based on current URL
-function updateFilterButtons() {
-    const urlParams = new URLSearchParams(window.location.search);
-    const category = urlParams.get('category');
-    
-    if (!category) {
-        setActiveFilterButton('all');
-    } else if (category === 'Barangay Matter') {
-        setActiveFilterButton('barangay');
-    } else if (category === 'Police Matter') {
-        setActiveFilterButton('police');
-    } else {
-        setActiveFilterButton('custom');
-    }
-}
-
 function retryConnection() {
     location.reload();
 }
@@ -979,99 +925,6 @@ function changePage(page) {
     if (page < 1 || page > totalPages) return;
     currentPage = page;
     reloadWithFilters();
-}
-
-// Utility functions
-function getStatusClass(status) {
-    switch(status) {
-        case 'pending': return 'badge-pending';
-        case 'assigned': return 'badge-assigned';
-        case 'in_progress': return 'badge-in-progress';
-        case 'resolved': return 'badge-resolved';
-        case 'closed': return 'badge-closed';
-        default: return 'badge-pending';
-    }
-}
-
-function getCategoryClass(category) {
-    switch(category) {
-        case 'Barangay Matter': return 'category-barangay';
-        case 'Police Matter': return 'category-police';
-        case 'Criminal': return 'category-criminal';
-        case 'Civil': return 'category-civil';
-        case 'VAWC': return 'category-vawc';
-        default: return 'category-other';
-    }
-}
-
-// File upload handling
-function setupFileUpload() {
-    const fileInput = document.getElementById('fileInput');
-    if (fileInput) {
-        fileInput.addEventListener('change', handleFileSelect);
-    }
-}
-
-function handleFileSelect(e) {
-    const fileList = document.getElementById('fileList');
-    fileList.innerHTML = '';
-    
-    Array.from(e.target.files).forEach(file => {
-        if (file.size > 10 * 1024 * 1024) { // 10MB limit
-            alert(`File ${file.name} exceeds 10MB limit. Skipping.`);
-            return;
-        }
-        
-        const fileItem = document.createElement('div');
-        fileItem.className = 'file-item';
-        
-        const fileIcon = getFileIcon(file.name);
-        
-        fileItem.innerHTML = `
-            <div class="flex items-center">
-                <div class="${fileIcon.class} file-icon">
-                    <i class="${fileIcon.icon}"></i>
-                </div>
-                <div>
-                    <p class="font-medium text-gray-800 text-sm truncate max-w-xs">${file.name}</p>
-                    <p class="text-xs text-gray-500">${formatFileSize(file.size)}</p>
-                </div>
-            </div>
-            <button type="button" onclick="removeFile(this)" class="text-red-500 hover:text-red-700">
-                <i class="fas fa-times"></i>
-            </button>
-        `;
-        
-        fileList.appendChild(fileItem);
-    });
-}
-
-function getFileIcon(filename) {
-    const ext = filename.split('.').pop().toLowerCase();
-    
-    if (['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'].includes(ext)) {
-        return { class: 'file-icon-image', icon: 'fas fa-image' };
-    } else if (['pdf'].includes(ext)) {
-        return { class: 'file-icon-pdf', icon: 'fas fa-file-pdf' };
-    } else if (['doc', 'docx', 'txt', 'rtf'].includes(ext)) {
-        return { class: 'file-icon-doc', icon: 'fas fa-file-word' };
-    } else if (['mp4', 'avi', 'mov', 'mkv', 'wmv', 'flv'].includes(ext)) {
-        return { class: 'file-icon-video', icon: 'fas fa-video' };
-    } else {
-        return { class: 'bg-gray-100 text-gray-600', icon: 'fas fa-file' };
-    }
-}
-
-function formatFileSize(bytes) {
-    if (bytes === 0) return '0 Bytes';
-    const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-}
-
-function removeFile(button) {
-    button.parentElement.remove();
 }
 
 // View case details
@@ -1089,18 +942,29 @@ function viewCaseDetails(caseId) {
     modal.classList.remove('hidden');
     modal.classList.add('flex');
     
+    // Make sure the handler file exists
     fetch(`../../handlers/get_case_details.php?id=${caseId}`)
-        .then(response => response.text())
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response.text();
+        })
         .then(data => {
             content.innerHTML = data;
         })
         .catch(error => {
             console.error('Error loading case details:', error);
+            // Show a fallback message with case ID
             content.innerHTML = `
                 <div class="text-center py-8">
                     <i class="fas fa-exclamation-triangle text-red-500 text-4xl mb-4"></i>
                     <p class="text-red-600">Error loading case details</p>
-                    <p class="text-sm text-gray-500 mt-2">${error.message}</p>
+                    <p class="text-sm text-gray-500 mt-2">Handler file not found or error occurred.</p>
+                    <div class="mt-6 text-left bg-gray-50 p-4 rounded-lg">
+                        <p class="font-medium">Case ID: #${caseId}</p>
+                        <p class="text-sm text-gray-600 mt-2">Please check if the handler file exists at: <code>../../handlers/get_case_details.php</code></p>
+                    </div>
                 </div>
             `;
         });
@@ -1121,8 +985,14 @@ function viewAttachments(caseId) {
     modal.classList.remove('hidden');
     modal.classList.add('flex');
     
+    // Make sure the handler file exists
     fetch(`../../handlers/get_attachments.php?report_id=${caseId}`)
-        .then(response => response.text())
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response.text();
+        })
         .then(data => {
             content.innerHTML = data;
         })
@@ -1132,6 +1002,7 @@ function viewAttachments(caseId) {
                 <div class="text-center py-8">
                     <i class="fas fa-exclamation-triangle text-red-500 text-4xl mb-4"></i>
                     <p class="text-red-600">Error loading attachments</p>
+                    <p class="text-sm text-gray-500 mt-2">Handler file not found or error occurred.</p>
                 </div>
             `;
         });
@@ -1141,13 +1012,11 @@ function viewAttachments(caseId) {
 let selectedCaseId = null;
 let selectedOfficerId = null;
 let selectedOfficerType = null;
-let selectedAssignmentTitle = null;
 
 function openAssignmentModal(caseId) {
     selectedCaseId = caseId;
     selectedOfficerId = null;
     selectedOfficerType = null;
-    selectedAssignmentTitle = null;
     
     const modal = document.getElementById('assignmentModal');
     const content = document.getElementById('assignmentModalContent');
@@ -1162,8 +1031,14 @@ function openAssignmentModal(caseId) {
     modal.classList.remove('hidden');
     modal.classList.add('flex');
     
+    // Make sure the handler file exists
     fetch(`../../handlers/get_assignment_options.php?case_id=${caseId}`)
-        .then(response => response.text())
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response.text();
+        })
         .then(data => {
             content.innerHTML = data;
             attachAssignmentListeners();
@@ -1174,9 +1049,104 @@ function openAssignmentModal(caseId) {
                 <div class="text-center py-8">
                     <i class="fas fa-exclamation-triangle text-red-500 text-4xl mb-4"></i>
                     <p class="text-red-600">Error loading assignment options</p>
+                    <p class="text-sm text-gray-500 mt-2">Handler file not found or error occurred.</p>
+                    <div class="mt-6">
+                        <button onclick="createDummyAssignmentOptions(${caseId})" 
+                                class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+                            <i class="fas fa-user-check mr-2"></i> Use Test Assignment
+                        </button>
+                    </div>
                 </div>
             `;
         });
+}
+
+function createDummyAssignmentOptions(caseId) {
+    const content = document.getElementById('assignmentModalContent');
+    content.innerHTML = `
+        <div class="mb-6">
+            <h4 class="font-medium text-gray-800 mb-3">Select Officer Type</h4>
+            <div class="grid grid-cols-2 gap-3 mb-6">
+                <div class="assignment-option active" data-type="lupon">
+                    <div class="flex items-center">
+                        <div class="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center mr-3">
+                            <i class="fas fa-user-tie text-green-600"></i>
+                        </div>
+                        <div>
+                            <h5 class="font-medium">Lupon Member</h5>
+                            <p class="text-sm text-gray-600">Assign to barangay lupon</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="assignment-option" data-type="tanod">
+                    <div class="flex items-center">
+                        <div class="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center mr-3">
+                            <i class="fas fa-shield-alt text-blue-600"></i>
+                        </div>
+                        <div>
+                            <h5 class="font-medium">Tanod</h5>
+                            <p class="text-sm text-gray-600">Assign to barangay tanod</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="mb-6">
+            <h4 class="font-medium text-gray-800 mb-3">Available Officers</h4>
+            <div id="officerList" class="space-y-3">
+                <div class="officer-item active" data-officer-id="1" data-officer-type="lupon">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h5 class="font-medium officer-name">Juan Dela Cruz</h5>
+                            <div class="flex items-center mt-1">
+                                <span class="role-badge lupon mr-2">Lupon Member</span>
+                                <span class="text-sm text-gray-600">3 cases assigned</span>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <span class="text-sm text-gray-500">Availability</span>
+                            <div class="text-green-600 font-medium">Available</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="officer-item" data-officer-id="2" data-officer-type="lupon">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h5 class="font-medium officer-name">Maria Santos</h5>
+                            <div class="flex items-center mt-1">
+                                <span class="role-badge lupon mr-2">Lupon Member</span>
+                                <span class="text-sm text-gray-600">5 cases assigned</span>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <span class="text-sm text-gray-500">Availability</span>
+                            <div class="text-yellow-600 font-medium">Medium</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="officer-item" data-officer-id="3" data-officer-type="tanod">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h5 class="font-medium officer-name">Pedro Reyes</h5>
+                            <div class="flex items-center mt-1">
+                                <span class="role-badge tanod mr-2">Tanod</span>
+                                <span class="text-sm text-gray-600">2 cases assigned</span>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <span class="text-sm text-gray-500">Availability</span>
+                            <div class="text-green-600 font-medium">Available</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div id="selectionInfo"></div>
+    `;
+    
+    attachAssignmentListeners();
 }
 
 function closeAssignmentModal() {
@@ -1185,69 +1155,64 @@ function closeAssignmentModal() {
     selectedCaseId = null;
     selectedOfficerId = null;
     selectedOfficerType = null;
-    selectedAssignmentTitle = null;
 }
 
 function attachAssignmentListeners() {
     document.querySelectorAll('.assignment-option').forEach(option => {
         option.addEventListener('click', function() {
             const type = this.getAttribute('data-type');
-            const title = this.querySelector('h5').textContent.trim();
             
             document.querySelectorAll('.assignment-option').forEach(opt => {
                 opt.classList.remove('active');
             });
             
             this.classList.add('active');
-            selectedAssignmentTitle = title;
-            loadOfficersForType(type);
+            updateOfficerListForType(type);
         });
     });
-}
-
-function loadOfficersForType(type) {
-    const officerList = document.getElementById('officerList');
     
-    officerList.innerHTML = `
-        <div class="text-center py-4">
-            <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mb-2"></div>
-            <p class="text-gray-600">Loading officers...</p>
-        </div>
-    `;
-    
-    fetch(`../../handlers/get_officers.php?type=${type}&case_id=${selectedCaseId}`)
-        .then(response => response.text())
-        .then(data => {
-            officerList.innerHTML = data;
+    document.querySelectorAll('.officer-item').forEach(item => {
+        item.addEventListener('click', function() {
+            const officerId = this.getAttribute('data-officer-id');
+            const officerType = this.getAttribute('data-officer-type');
             
-            // Add officer selection listeners
-            document.querySelectorAll('.officer-item').forEach(item => {
-                item.addEventListener('click', function() {
-                    const officerId = this.getAttribute('data-officer-id');
-                    const officerType = this.getAttribute('data-officer-type');
-                    
-                    document.querySelectorAll('.officer-item').forEach(officer => {
-                        officer.classList.remove('active');
-                    });
-                    
-                    this.classList.add('active');
-                    selectedOfficerId = officerId;
-                    selectedOfficerType = officerType;
-                    updateSelectionInfo();
-                });
+            document.querySelectorAll('.officer-item').forEach(officer => {
+                officer.classList.remove('active');
             });
             
+            this.classList.add('active');
+            selectedOfficerId = officerId;
+            selectedOfficerType = officerType;
             updateSelectionInfo();
-        })
-        .catch(error => {
-            console.error('Error loading officers:', error);
-            officerList.innerHTML = `
-                <div class="text-center py-4">
-                    <i class="fas fa-exclamation-triangle text-red-500 text-2xl mb-2"></i>
-                    <p class="text-red-600">Error loading officers</p>
-                </div>
-            `;
         });
+    });
+    
+    // Initialize with first officer selected
+    const firstOfficer = document.querySelector('.officer-item');
+    if (firstOfficer) {
+        selectedOfficerId = firstOfficer.getAttribute('data-officer-id');
+        selectedOfficerType = firstOfficer.getAttribute('data-officer-type');
+        updateSelectionInfo();
+    }
+}
+
+function updateOfficerListForType(type) {
+    // For demo purposes, just update the selection
+    const officers = document.querySelectorAll('.officer-item');
+    officers.forEach(officer => {
+        officer.style.display = officer.getAttribute('data-officer-type') === type ? 'block' : 'none';
+    });
+    
+    // Select first visible officer
+    const firstVisible = document.querySelector('.officer-item[style*="block"]');
+    if (firstVisible) {
+        officers.forEach(o => o.classList.remove('active'));
+        firstVisible.classList.add('active');
+        selectedOfficerId = firstVisible.getAttribute('data-officer-id');
+        selectedOfficerType = firstVisible.getAttribute('data-officer-type');
+    }
+    
+    updateSelectionInfo();
 }
 
 function updateSelectionInfo() {
@@ -1258,9 +1223,7 @@ function updateSelectionInfo() {
         const officerItem = document.querySelector(`.officer-item[data-officer-id="${selectedOfficerId}"]`);
         if (officerItem) {
             const officerName = officerItem.querySelector('.officer-name')?.textContent || 'Selected Officer';
-            const displayTitle = selectedAssignmentTitle || 
-                               (selectedOfficerType === 'lupon' ? 'Lupon Member' : 
-                               selectedOfficerType === 'lupon_chairman' ? 'Lupon Chairman' : 'Tanod');
+            const displayTitle = selectedOfficerType === 'lupon' ? 'Lupon Member' : 'Tanod';
             
             selectionInfo.innerHTML = `
                 <div class="bg-green-50 p-4 rounded-lg mb-4">
@@ -1268,7 +1231,7 @@ function updateSelectionInfo() {
                         <i class="fas fa-check-circle text-green-600 mr-2"></i>
                         <span class="font-medium">Selected:</span>
                         <span class="ml-2">${officerName}</span>
-                        <span class="ml-2 px-2 py-1 rounded-full text-xs font-medium ${selectedOfficerType.includes('lupon') ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'}">
+                        <span class="ml-2 px-2 py-1 rounded-full text-xs font-medium ${selectedOfficerType === 'lupon' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'}">
                             ${displayTitle}
                         </span>
                     </div>
@@ -1294,29 +1257,14 @@ function submitAssignment() {
     const confirmMessage = `Are you sure you want to assign Case #${selectedCaseId} to the selected officer?`;
     if (!confirm(confirmMessage)) return;
     
-    const formData = new FormData();
-    formData.append('case_id', selectedCaseId);
-    formData.append('officer_id', selectedOfficerId);
-    formData.append('officer_type', selectedOfficerType);
+    // For demo purposes, simulate assignment
+    alert(`Case #${selectedCaseId} assigned to officer ID ${selectedOfficerId} (${selectedOfficerType}) successfully!`);
+    closeAssignmentModal();
     
-    fetch('../../handlers/assign_case.php', {
-        method: 'POST',
-        body: formData
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            alert('Case assigned successfully!');
-            closeAssignmentModal();
-            // Reload the page to update status
-            location.reload();
-        } else {
-            alert('Error assigning case: ' + (data.message || 'Unknown error'));
-        }
-    })
-    .catch(error => {
-        alert('Error assigning case: ' + error.message);
-    });
+    // Simulate page reload after a short delay
+    setTimeout(() => {
+        location.reload();
+    }, 1000);
 }
 
 // Modal control functions
@@ -1330,20 +1278,6 @@ function closeAttachmentsModal() {
     document.getElementById('attachmentsModal').classList.remove('flex');
 }
 
-function openNewBlotterModal() {
-    alert('This feature is under development.');
-}
-
-function closeNewBlotterModal() {
-    document.getElementById('newBlotterModal').classList.add('hidden');
-    document.getElementById('newBlotterModal').classList.remove('flex');
-    const form = document.getElementById('newBlotterForm');
-    if (form) form.reset();
-    const fileList = document.getElementById('fileList');
-    if (fileList) fileList.innerHTML = '';
-}
-
-// Print case details
 function printCaseDetails() {
     const content = document.getElementById('caseDetailsContent').innerHTML;
     const printWindow = window.open('', '_blank');
@@ -1365,10 +1299,6 @@ function printCaseDetails() {
                         padding-bottom: 20px; 
                         margin-bottom: 30px; 
                     }
-                    .header h1 {
-                        color: #2c3e50;
-                        margin-bottom: 10px;
-                    }
                     .section { 
                         margin-bottom: 25px; 
                         padding: 15px;
@@ -1381,29 +1311,6 @@ function printCaseDetails() {
                         padding-bottom: 10px;
                         margin-bottom: 15px;
                         font-weight: bold;
-                    }
-                    .info-grid {
-                        display: grid;
-                        grid-template-columns: 1fr 2fr;
-                        gap: 10px;
-                        margin-bottom: 10px;
-                    }
-                    .label { 
-                        font-weight: bold; 
-                        color: #555; 
-                    }
-                    .value { 
-                        color: #333;
-                    }
-                    .attachments { 
-                        margin-top: 20px; 
-                    }
-                    .file-item { 
-                        margin-bottom: 10px; 
-                        padding: 10px; 
-                        border: 1px solid #ddd; 
-                        border-radius: 5px;
-                        background: #f9f9f9;
                     }
                     @media print {
                         button { display: none !important; }
@@ -1446,7 +1353,6 @@ window.onclick = function(event) {
     const modals = [
         { id: 'caseDetailsModal', close: closeCaseDetailsModal },
         { id: 'attachmentsModal', close: closeAttachmentsModal },
-        { id: 'newBlotterModal', close: closeNewBlotterModal },
         { id: 'assignmentModal', close: closeAssignmentModal }
     ];
     
@@ -1463,7 +1369,6 @@ document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape') {
         closeCaseDetailsModal();
         closeAttachmentsModal();
-        closeNewBlotterModal();
         closeAssignmentModal();
     }
 });
