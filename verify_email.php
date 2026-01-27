@@ -10,7 +10,10 @@ ini_set('display_errors', 1);
 // Get token from URL - handle both URL encoded and raw formats
 $raw_token = isset($_GET['token']) ? $_GET['token'] : '';
 $token = rawurldecode(trim($raw_token));
-$token = filter_var($token, FILTER_SANITIZE_STRING);
+
+// Clean the token - remove any non-hex characters (should only be [a-f0-9])
+// This is safer than using deprecated filter functions
+$token = preg_replace('/[^a-f0-9]/i', '', $token);
 
 $message = '';
 $is_success = false;
@@ -18,7 +21,7 @@ $is_success = false;
 // Debug logging
 error_log("=== Verification Request ===");
 error_log("Raw token from URL: " . $raw_token);
-error_log("Decoded token: " . $token);
+error_log("Decoded and cleaned token: " . $token);
 error_log("Token length: " . strlen($token));
 error_log("Token format check: " . (preg_match('/^[a-f0-9]{64}$/i', $token) ? 'Valid' : 'Invalid'));
 
