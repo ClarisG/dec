@@ -12,7 +12,7 @@ $report_id = $_GET['id'] ?? 0;
 
 // Get report details
 $query = "SELECT r.*, rt.type_name, 
-                 u.first_name, u.last_name, u.email, u.contact_number as phone, u.address,
+                 u.first_name, u.last_name, u.email, u.contact_number as phone, u.permanent_address as address,
                  CONCAT(u.first_name, ' ', u.last_name) as user_name
           FROM reports r 
           LEFT JOIN report_types rt ON r.report_type_id = rt.id 
