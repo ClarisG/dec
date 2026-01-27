@@ -1,20 +1,37 @@
 <?php
-// citizen_dashboard.php - UPDATED HEADER
-// Start session only once
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
-
-// Check if user is logged in and is a citizen
-if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'citizen') {
-    header("Location: ../index.php");
-    exit();
-}
-
-// Include database configuration
 require_once 'config/database.php';
 require_once 'config/rate_limit.php';
 require_once 'config/base_url.php';
+
+// Define getRateLimitInfo function if it doesn't exist
+if (!function_exists('getRateLimitInfo')) {
+    function getRateLimitInfo($user_id) {
+        try {
+            $conn = getDbConnection();
+            
+            // Count reports in the last hour
+            $query = "SELECT COUNT(*) as count, MAX(created_at) as last_report 
+                      FROM reports 
+                      WHERE user_id = :user_id 
+                      AND created_at >= DATE_SUB(NOW(), INTERVAL 1 HOUR)";
+            $stmt = $conn->prepare($query);
+            $stmt->bindParam(':user_id', $user_id);
+            $stmt->execute();
+            $result = $stmt->fetch(PDO::FETCH_ASSOC);
+            
+            return [
+                'count' => $result['count'] ?? 0,
+                'last_report' => $result['last_report'] ?? null
+            ];
+        } catch (Exception $e) {
+            error_log("Error getting rate limit info: " . $e->getMessage());
+            return [
+                'count' => 0,
+                'last_report' => null
+            ];
+        }
+    }
+}
 
 // Get user data
 $user_id = $_SESSION['user_id'];

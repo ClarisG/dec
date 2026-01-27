@@ -1,32 +1,29 @@
 <?php
-// config/rate_limit.php - Rate limiting functions
-
-function check_rate_limit($key, $limit = 5, $timeframe = 3600) {
-    $ip = $_SERVER['REMOTE_ADDR'];
-    $cache_key = "rate_limit_{$key}_{$ip}";
-    
-    if (!isset($_SESSION[$cache_key])) {
-        $_SESSION[$cache_key] = [
-            'count' => 1,
-            'time' => time()
+// config/rate_limit.php
+function getRateLimitInfo($user_id) {
+    try {
+        $conn = getDbConnection();
+        
+        // Count reports in the last hour
+        $query = "SELECT COUNT(*) as count, MAX(created_at) as last_report 
+                  FROM reports 
+                  WHERE user_id = :user_id 
+                  AND created_at >= DATE_SUB(NOW(), INTERVAL 1 HOUR)";
+        $stmt = $conn->prepare($query);
+        $stmt->bindParam(':user_id', $user_id);
+        $stmt->execute();
+        $result = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        return [
+            'count' => $result['count'] ?? 0,
+            'last_report' => $result['last_report'] ?? null
         ];
-        return true;
-    }
-    
-    $data = $_SESSION[$cache_key];
-    
-    if (time() - $data['time'] > $timeframe) {
-        $_SESSION[$cache_key] = [
-            'count' => 1,
-            'time' => time()
+    } catch (Exception $e) {
+        error_log("Error getting rate limit info: " . $e->getMessage());
+        return [
+            'count' => 0,
+            'last_report' => null
         ];
-        return true;
     }
-    
-    if ($data['count'] >= $limit) {
-        return false;
-    }
-    
-    $_SESSION[$cache_key]['count']++;
-    return true;
 }
+?>
