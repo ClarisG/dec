@@ -1,7 +1,16 @@
 <?php
+// Start the session first
+session_start();
+
 require_once 'config/database.php';
 require_once 'config/rate_limit.php';
 require_once 'config/base_url.php';
+
+// Check if user is logged in, redirect if not
+if (!isset($_SESSION['user_id'])) {
+    header("Location: ../login.php");
+    exit;
+}
 
 // Define getRateLimitInfo function if it doesn't exist
 if (!function_exists('getRateLimitInfo')) {
