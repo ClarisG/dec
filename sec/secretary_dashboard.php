@@ -692,51 +692,7 @@ function getModuleSubtitle($module) {
         </div>
     </div>
 
-    <!-- Assignment Modal (for case module) -->
-    <div id="assignmentModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50 p-4">
-        <div class="bg-white rounded-2xl max-w-md w-full p-6">
-            <div class="flex justify-between items-center mb-6">
-                <h3 class="text-xl font-bold text-gray-800">Assign Case to Lupon Member</h3>
-                <button onclick="closeAssignmentModal()" class="text-gray-400 hover:text-gray-600">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-            
-            <form method="POST" action="">
-                <input type="hidden" name="case_id" id="modalCaseId">
-                <input type="hidden" name="assign_case" value="1">
-                
-                <div class="mb-6">
-                    <label class="block text-sm font-medium text-gray-700 mb-2">Select Lupon Member</label>
-                    <select name="lupon_member" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-                        <option value="">Choose Lupon Member</option>
-                        <option value="Juan Dela Cruz">Juan Dela Cruz - Lupon Chairman</option>
-                        <option value="Maria Santos">Maria Santos - Lupon Member</option>
-                        <option value="Pedro Reyes">Pedro Reyes - Lupon Member</option>
-                        <option value="Ana Lim">Ana Lim - Lupon Member</option>
-                        <option value="Carlos Torres">Carlos Torres - Lupon Member</option>
-                    </select>
-                </div>
-                
-                <div class="mb-6">
-                    <label class="block text-sm font-medium text-gray-700 mb-2">Blotter Number</label>
-                    <input type="text" value="BLT-2024-<?php echo date('md') . '-' . rand(100, 999); ?>" 
-                           class="w-full p-3 bg-gray-50 border border-gray-300 rounded-lg" readonly>
-                </div>
-                
-                <div class="flex justify-end space-x-3">
-                    <button type="button" onclick="closeAssignmentModal()" 
-                            class="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50">
-                        Cancel
-                    </button>
-                    <button type="submit" 
-                            class="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
-                        Assign Case
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>
+    <!-- Assignment Modal (for case module) - REMOVED (Handled by case.php) -->
 
     <script>
         // Mobile menu toggle
@@ -770,25 +726,7 @@ function getModuleSubtitle($module) {
             if (userDropdown) userDropdown.classList.add('hidden');
         });
 
-        // Assignment Modal Functions
-        function openAssignmentModal(caseId) {
-            document.getElementById('modalCaseId').value = caseId;
-            document.getElementById('assignmentModal').classList.remove('hidden');
-            document.getElementById('assignmentModal').classList.add('flex');
-        }
-        
-        function closeAssignmentModal() {
-            document.getElementById('assignmentModal').classList.add('hidden');
-            document.getElementById('assignmentModal').classList.remove('flex');
-        }
-        
-        // Close modal when clicking outside
-        window.onclick = function(event) {
-            const modal = document.getElementById('assignmentModal');
-            if (event.target == modal) {
-                closeAssignmentModal();
-            }
-        }
+        // Assignment Modal Functions - REMOVED (Handled by case.php)
         
         // Auto-refresh for compliance monitoring
         if (window.location.search.includes('module=compliance')) {

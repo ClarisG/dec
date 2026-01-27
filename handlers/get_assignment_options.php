@@ -45,13 +45,13 @@ try {
             </div>
         </div>
         
-        <div class="assignment-option" data-type="lupon_chairman">
+        <div class="assignment-option" data-type="barangay_captain">
             <div class="text-center p-4">
                 <div class="w-12 h-12 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-3">
                     <i class="fas fa-user-tie text-yellow-600 text-xl"></i>
                 </div>
-                <h5 class="font-bold text-gray-800">Lupon Chairman</h5>
-                <p class="text-sm text-gray-600 mt-1">Assign to Lupon chairman for arbitration</p>
+                <h5 class="font-bold text-gray-800">Barangay Captain</h5>
+                <p class="text-sm text-gray-600 mt-1">Assign to Barangay Captain for arbitration</p>
             </div>
         </div>
         
