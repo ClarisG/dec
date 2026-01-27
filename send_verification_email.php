@@ -13,7 +13,16 @@ function sendVerificationEmail($email, $first_name, $verification_token) {
     
     // Verification link (valid for 20 minutes)
     $protocol = isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http';
-    $verification_link = $protocol . "://" . $_SERVER['HTTP_HOST'] . "/verify_email.php?token=" . $verification_token;
+    $domain = $_SERVER['HTTP_HOST'];
+    
+    // Don't URL encode the token - it's already safe (hex characters)
+    $verification_link = $protocol . "://" . $domain . "/verify_email.php?token=" . $verification_token;
+    
+    // Debug logging
+    error_log("Sending verification email to: " . $email);
+    error_log("Generated link: " . $verification_link);
+    error_log("Token length: " . strlen($verification_token));
+    error_log("Token format: " . (preg_match('/^[a-f0-9]{64}$/i', $verification_token) ? 'Valid' : 'Invalid'));
     
     // HTML email content
     $message = '
@@ -235,6 +244,12 @@ function sendVerificationEmail($email, $first_name, $verification_token) {
         // Also send plain text version
         $headers_plain = str_replace("text/html", "text/plain", $headers);
         mail($to, $subject, $alt_body, $headers_plain);
+        
+        if ($result) {
+            error_log("Verification email sent successfully to: " . $email);
+        } else {
+            error_log("Failed to send verification email to: " . $email);
+        }
         
         return $result;
     } catch (Exception $e) {

@@ -3,68 +3,133 @@
 session_start();
 require_once 'config/database.php';
 
-$token = isset($_GET['token']) ? trim($_GET['token']) : '';
+// Enable error reporting for debugging
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
+
+// Get token from URL - handle both URL encoded and raw formats
+$raw_token = isset($_GET['token']) ? $_GET['token'] : '';
+$token = rawurldecode(trim($raw_token));
+$token = filter_var($token, FILTER_SANITIZE_STRING);
+
 $message = '';
 $is_success = false;
 
-if (empty($token)) {
+// Debug logging
+error_log("=== Verification Request ===");
+error_log("Raw token from URL: " . $raw_token);
+error_log("Decoded token: " . $token);
+error_log("Token length: " . strlen($token));
+error_log("Token format check: " . (preg_match('/^[a-f0-9]{64}$/i', $token) ? 'Valid' : 'Invalid'));
+
+if (empty($token) || strlen($token) !== 64 || !preg_match('/^[a-f0-9]{64}$/i', $token)) {
+    error_log("Invalid token format: " . $token);
     $message = "Invalid verification link. Please check your email for the correct link.";
 } else {
     try {
         $conn = getDbConnection();
         
         // Check if token exists and is not expired
-        $query = "SELECT id, first_name, email, verification_expiry FROM users 
-                  WHERE verification_token = :token AND verification_expiry > NOW()";
+        $query = "SELECT id, first_name, email, verification_expiry, email_verified 
+                  FROM users 
+                  WHERE verification_token = :token 
+                  AND verification_expiry > NOW()";
         $stmt = $conn->prepare($query);
-        $stmt->bindParam(':token', $token);
+        $stmt->bindParam(':token', $token, PDO::PARAM_STR);
         $stmt->execute();
         
         if ($stmt->rowCount() == 1) {
             $user = $stmt->fetch(PDO::FETCH_ASSOC);
             
-            // Update user as verified
-            $update_query = "UPDATE users SET 
-                email_verified = 1,
-                status = 'active',
-                is_active = 1,
-                verification_token = NULL,
-                verification_expiry = NULL,
-                verified_at = NOW(),
-                updated_at = NOW()
-                WHERE id = :id";
+            // Debug log
+            error_log("Token found for user ID: " . $user['id'] . ", Email: " . $user['email']);
             
-            $update_stmt = $conn->prepare($update_query);
-            $update_stmt->bindParam(':id', $user['id']);
-            
-            if ($update_stmt->execute()) {
-                $message = "Email successfully verified! Your account is now active.";
+            // Check if already verified
+            if ($user['email_verified'] == 1) {
+                $message = "Email is already verified. You can login now.";
                 $is_success = true;
-                
-                // Redirect to login after 1.5 seconds
                 header("refresh:1.5;url=login.php");
             } else {
-                $message = "Verification failed. Please try again or contact support.";
+                // Update user as verified
+                $update_query = "UPDATE users SET 
+                    email_verified = 1,
+                    status = 'active',
+                    is_active = 1,
+                    verification_token = NULL,
+                    verification_expiry = NULL,
+                    verified_at = NOW(),
+                    updated_at = NOW()
+                    WHERE id = :id";
+                
+                $update_stmt = $conn->prepare($update_query);
+                $update_stmt->bindParam(':id', $user['id'], PDO::PARAM_INT);
+                
+                if ($update_stmt->execute()) {
+                    error_log("Email verified successfully for user ID: " . $user['id']);
+                    $message = "Email successfully verified! Your account is now active.";
+                    $is_success = true;
+                    
+                    // Redirect to login after 1.5 seconds
+                    header("refresh:1.5;url=login.php");
+                } else {
+                    error_log("Failed to update user verification status for ID: " . $user['id']);
+                    $message = "Verification failed. Please try again or contact support.";
+                }
             }
         } else {
-            // Check if token exists but expired
-            $expired_query = "SELECT id FROM users WHERE verification_token = :token";
-            $expired_stmt = $conn->prepare($expired_query);
-            $expired_stmt->bindParam(':token', $token);
-            $expired_stmt->execute();
+            // Check if token exists but expired or already used
+            $check_query = "SELECT id, email_verified, verification_expiry 
+                           FROM users 
+                           WHERE verification_token = :token";
+            $check_stmt = $conn->prepare($check_query);
+            $check_stmt->bindParam(':token', $token, PDO::PARAM_STR);
+            $check_stmt->execute();
             
-            if ($expired_stmt->rowCount() == 1) {
-                $message = "Verification link has expired. Please register again or request a new verification link.";
+            if ($check_stmt->rowCount() == 1) {
+                $user = $check_stmt->fetch(PDO::FETCH_ASSOC);
+                
+                if ($user['email_verified'] == 1) {
+                    $message = "Email is already verified. You can login now.";
+                    $is_success = true;
+                    header("refresh:1.5;url=login.php");
+                } else {
+                    // Check if expired
+                    $expiry = new DateTime($user['verification_expiry']);
+                    $now = new DateTime();
+                    
+                    if ($expiry < $now) {
+                        $message = "Verification link has expired. Please register again.";
+                    } else {
+                        $message = "Verification link is invalid. Please check your email.";
+                    }
+                }
             } else {
+                error_log("Token not found in database: " . substr($token, 0, 20) . "...");
+                
+                // Try to find similar tokens for debugging
+                $similar_query = "SELECT id, email, verification_token, LENGTH(verification_token) as token_len 
+                                 FROM users 
+                                 WHERE verification_token IS NOT NULL 
+                                 ORDER BY created_at DESC LIMIT 5";
+                $similar_stmt = $conn->prepare($similar_query);
+                $similar_stmt->execute();
+                $similar_tokens = $similar_stmt->fetchAll(PDO::FETCH_ASSOC);
+                
+                error_log("Recent tokens in database:");
+                foreach ($similar_tokens as $row) {
+                    error_log("  ID: " . $row['id'] . ", Email: " . $row['email'] . 
+                             ", Token: " . substr($row['verification_token'], 0, 20) . "...");
+                }
+                
                 $message = "Invalid verification link. Please check your email for the correct link.";
             }
         }
     } catch(PDOException $e) {
+        error_log("Database error in verify_email.php: " . $e->getMessage());
         $message = "Database error: " . $e->getMessage();
     }
 }
 ?>
-
 <!DOCTYPE html>
 <html lang="en">
 <head>

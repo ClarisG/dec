@@ -4,6 +4,10 @@ require_once 'config/database.php';
 require_once 'send_verification_email.php';
 session_start();
 
+// Enable error reporting
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
+
 // Check if user is already logged in
 if (isset($_SESSION['user_id'])) {
     $role = $_SESSION['role'];
@@ -258,6 +262,11 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 $verification_token = generateVerificationToken();
                 $verification_expiry = date('Y-m-d H:i:s', strtotime('+20 minutes'));
                 
+                // Debug logging
+                error_log("Generated token for " . $email . ": " . $verification_token);
+                error_log("Token length: " . strlen($verification_token));
+                error_log("Token expiry: " . $verification_expiry);
+                
                 // Start transaction
                 $conn->beginTransaction();
                 
@@ -296,11 +305,12 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     $insert_stmt->bindParam(':username', $username);
                     $insert_stmt->bindParam(':password', $hashed_password);
                     $insert_stmt->bindParam(':barangay', $barangay);
-                    $insert_stmt->bindParam(':verification_token', $verification_token);
-                    $insert_stmt->bindParam(':verification_expiry', $verification_expiry);
+                    $insert_stmt->bindParam(':verification_token', $verification_token, PDO::PARAM_STR);
+                    $insert_stmt->bindParam(':verification_expiry', $verification_expiry, PDO::PARAM_STR);
                     
                     if ($insert_stmt->execute()) {
                         $user_id = $conn->lastInsertId();
+                        error_log("User inserted with ID: " . $user_id . " and token: " . $verification_token);
                         
                         // Insert citizen details (ONLY for citizen users)
                         $citizen_query = "INSERT INTO user_citizen_details (
@@ -337,6 +347,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     } else {
                         $conn->rollBack();
                         $error = "Registration failed. Please try again.";
+                        error_log("Registration failed for email: " . $email);
                     }
                 } catch(Exception $e) {
                     $conn->rollBack();
