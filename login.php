@@ -1,11 +1,11 @@
 <?php
 // login.php - Simplified design matching your uploaded image
 
-
 // Include database configuration
 require_once __DIR__ . '/config/config.php';
 require_once __DIR__ . '/config/database.php';
 require_once __DIR__ . '/config/session.php';
+
 // Helper function for redirection
 function redirectUser($role) {
     switch($role) {
@@ -206,26 +206,32 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                                         error_log("No master code assigned for personnel");
                                     }
                                 } else {
-                                    // Set session variables for citizens (no master code required)
-                                    error_log("User is citizen, logging in directly");
-                                    
-                                    $_SESSION['user_id'] = $user['id'];
-                                    $_SESSION['username'] = $user['username'];
-                                    $_SESSION['email'] = $user['email'];
-                                    $_SESSION['first_name'] = $user['first_name'];
-                                    $_SESSION['last_name'] = $user['last_name'];
-                                    $_SESSION['role'] = $user['role'];
-                                    $_SESSION['barangay'] = $user['barangay'];
-                                    $_SESSION['phone'] = $user['contact_number'];
-                                    
-                                    // Update last login
-                                    $update_query = "UPDATE users SET last_login = NOW() WHERE id = :id";
+                                    // Check if citizen has verified email
+                                    if ($user['email_verified'] == 1) {
+                                        // Set session variables for citizens (no master code required)
+                                        error_log("User is citizen with verified email, logging in directly");
+                                        
+                                        $_SESSION['user_id'] = $user['id'];
+                                        $_SESSION['username'] = $user['username'];
+                                        $_SESSION['email'] = $user['email'];
+                                        $_SESSION['first_name'] = $user['first_name'];
+                                        $_SESSION['last_name'] = $user['last_name'];
+                                        $_SESSION['role'] = $user['role'];
+                                        $_SESSION['barangay'] = $user['barangay'];
+                                        $_SESSION['phone'] = $user['contact_number'];
+                                        
+                                        // Update last login
+                                        $update_query = "UPDATE users SET last_login = NOW() WHERE id = :id";
                                         $update_stmt = $conn->prepare($update_query);
                                         $update_stmt->bindParam(':id', $user['id']);
                                         $update_stmt->execute();
                                         
                                         // Redirect based on role
                                         redirectUser($user['role']);
+                                    } else {
+                                        $error = "Please verify your email address before logging in. Check your inbox (and spam folder) for the verification email.";
+                                        error_log("Citizen login failed - email not verified");
+                                    }
                                 }
                             } else {
                                 // Account is not active or pending
@@ -430,196 +436,132 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     }
     
     /* Mobile Layout */
- /* Mobile Layout */
-@media (max-width: 767px) {
-    body {
-        background: white;
-        padding: 0;
-    }
-    
-    .mobile-container {
-        width: 100%;
-        min-height: 100vh;
-        background: white;
-        display: flex;
-        flex-direction: column;
-    }
-    
-    .mobile-header {
-        flex-shrink: 0;
-        background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 50%, #1d4ed8 100%);
-        padding: 50px 30px 100px; /* Slightly increased top padding */
-        text-align: center;
-        color: white;
-        position: relative;
-        overflow: hidden;
-        z-index: 1;
-    }
-    
-    /* Wave container */
-    .wave-separator-index {
-        position: absolute;
-        bottom: 0;
-        left: 0;
-        width: 100%;
-        height: 80px;
-        z-index: 2;
-        pointer-events: none;
-    }
-    
-    .wave-separator-index svg {
-        position: absolute;
-        bottom: 0;
-        left: 0;
-        width: 100%;
-        height: 80px;
-        display: block;
-    }
-    
-    /* UPDATED: Larger logo without circle, with white shadow */
-    .mobile-logo-circle {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin: 0 auto 20px;
-    position: relative;
-    z-index: 3;
-    background: transparent;
-    border: none;
-    border-radius: 0;
-    backdrop-filter: none;
-    /* Container size constraints */
-    width: 100%;
-    max-width: 300px;
-    height: auto;
-    aspect-ratio: 1; /* Makes it square */
-    }
-    
-    .mobile-logo-circle img {
-        width: 150px; /* Makes it responsive to container */
+    @media (max-width: 767px) {
+        body {
+            background: white;
+            padding: 0;
+        }
+        
+        .mobile-container {
+            width: 100%;
+            min-height: 100vh;
+            background: white;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .mobile-header {
+            flex-shrink: 0;
+            background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 50%, #1d4ed8 100%);
+            padding: 50px 30px 100px;
+            text-align: center;
+            color: white;
+            position: relative;
+            overflow: hidden;
+            z-index: 1;
+        }
+        
+        /* Wave container */
+        .wave-separator-index {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 80px;
+            z-index: 2;
+            pointer-events: none;
+        }
+        
+        .wave-separator-index svg {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 80px;
+            display: block;
+        }
+        
+        /* UPDATED: Larger logo without circle, with white shadow */
+        .mobile-logo-circle {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 20px;
+            position: relative;
+            z-index: 3;
+            background: transparent;
+            border: none;
+            border-radius: 0;
+            backdrop-filter: none;
+            /* Container size constraints */
+            width: 100%;
+            max-width: 300px;
+            height: auto;
+            aspect-ratio: 1;
+        }
+        
+        .mobile-logo-circle img {
+            width: 150px;
             height: 150px;
             max-width: 100%;
             object-fit: contain;
             filter: drop-shadow(0 0 20px rgba(255, 255, 255, 0.8))
-                drop-shadow(0 0 40px rgba(255, 255, 255, 0.6));
+                   drop-shadow(0 0 40px rgba(255, 255, 255, 0.6));
+        }
+        
+        .mobile-logo-circle img:hover {
+            filter: drop-shadow(0 0 35px rgba(255,255,255,1))
+                   drop-shadow(0 0 70px rgba(255,255,255,0.8))
+                   drop-shadow(0 0 120px rgba(255,255,255,0.6));
+        }
+        
+        .mobile-header h1 {
+            font-size: 26px;
+            font-weight: 700;
+            margin-bottom: 8px;
+            position: relative;
+            z-index: 4;
+        }
+        
+        .mobile-header p {
+            font-size: 17px;
+            opacity: 0.9;
+            position: relative;
+            z-index: 4;
+            margin-bottom: 20px;
+        }
+        
+        /* Adjust the form container */
+        .mobile-form-container {
+            flex: 1;
+            padding: 40px 30px;
+            display: flex;
+            flex-direction: column;
+            background: white;
+            position: relative;
+            z-index: 1;
+            margin-top: 0;
+            padding-top: 20px;
+            border-radius: 30px 30px 0 0;
+        }
+        
+        .mobile-form-header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .mobile-form-header h2 {
+            font-size: 28px;
+            font-weight: 700;
+            color: #2d3748;
+            margin-bottom: 10px;
+        }
+        
+        .mobile-form-header p {
+            color: #718096;
+            font-size: 15px;
+        }
     }
-    .mobile-logo-circle img:hover {
-    filter:
-        drop-shadow(0 0 35px rgba(255,255,255,1))
-        drop-shadow(0 0 70px rgba(255,255,255,0.8))
-        drop-shadow(0 0 120px rgba(255,255,255,0.6));
-}
-    .mobile-header h1 {
-        font-size: 26px; /* Slightly larger font */
-        font-weight: 700;
-        margin-bottom: 8px;
-        position: relative;
-        z-index: 4;
-    }
-    
-    .mobile-header p {
-        font-size: 17px; /* Slightly larger font */
-        opacity: 0.9;
-        position: relative;
-        z-index: 4;
-        margin-bottom: 20px;
-    }
-    
-    /* Adjust the form container */
-    .mobile-form-container {
-          flex: 1;
-    padding: 40px 30px;
-    display: flex;
-    flex-direction: column;
-    background: white;
-    position: relative;
-    z-index: 1;
-    margin-top: 0;
-    padding-top: 20px;
-    border-radius: 30px 30px 0 0;
-    }
-    
-    .mobile-form-header {
-        text-align: center;
-        margin-bottom: 30px;
-    }
-    
-    .mobile-form-header h2 {
-        font-size: 28px;
-        font-weight: 700;
-        color: #2d3748;
-        margin-bottom: 10px;
-    }
-    
-    .mobile-form-header p {
-        color: #718096;
-        font-size: 15px;
-    }
-
-    
-    /* Adjust the form container */
-    .mobile-form-container {
-        flex: 1;
-        padding: 40px 30px;
-        display: flex;
-        flex-direction: column;
-        background: white;
-        position: relative;
-        z-index: 1;
-        margin-top: 0;
-        padding-top: 20px;
-        border-radius: 30px 30px 0 0;
-    }
-    
-    .mobile-form-header {
-        text-align: center;
-        margin-bottom: 30px;
-    }
-    
-    .mobile-form-header h2 {
-        font-size: 28px;
-        font-weight: 700;
-        color: #2d3748;
-        margin-bottom: 10px;
-    }
-    
-    .mobile-form-header p {
-        color: #718096;
-        font-size: 15px;
-    }
-
-    
-    /* Adjust the form container - NO negative margin */
-    .mobile-form-container {
-        flex: 1;
-        padding: 40px 30px;
-        display: flex;
-        flex-direction: column;
-        background: white;
-        position: relative;
-        z-index: 1;
-        margin-top: 0; /* Remove negative margin */
-        padding-top: 20px; /* Reduced top padding */
-        border-radius: 30px 30px 0 0;
-    }
-    
-    .mobile-form-header {
-        text-align: center;
-        margin-bottom: 30px;
-    }
-    
-    .mobile-form-header h2 {
-        font-size: 28px;
-        font-weight: 700;
-        color: #2d3748;
-        margin-bottom: 10px;
-    }
-    
-    .mobile-form-header p {
-        color: #718096;
-        font-size: 15px;
-    }
-}
     
     /* Common Form Styles */
     .form-group {
@@ -887,12 +829,12 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         height: 50px;
     }
     
-   .back-home:hover {
+    .back-home:hover {
         background: rgba(255, 255, 255, 0.25);
         transform: translateX(-5px);
         box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
     }
-
+    
     .back-home i {
         margin-right: 10px;
         font-size: 22px;
@@ -900,50 +842,49 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     }
     
     /* Responsive adjustments */
-@media (max-width: 480px) {
-    .mobile-header {
-        padding: 30px 20px 80px;
+    @media (max-width: 480px) {
+        .mobile-header {
+            padding: 30px 20px 80px;
+        }
+        
+        .mobile-logo-circle {
+            width: 90px;
+            height: 90px;
+        }
+        
+        .mobile-logo-circle img {
+            width: 70px;
+            height: 70px;
+            filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.5))
+                   drop-shadow(0 0 15px rgba(255, 255, 255, 0.3));
+        }
+        
+        .mobile-header h1 {
+            font-size: 22px;
+        }
+        
+        .mobile-header p {
+            font-size: 15px;
+        }
+        
+        .mobile-form-container {
+            padding: 30px 20px;
+        }
+        
+        .mobile-form-header h2 {
+            font-size: 24px;
+        }
+        
+        .mobile-form-header p {
+            font-size: 14px;
+        }
+        
+        .pin-input {
+            width: 50px;
+            height: 50px;
+            font-size: 22px;
+        }
     }
-    
-    /* Updated for smaller screens */
-    .mobile-logo-circle {
-        width: 90px;
-        height: 90px;
-    }
-    
-    .mobile-logo-circle img {
-        width: 70px;
-        height: 70px;
-        filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.5))
-               drop-shadow(0 0 15px rgba(255, 255, 255, 0.3));
-    }
-    
-    .mobile-header h1 {
-        font-size: 22px;
-    }
-    
-    .mobile-header p {
-        font-size: 15px;
-    }
-    
-    .mobile-form-container {
-        padding: 30px 20px;
-    }
-    
-    .mobile-form-header h2 {
-        font-size: 24px;
-    }
-    
-    .mobile-form-header p {
-        font-size: 14px;
-    }
-    
-    .pin-input {
-        width: 50px;
-        height: 50px;
-        font-size: 22px;
-    }
-}
     
     /* Loading overlay */
     .loading-overlay {
@@ -976,7 +917,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         100% { transform: rotate(360deg); }
     }
 </style>
-    
 </head>
 <body>
     
@@ -1059,7 +999,14 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 <?php if (isset($_GET['registered'])): ?>
                     <div class="alert alert-success">
                         <i class="fas fa-check-circle"></i>
-                        Registration successful! Please login with your credentials.
+                        Registration successful! Please verify your email to login.
+                    </div>
+                <?php endif; ?>
+                
+                <?php if (isset($_GET['verified'])): ?>
+                    <div class="alert alert-success">
+                        <i class="fas fa-check-circle"></i>
+                        Email verified successfully! You can now login.
                     </div>
                 <?php endif; ?>
                 
@@ -1112,19 +1059,19 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         </div>
     </div>
     
-<div class="mobile-container md:hidden">
-    <div class="mobile-header">
-        <div class="mobile-logo-circle">
-            <img src="images/10213.png" alt="LEIR Logo">
+    <div class="mobile-container md:hidden">
+        <div class="mobile-header">
+            <div class="mobile-logo-circle">
+                <img src="images/10213.png" alt="LEIR Logo">
+            </div>
+            
+            <!-- Add the wave separator from index.php -->
+            <div class="wave-separator-index">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 100" preserveAspectRatio="none">
+                    <path fill="white" fill-opacity="1" d="M0,80L48,75C96,70,192,60,288,55C384,50,480,50,576,55C672,60,768,70,864,75C960,80,1056,80,1152,75C1248,70,1344,60,1392,55L1440,50L1440,100L1392,100C1344,100,1248,100,1152,100C1056,100,960,100,864,100C768,100,672,100,576,100C480,100,384,100,288,100C192,100,96,100,48,100L0,100Z"></path>
+                </svg>
+            </div>
         </div>
-        
-        <!-- Add the wave separator from index.php -->
-        <div class="wave-separator-index">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 100" preserveAspectRatio="none">
-                <path fill="white" fill-opacity="1" d="M0,80L48,75C96,70,192,60,288,55C384,50,480,50,576,55C672,60,768,70,864,75C960,80,1056,80,1152,75C1248,70,1344,60,1392,55L1440,50L1440,100L1392,100C1344,100,1248,100,1152,100C1056,100,960,100,864,100C768,100,672,100,576,100C480,100,384,100,288,100C192,100,96,100,48,100L0,100Z"></path>
-            </svg>
-        </div>
-    </div>
         <div class="mobile-form-container">
             <div class="mobile-form-header">
                 <h2>Welcome Back</h2>
@@ -1141,7 +1088,14 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             <?php if (isset($_GET['registered'])): ?>
                 <div class="alert alert-success">
                     <i class="fas fa-check-circle"></i>
-                    Registration successful! Please login with your credentials.
+                    Registration successful! Please verify your email to login.
+                </div>
+            <?php endif; ?>
+            
+            <?php if (isset($_GET['verified'])): ?>
+                <div class="alert alert-success">
+                    <i class="fas fa-check-circle"></i>
+                    Email verified successfully! You can now login.
                 </div>
             <?php endif; ?>
             
@@ -1180,7 +1134,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 <div class="register-link">
                     Don't have an account? 
                     <a href="register.php">Sign Up</a>        
-                     </div>
+                </div>
             </form>
         </div>
     </div>
