@@ -990,6 +990,13 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     </div>
                 <?php endif; ?>
                 
+                <?php if (isset($_GET['password_reset'])): ?>
+                    <div class="alert alert-success">
+                        <i class="fas fa-check-circle"></i>
+                        Password has been reset successfully! You can now login with your new password.
+                    </div>
+                <?php endif; ?>
+                
                 <form id="loginForm" method="POST" action="">
                     <div class="form-group">
                         <label for="username" class="form-label">Email or Username</label>
@@ -1076,6 +1083,13 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 <div class="alert alert-success">
                     <i class="fas fa-check-circle"></i>
                     You have been successfully logged out.
+                </div>
+            <?php endif; ?>
+            
+            <?php if (isset($_GET['password_reset'])): ?>
+                <div class="alert alert-success">
+                    <i class="fas fa-check-circle"></i>
+                    Password has been reset successfully! You can now login with your new password.
                 </div>
             <?php endif; ?>
             

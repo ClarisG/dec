@@ -1,86 +1,178 @@
 <?php
-// reset_password.php - Password Reset Page
+// verify_otp.php - OTP Verification Page
 
 // Include database configuration
 require_once __DIR__ . '/config/config.php';
 require_once __DIR__ . '/config/database.php';
 require_once __DIR__ . '/config/session.php';
 
-// Check if OTP was verified
-if (!isset($_SESSION['otp_verified']) || $_SESSION['otp_verified'] !== true || !isset($_SESSION['reset_user_id'])) {
+// Check if user has requested OTP (has otp_user_id in session)
+if (!isset($_SESSION['otp_user_id']) || !isset($_SESSION['otp_email'])) {
     header("Location: forgot_password.php");
     exit();
 }
 
-// Handle password reset form submission
+// Handle OTP verification form submission
 $error = '';
 $success = '';
 
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
-    $password = isset($_POST['password']) ? trim($_POST['password']) : '';
-    $confirm_password = isset($_POST['confirm_password']) ? trim($_POST['confirm_password']) : '';
+    $otp = isset($_POST['otp']) ? trim($_POST['otp']) : '';
     
-    // Password validation
-    $errors = [];
-    
-    if (empty($password)) {
-        $errors[] = "Please enter a new password.";
-    } elseif (strlen($password) < 8) {
-        $errors[] = "Password must be at least 8 characters long.";
-    } elseif (!preg_match('/[A-Z]/', $password)) {
-        $errors[] = "Password must contain at least one uppercase letter.";
-    } elseif (!preg_match('/[a-z]/', $password)) {
-        $errors[] = "Password must contain at least one lowercase letter.";
-    } elseif (!preg_match('/[0-9]/', $password)) {
-        $errors[] = "Password must contain at least one number.";
-    } elseif (!preg_match('/[\W_]/', $password)) {
-        $errors[] = "Password must contain at least one special character.";
-    }
-    
-    if (empty($confirm_password)) {
-        $errors[] = "Please confirm your password.";
-    } elseif ($password !== $confirm_password) {
-        $errors[] = "Passwords do not match.";
-    }
-    
-    if (empty($errors)) {
+    // Basic validation
+    if (empty($otp)) {
+        $error = "Please enter the 6-digit OTP code.";
+    } elseif (!preg_match('/^[0-9]{6}$/', $otp)) {
+        $error = "OTP must be exactly 6 digits.";
+    } else {
         try {
             $conn = getDbConnection();
             
-            // Hash the new password
-            $password_hash = password_hash($password, PASSWORD_DEFAULT);
+            // Get user data
+            $query = "SELECT * FROM users WHERE id = :id AND email = :email AND is_active = 1";
+            $stmt = $conn->prepare($query);
+            $stmt->bindParam(':id', $_SESSION['otp_user_id']);
+            $stmt->bindParam(':email', $_SESSION['otp_email']);
+            $stmt->execute();
             
-            // Update password in database
-            $update_query = "UPDATE users 
-                            SET password = :password_hash,
-                                reset_token = NULL,
-                                reset_token_expiry = NULL,
-                                updated_at = NOW()
-                            WHERE id = :id";
-            $update_stmt = $conn->prepare($update_query);
-            $update_stmt->bindParam(':password_hash', $password_hash);
-            $update_stmt->bindParam(':id', $_SESSION['reset_user_id']);
-            
-            if ($update_stmt->execute()) {
-                // Clear all reset-related session variables
-                unset($_SESSION['otp_verified']);
-                unset($_SESSION['reset_user_id']);
-                unset($_SESSION['otp_user_id']);
-                unset($_SESSION['otp_email']);
+            if ($stmt->rowCount() == 1) {
+                $user = $stmt->fetch(PDO::FETCH_ASSOC);
                 
-                $success = "Password has been reset successfully! Redirecting to login page...";
-                
-                // Redirect to login page after 3 seconds
-                header("refresh:3;url=login.php?password_reset=1");
+                // Check if OTP exists and hasn't expired
+                if (!empty($user['reset_token']) && !empty($user['reset_token_expiry'])) {
+                    $current_time = date("Y-m-d H:i:s");
+                    
+                    if ($current_time > $user['reset_token_expiry']) {
+                        $error = "OTP has expired. Please request a new one.";
+                    } else {
+                        // Verify OTP
+                        if (password_verify($otp, $user['reset_token'])) {
+                            // OTP is correct
+                            $_SESSION['otp_verified'] = true;
+                            $_SESSION['reset_user_id'] = $user['id'];
+                            
+                            // Clear the OTP from database
+                            $clear_query = "UPDATE users SET reset_token = NULL, reset_token_expiry = NULL WHERE id = :id";
+                            $clear_stmt = $conn->prepare($clear_query);
+                            $clear_stmt->bindParam(':id', $user['id']);
+                            $clear_stmt->execute();
+                            
+                            // Redirect to reset password page
+                            header("Location: reset_password.php");
+                            exit();
+                        } else {
+                            $error = "Invalid OTP code. Please try again.";
+                        }
+                    }
+                } else {
+                    $error = "No OTP request found. Please request a new OTP.";
+                }
             } else {
-                $error = "Failed to reset password. Please try again.";
+                $error = "User not found. Please try again.";
             }
         } catch(PDOException $e) {
             $error = "Database error: " . $e->getMessage();
-            error_log("Password Reset Error: " . $e->getMessage());
+            error_log("OTP Verification Error: " . $e->getMessage());
         }
-    } else {
-        $error = implode("<br>", $errors);
+    }
+}
+
+// Handle resend OTP
+if (isset($_POST['resend_otp'])) {
+    try {
+        $conn = getDbConnection();
+        
+        // Get user data
+        $query = "SELECT * FROM users WHERE id = :id AND email = :email AND is_active = 1";
+        $stmt = $conn->prepare($query);
+        $stmt->bindParam(':id', $_SESSION['otp_user_id']);
+        $stmt->bindParam(':email', $_SESSION['otp_email']);
+        $stmt->execute();
+        
+        if ($stmt->rowCount() == 1) {
+            $user = $stmt->fetch(PDO::FETCH_ASSOC);
+            
+            // Generate new 6-digit OTP
+            $new_otp = str_pad(random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+            $otp_hash = password_hash($new_otp, PASSWORD_DEFAULT);
+            $expiry = date("Y-m-d H:i:s", strtotime("+10 minutes"));
+            
+            // Update OTP in database
+            $update_query = "UPDATE users 
+                            SET reset_token = :otp_hash, 
+                                reset_token_expiry = :expiry 
+                            WHERE id = :id";
+            $update_stmt = $conn->prepare($update_query);
+            $update_stmt->bindParam(':otp_hash', $otp_hash);
+            $update_stmt->bindParam(':expiry', $expiry);
+            $update_stmt->bindParam(':id', $user['id']);
+            
+            if ($update_stmt->execute()) {
+                // Send new OTP email
+                $to = $user['email'];
+                $subject = "New OTP Code - LEIR System";
+                $message = "
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <style>
+                        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+                        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+                        .header { background: linear-gradient(135deg, #1e3a8a 0%, #1d4ed8 100%); padding: 20px; color: white; text-align: center; border-radius: 10px 10px 0 0; }
+                        .content { background: #f8fafc; padding: 30px; border-radius: 0 0 10px 10px; border: 1px solid #e2e8f0; }
+                        .otp-box { background: #ffffff; border: 2px dashed #1d4ed8; padding: 20px; text-align: center; margin: 20px 0; border-radius: 8px; }
+                        .otp-code { font-size: 32px; font-weight: bold; color: #1d4ed8; letter-spacing: 10px; margin: 15px 0; }
+                        .warning { background: #fff5f5; border-left: 4px solid #e53e3e; padding: 15px; margin: 20px 0; }
+                        .footer { margin-top: 30px; padding-top: 20px; border-top: 1px solid #e2e8f0; color: #718096; font-size: 14px; }
+                    </style>
+                </head>
+                <body>
+                    <div class='container'>
+                        <div class='header'>
+                            <h2>LEIR - Law Enforcement Incident Reporting</h2>
+                        </div>
+                        <div class='content'>
+                            <h3>Hello " . htmlspecialchars($user['first_name']) . ",</h3>
+                            <p>You requested a new OTP code for password reset.</p>
+                            
+                            <p>Use the new OTP code below:</p>
+                            
+                            <div class='otp-box'>
+                                <p>Your New One-Time Password (OTP):</p>
+                                <div class='otp-code'>" . $new_otp . "</div>
+                                <p>Enter this code on the password reset page</p>
+                            </div>
+                            
+                            <div class='warning'>
+                                <p><strong>Important:</strong> This OTP will expire in 10 minutes.</p>
+                                <p>If you didn't request this, please ignore this email or contact support.</p>
+                            </div>
+                            
+                            <div class='footer'>
+                                <p>This is an automated message, please do not reply to this email.</p>
+                                <p>&copy; " . date('Y') . " LEIR System. All rights reserved.</p>
+                            </div>
+                        </div>
+                    </div>
+                </body>
+                </html>
+                ";
+                
+                $headers = "MIME-Version: 1.0" . "\r\n";
+                $headers .= "Content-type:text/html;charset=UTF-8" . "\r\n";
+                $headers .= "From: LEIR System <noreply@" . $_SERVER['HTTP_HOST'] . ">" . "\r\n";
+                $headers .= "Reply-To: noreply@" . $_SERVER['HTTP_HOST'] . "\r\n";
+                $headers .= "X-Mailer: PHP/" . phpversion();
+                
+                if (mail($to, $subject, $message, $headers)) {
+                    $success = "New OTP code has been sent to your email.";
+                } else {
+                    $error = "Failed to send new OTP. Please try again.";
+                }
+            }
+        }
+    } catch(PDOException $e) {
+        $error = "Database error: " . $e->getMessage();
     }
 }
 ?>
@@ -89,7 +181,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LEIR | Reset Password</title>
+    <title>LEIR | Verify OTP</title>
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -631,36 +723,70 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             margin-right: 10px;
         }
         
-        /* Password toggle */
-        .password-toggle {
-            position: absolute;
-            right: 15px;
-            top: 50%;
-            transform: translateY(-50%);
-            background: none;
+        /* OTP Input Styles */
+        .otp-input-group {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin: 20px 0;
+        }
+        
+        .otp-input {
+            width: 50px;
+            height: 60px;
+            text-align: center;
+            font-size: 24px;
+            font-weight: 600;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            background: #f8fafc;
+            transition: all 0.2s;
+        }
+        
+        .otp-input:focus {
+            outline: none;
+            border-color: #1a4f8c;
+            box-shadow: 0 0 0 3px rgba(26, 79, 140, 0.1);
+            background: white;
+        }
+        
+        /* Resend OTP link */
+        .resend-link {
+            text-align: center;
+            margin: 20px 0;
+            font-size: 14px;
+            color: #718096;
+        }
+        
+        .resend-link a {
+            color: #1a4f8c;
+            text-decoration: none;
+            font-weight: 600;
+        }
+        
+        .resend-link a:hover {
+            text-decoration: underline;
+        }
+        
+        .resend-form {
+            text-align: center;
+            margin: 20px 0;
+        }
+        
+        .btn-resend {
+            background: #f1f5f9;
+            color: #4a5568;
             border: none;
-            color: #a0aec0;
+            border-radius: 8px;
+            padding: 10px 20px;
+            font-size: 14px;
+            font-weight: 600;
             cursor: pointer;
-            z-index: 10;
-            padding: 5px;
+            transition: all 0.3s;
         }
         
-        /* Password strength indicator */
-        .password-strength {
-            margin-top: 5px;
-            font-size: 12px;
-        }
-        
-        .strength-weak {
-            color: #e53e3e;
-        }
-        
-        .strength-medium {
-            color: #d69e2e;
-        }
-        
-        .strength-strong {
-            color: #38a169;
+        .btn-resend:hover {
+            background: #e2e8f0;
         }
     </style>
 </head>
@@ -668,12 +794,12 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     
     <div class="loading-overlay" id="loadingOverlay">
         <div class="spinner"></div>
-        <p class="text-gray-600 font-medium">Resetting password...</p>
+        <p class="text-gray-600 font-medium">Verifying OTP...</p>
     </div>
     
     <div class="login-container hidden md:flex">
         <div class="left-section">
-            <a href="verify_otp.php" class="back-home">
+            <a href="forgot_password.php" class="back-home">
                 <i class="fas fa-long-arrow-alt-left"></i>
             </a>
             
@@ -687,69 +813,63 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         <div class="right-section">
             <div class="right-content">
                 <div class="form-header">
-                    <h2>Set New Password</h2>
-                    <p>Create a strong new password for your account</p>
+                    <h2>Verify OTP Code</h2>
+                    <p>Enter the 6-digit code sent to your email</p>
                 </div>
                 
                 <div class="info-box">
                     <i class="fas fa-info-circle"></i>
-                    Your password must be at least 8 characters long and include uppercase, lowercase, numbers, and special characters.
+                    Check your email for the 6-digit OTP code. The code is valid for 10 minutes.
                 </div>
                 
                 <?php if ($error): ?>
                     <div class="alert alert-error">
                         <i class="fas fa-exclamation-circle"></i>
-                        <?php echo $error; ?>
+                        <?php echo htmlspecialchars($error); ?>
                     </div>
                 <?php endif; ?>
                 
                 <?php if ($success): ?>
                     <div class="alert alert-success">
                         <i class="fas fa-check-circle"></i>
-                        <?php echo $success; ?>
+                        <?php echo htmlspecialchars($success); ?>
                     </div>
                 <?php endif; ?>
                 
-                <form id="resetPasswordForm" method="POST" action="">
+                <form id="verifyOtpForm" method="POST" action="">
                     <div class="form-group">
-                        <label for="password" class="form-label">New Password</label>
-                        <div class="input-group">
-                            <span class="input-icon">
-                                <i class="fas fa-lock"></i>
-                            </span>
-                            <input type="password" id="password" name="password" class="form-input" 
-                                   placeholder="Enter new password" required
-                                   minlength="8">
-                            <button type="button" class="password-toggle" id="togglePassword">
-                                <i class="fas fa-eye"></i>
-                            </button>
+                        <label class="form-label">Enter 6-digit OTP Code</label>
+                        <div class="otp-input-group">
+                            <input type="text" name="otp[]" class="otp-input" maxlength="1" pattern="[0-9]" inputmode="numeric" required autofocus>
+                            <input type="text" name="otp[]" class="otp-input" maxlength="1" pattern="[0-9]" inputmode="numeric" required>
+                            <input type="text" name="otp[]" class="otp-input" maxlength="1" pattern="[0-9]" inputmode="numeric" required>
+                            <input type="text" name="otp[]" class="otp-input" maxlength="1" pattern="[0-9]" inputmode="numeric" required>
+                            <input type="text" name="otp[]" class="otp-input" maxlength="1" pattern="[0-9]" inputmode="numeric" required>
+                            <input type="text" name="otp[]" class="otp-input" maxlength="1" pattern="[0-9]" inputmode="numeric" required>
                         </div>
-                        <div class="password-strength" id="passwordStrength"></div>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="confirm_password" class="form-label">Confirm New Password</label>
-                        <div class="input-group">
-                            <span class="input-icon">
-                                <i class="fas fa-lock"></i>
-                            </span>
-                            <input type="password" id="confirm_password" name="confirm_password" class="form-input" 
-                                   placeholder="Confirm new password" required
-                                   minlength="8">
-                            <button type="button" class="password-toggle" id="toggleConfirmPassword">
-                                <i class="fas fa-eye"></i>
-                            </button>
-                        </div>
-                        <div id="passwordMatch" class="password-strength"></div>
+                        <input type="hidden" id="fullOtp" name="otp" value="">
                     </div>
                     
                     <button type="submit" class="btn-submit">
-                        <i class="fas fa-key"></i> Reset Password
+                        <i class="fas fa-check-circle"></i> Verify OTP
                     </button>
                     
-                    <a href="login.php" class="btn-secondary">
-                        <i class="fas fa-sign-in-alt"></i> Back to Login
+                    <div class="resend-form">
+                        <form method="POST" action="" style="display: inline;">
+                            <button type="submit" name="resend_otp" class="btn-resend">
+                                <i class="fas fa-redo"></i> Resend OTP Code
+                            </button>
+                        </form>
+                    </div>
+                    
+                    <a href="forgot_password.php" class="btn-secondary">
+                        <i class="fas fa-arrow-left"></i> Back to Forgot Password
                     </a>
+                    
+                    <div class="login-link">
+                        Remember your password? 
+                        <a href="login.php">Sign In</a> 
+                    </div>
                 </form>
             </div>
         </div>
@@ -770,148 +890,108 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         </div>
         <div class="mobile-form-container">
             <div class="mobile-form-header">
-                <h2>Set New Password</h2>
-                <p>Create a strong new password for your account</p>
+                <h2>Verify OTP Code</h2>
+                <p>Enter the 6-digit code sent to your email</p>
             </div>
             
             <div class="info-box">
                 <i class="fas fa-info-circle"></i>
-                Your password must be at least 8 characters long and include uppercase, lowercase, numbers, and special characters.
+                Check your email for the 6-digit OTP code. The code is valid for 10 minutes.
             </div>
             
             <?php if ($error): ?>
                 <div class="alert alert-error">
                     <i class="fas fa-exclamation-circle"></i>
-                    <?php echo $error; ?>
+                    <?php echo htmlspecialchars($error); ?>
                 </div>
             <?php endif; ?>
             
             <?php if ($success): ?>
                 <div class="alert alert-success">
                     <i class="fas fa-check-circle"></i>
-                    <?php echo $success; ?>
+                    <?php echo htmlspecialchars($success); ?>
                 </div>
             <?php endif; ?>
             
-            <form id="mobileResetPasswordForm" method="POST" action="">
+            <form id="mobileVerifyOtpForm" method="POST" action="">
                 <div class="form-group">
-                    <label for="mobile_password" class="form-label">New Password</label>
-                    <div class="input-group">
-                        <span class="input-icon">
-                            <i class="fas fa-lock"></i>
-                        </span>
-                        <input type="password" id="mobile_password" name="password" class="form-input" 
-                               placeholder="Enter new password" required
-                               minlength="8">
-                        <button type="button" class="password-toggle" id="mobileTogglePassword">
-                            <i class="fas fa-eye"></i>
-                        </button>
+                    <label class="form-label">Enter 6-digit OTP Code</label>
+                    <div class="otp-input-group">
+                        <input type="text" name="otp[]" class="otp-input" maxlength="1" pattern="[0-9]" inputmode="numeric" required autofocus>
+                        <input type="text" name="otp[]" class="otp-input" maxlength="1" pattern="[0-9]" inputmode="numeric" required>
+                        <input type="text" name="otp[]" class="otp-input" maxlength="1" pattern="[0-9]" inputmode="numeric" required>
+                        <input type="text" name="otp[]" class="otp-input" maxlength="1" pattern="[0-9]" inputmode="numeric" required>
+                        <input type="text" name="otp[]" class="otp-input" maxlength="1" pattern="[0-9]" inputmode="numeric" required>
+                        <input type="text" name="otp[]" class="otp-input" maxlength="1" pattern="[0-9]" inputmode="numeric" required>
                     </div>
-                    <div class="password-strength" id="mobilePasswordStrength"></div>
-                </div>
-                
-                <div class="form-group">
-                    <label for="mobile_confirm_password" class="form-label">Confirm New Password</label>
-                    <div class="input-group">
-                        <span class="input-icon">
-                            <i class="fas fa-lock"></i>
-                        </span>
-                        <input type="password" id="mobile_confirm_password" name="confirm_password" class="form-input" 
-                               placeholder="Confirm new password" required
-                               minlength="8">
-                        <button type="button" class="password-toggle" id="mobileToggleConfirmPassword">
-                            <i class="fas fa-eye"></i>
-                        </button>
-                    </div>
-                    <div id="mobilePasswordMatch" class="password-strength"></div>
+                    <input type="hidden" id="mobileFullOtp" name="otp" value="">
                 </div>
                 
                 <button type="submit" class="btn-submit">
-                    <i class="fas fa-key"></i> Reset Password
+                    <i class="fas fa-check-circle"></i> Verify OTP
                 </button>
                 
-                <a href="login.php" class="btn-secondary">
-                    <i class="fas fa-sign-in-alt"></i> Back to Login
+                <div class="resend-form">
+                    <form method="POST" action="" style="display: inline;">
+                        <button type="submit" name="resend_otp" class="btn-resend">
+                            <i class="fas fa-redo"></i> Resend OTP Code
+                        </button>
+                    </form>
+                </div>
+                
+                <a href="forgot_password.php" class="btn-secondary">
+                    <i class="fas fa-arrow-left"></i> Back to Forgot Password
                 </a>
+                
+                <div class="login-link">
+                    Remember your password? 
+                    <a href="login.php">Sign In</a>        
+                </div>
             </form>
         </div>
     </div>
 
     <script>
-        // Password strength checker
-        function checkPasswordStrength(password) {
-            let strength = 0;
-            
-            if (password.length >= 8) strength++;
-            if (/[A-Z]/.test(password)) strength++;
-            if (/[a-z]/.test(password)) strength++;
-            if (/[0-9]/.test(password)) strength++;
-            if (/[\W_]/.test(password)) strength++;
-            
-            return strength;
-        }
-        
-        function updatePasswordStrength(password, strengthElementId) {
-            const strengthElement = document.getElementById(strengthElementId);
-            if (!strengthElement) return;
-            
-            if (password.length === 0) {
-                strengthElement.textContent = '';
-                strengthElement.className = 'password-strength';
-                return;
-            }
-            
-            const strength = checkPasswordStrength(password);
-            
-            let message = '';
-            let className = '';
-            
-            if (strength <= 2) {
-                message = 'Weak password';
-                className = 'strength-weak';
-            } else if (strength === 3) {
-                message = 'Medium password';
-                className = 'strength-medium';
-            } else if (strength >= 4) {
-                message = 'Strong password';
-                className = 'strength-strong';
-            }
-            
-            strengthElement.textContent = message;
-            strengthElement.className = `password-strength ${className}`;
-        }
-        
-        function checkPasswordMatch(password, confirmPassword, matchElementId) {
-            const matchElement = document.getElementById(matchElementId);
-            if (!matchElement) return;
-            
-            if (confirmPassword.length === 0) {
-                matchElement.textContent = '';
-                matchElement.className = 'password-strength';
-                return;
-            }
-            
-            if (password === confirmPassword) {
-                matchElement.textContent = 'Passwords match ✓';
-                matchElement.className = 'password-strength strength-strong';
-            } else {
-                matchElement.textContent = 'Passwords do not match ✗';
-                matchElement.className = 'password-strength strength-weak';
-            }
-        }
-        
-        // Toggle password visibility
-        function togglePasswordVisibility(inputId, toggleBtnId) {
-            const passwordInput = document.getElementById(inputId);
-            const toggleBtn = document.getElementById(toggleBtnId);
-            
-            if (passwordInput.type === 'password') {
-                passwordInput.type = 'text';
-                toggleBtn.innerHTML = '<i class="fas fa-eye-slash"></i>';
-            } else {
-                passwordInput.type = 'password';
-                toggleBtn.innerHTML = '<i class="fas fa-eye"></i>';
-            }
+        // OTP input handling
+        function handleOtpInput(otpInputs, fullOtpInputId) {
+            otpInputs.forEach((input, index) => {
+                input.addEventListener('input', function(e) {
+                    // Allow only numbers
+                    this.value = this.value.replace(/\D/g, '');
+                    
+                    if (this.value.length === 1 && index < otpInputs.length - 1) {
+                        otpInputs[index + 1].focus();
+                    }
+                    
+                    // Update hidden input with full OTP
+                    let fullOtp = '';
+                    otpInputs.forEach(otp => {
+                        fullOtp += otp.value;
+                    });
+                    document.getElementById(fullOtpInputId).value = fullOtp;
+                });
+                
+                input.addEventListener('keydown', function(e) {
+                    if (e.key === 'Backspace' && !this.value && index > 0) {
+                        otpInputs[index - 1].focus();
+                    }
+                });
+                
+                // Auto-focus on paste
+                input.addEventListener('paste', function(e) {
+                    e.preventDefault();
+                    const pastedData = e.clipboardData.getData('text');
+                    if (pastedData.length === 6 && /^\d+$/.test(pastedData)) {
+                        for (let i = 0; i < 6; i++) {
+                            if (otpInputs[i]) {
+                                otpInputs[i].value = pastedData[i];
+                            }
+                        }
+                        document.getElementById(fullOtpInputId).value = pastedData;
+                        otpInputs[5].focus();
+                    }
+                });
+            });
         }
         
         // Form submission handling
@@ -924,7 +1004,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 
                 if (submitBtn) {
                     submitBtn.disabled = true;
-                    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Resetting...';
+                    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Verifying...';
                     
                     // Show loading overlay
                     document.getElementById('loadingOverlay').style.display = 'flex';
@@ -934,67 +1014,23 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         
         // Initialize everything when DOM is loaded
         document.addEventListener('DOMContentLoaded', function() {
-            // Desktop password strength
-            const desktopPassword = document.getElementById('password');
-            const desktopConfirm = document.getElementById('confirm_password');
+            // Initialize OTP input handling for desktop
+            const desktopOtpInputs = document.querySelectorAll('#verifyOtpForm .otp-input');
+            handleOtpInput(desktopOtpInputs, 'fullOtp');
             
-            if (desktopPassword) {
-                desktopPassword.addEventListener('input', function() {
-                    updatePasswordStrength(this.value, 'passwordStrength');
-                    checkPasswordMatch(this.value, desktopConfirm.value, 'passwordMatch');
-                });
-            }
-            
-            if (desktopConfirm) {
-                desktopConfirm.addEventListener('input', function() {
-                    checkPasswordMatch(desktopPassword.value, this.value, 'passwordMatch');
-                });
-            }
-            
-            // Mobile password strength
-            const mobilePassword = document.getElementById('mobile_password');
-            const mobileConfirm = document.getElementById('mobile_confirm_password');
-            
-            if (mobilePassword) {
-                mobilePassword.addEventListener('input', function() {
-                    updatePasswordStrength(this.value, 'mobilePasswordStrength');
-                    checkPasswordMatch(this.value, mobileConfirm.value, 'mobilePasswordMatch');
-                });
-            }
-            
-            if (mobileConfirm) {
-                mobileConfirm.addEventListener('input', function() {
-                    checkPasswordMatch(mobilePassword.value, this.value, 'mobilePasswordMatch');
-                });
-            }
-            
-            // Password toggle for desktop
-            document.getElementById('togglePassword')?.addEventListener('click', function() {
-                togglePasswordVisibility('password', 'togglePassword');
-            });
-            
-            document.getElementById('toggleConfirmPassword')?.addEventListener('click', function() {
-                togglePasswordVisibility('confirm_password', 'toggleConfirmPassword');
-            });
-            
-            // Password toggle for mobile
-            document.getElementById('mobileTogglePassword')?.addEventListener('click', function() {
-                togglePasswordVisibility('mobile_password', 'mobileTogglePassword');
-            });
-            
-            document.getElementById('mobileToggleConfirmPassword')?.addEventListener('click', function() {
-                togglePasswordVisibility('mobile_confirm_password', 'mobileToggleConfirmPassword');
-            });
+            // Initialize OTP input handling for mobile
+            const mobileOtpInputs = document.querySelectorAll('#mobileVerifyOtpForm .otp-input');
+            handleOtpInput(mobileOtpInputs, 'mobileFullOtp');
             
             // Form submission handling
-            handleFormSubmit('resetPasswordForm');
-            handleFormSubmit('mobileResetPasswordForm');
+            handleFormSubmit('verifyOtpForm');
+            handleFormSubmit('mobileVerifyOtpForm');
             
-            // Auto-focus password field on page load
-            if (desktopPassword) {
-                desktopPassword.focus();
-            } else if (mobilePassword) {
-                mobilePassword.focus();
+            // Auto-focus first OTP input
+            if (desktopOtpInputs.length > 0) {
+                desktopOtpInputs[0].focus();
+            } else if (mobileOtpInputs.length > 0) {
+                mobileOtpInputs[0].focus();
             }
             
             // Prevent form resubmission on page refresh
