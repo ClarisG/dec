@@ -42,68 +42,44 @@ try {
             if (function_exists('getDbConnection')) {
                 $conn = getDbConnection();
             } else {
-                // Try to create connection using constants if they exist
-                if (defined('DB_HOST') && defined('DB_USER') && defined('DB_PASS') && defined('DB_NAME')) {
-                    $dsn = "mysql:host=" . DB_HOST . ";port=" . (defined('DB_PORT') ? DB_PORT : '3306') . ";dbname=" . DB_NAME . ";charset=utf8mb4";
-                    $conn = new PDO($dsn, DB_USER, DB_PASS);
-                    $conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-                    $conn->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
-                } else {
-                    throw new Exception("Database configuration loaded but connection not established and constants not defined");
-                }
+                // Create connection using constants from database.php
+                $conn = new PDO("mysql:host=153.92.15.81;port=3306;dbname=u514031374_leir;charset=utf8mb4", 
+                              'u514031374_leir', 
+                              'leirP@55w0rd');
+                $conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+                $conn->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
             }
         }
         
         // Test connection
-        if ($conn) {
-            $test_query = "SELECT 1 as test";
-            $test_stmt = $conn->query($test_query);
-            $test_result = $test_stmt->fetch();
-            
-            if (!$test_result || $test_result['test'] != 1) {
-                throw new Exception("Database test query failed");
-            }
-            
-            // Check if required tables exist
-            $tables = ['reports', 'users'];
-            foreach ($tables as $table) {
-                $check_stmt = $conn->query("SHOW TABLES LIKE '$table'");
-                if (!$check_stmt) {
-                    throw new Exception("Failed to check for table '$table'");
-                }
-                if ($check_stmt->rowCount() == 0) {
-                    throw new Exception("Required table '$table' not found in database");
-                }
-            }
-        } else {
-            throw new Exception("Database connection not established");
-        }
-        
-    } else {
-        // If no config file found, try to connect directly using hardcoded credentials
-        // WARNING: This is not secure for production - only for debugging
-        $dsn = "mysql:host=153.92.15.81;port=3306;dbname=u514031374_leir;charset=utf8mb4";
-        $conn = new PDO($dsn, 'u514031374_leir', 'leirP@55w0rd');
-        
-        // Set PDO attributes
-        $conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-        $conn->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
-        $conn->setAttribute(PDO::ATTR_EMULATE_PREPARES, false);
-        $conn->setAttribute(PDO::ATTR_PERSISTENT, false);
-        
-        // Test the direct connection
         $test_query = "SELECT 1 as test";
         $test_stmt = $conn->query($test_query);
         $test_result = $test_stmt->fetch();
         
-        if (!$test_result || $test_result['test'] != 1) {
-            throw new Exception("Database test query failed with direct connection");
-        }
+    } else {
+        // Direct connection
+        $conn = new PDO("mysql:host=153.92.15.81;port=3306;dbname=u514031374_leir;charset=utf8mb4", 
+                       'u514031374_leir', 
+                       'leirP@55w0rd');
+        $conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+        $conn->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
     }
     
 } catch (Exception $e) {
     $db_error = $e->getMessage();
     error_log("Database connection error in case.php: " . $e->getMessage());
+    
+    // Try one more time with direct connection
+    try {
+        $conn = new PDO("mysql:host=153.92.15.81;port=3306;dbname=u514031374_leir;charset=utf8mb4", 
+                       'u514031374_leir', 
+                       'leirP@55w0rd');
+        $conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+        $conn->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
+        $db_error = null;
+    } catch (Exception $e2) {
+        $db_error = $e2->getMessage();
+    }
 }
 
 // Set current filter values from GET parameters
@@ -189,7 +165,12 @@ $availableOfficers = $conn ? getAvailableOfficers($conn) : [];
     <!-- Header Section -->
     <div class="glass-card rounded-xl p-6">
         <div class="flex justify-between items-center mb-6">
+            <h2 class="text-2xl font-bold text-gray-800">Case & Blotter Management</h2>
+            <div class="text-sm text-gray-600">
+                <i class="fas fa-calendar-alt mr-1"></i>
+                <?php echo date('F d, Y'); ?>
             </div>
+        </div>
         
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
             <div class="bg-blue-50 p-4 rounded-lg">
@@ -284,12 +265,18 @@ $availableOfficers = $conn ? getAvailableOfficers($conn) : [];
     <div class="glass-card rounded-xl p-6">
         <div class="flex justify-between items-center mb-4">
             <h3 class="text-xl font-bold text-gray-800">Filter Reports</h3>
+            <div class="text-sm text-gray-600">
+                <i class="fas fa-info-circle mr-1"></i>
+                Filter to find specific cases
+            </div>
         </div>
         
         <form id="filterForm" method="GET" class="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
+            <input type="hidden" name="module" value="case">
+            
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">Status</label>
-                <select name="status" class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                <select name="status" class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                     <option value="">All Status</option>
                     <option value="pending" <?php echo ($currentFilter['status'] ?? '') === 'pending' ? 'selected' : ''; ?>>Pending</option>
                     <option value="pending_field_verification" <?php echo ($currentFilter['status'] ?? '') === 'pending_field_verification' ? 'selected' : ''; ?>>Pending Verification</option>
@@ -302,7 +289,7 @@ $availableOfficers = $conn ? getAvailableOfficers($conn) : [];
             </div>
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">Classification</label>
-                <select name="category" class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                <select name="category" class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                     <option value="">All Types</option>
                     <option value="Barangay Matter" <?php echo ($currentFilter['category'] ?? '') === 'Barangay Matter' ? 'selected' : ''; ?>>Barangay Matter</option>
                     <option value="Police Matter" <?php echo ($currentFilter['category'] ?? '') === 'Police Matter' ? 'selected' : ''; ?>>Police Matter</option>
@@ -315,19 +302,21 @@ $availableOfficers = $conn ? getAvailableOfficers($conn) : [];
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">From Date</label>
                 <input type="date" name="from_date" value="<?php echo $currentFilter['from_date'] ?? ''; ?>"
-                       class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                       class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
             </div>
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">To Date</label>
                 <input type="date" name="to_date" value="<?php echo $currentFilter['to_date'] ?? ''; ?>"
-                       class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                       class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
             </div>
             <div class="flex items-end space-x-2">
-                <button type="button" onclick="resetFilters()" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors">
-                    <i class="fas fa-times mr-1"></i> Clear
+                <button type="button" onclick="resetFilters()" 
+                        class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors flex items-center">
+                    <i class="fas fa-times mr-2"></i> Clear
                 </button>
-                <button type="button" onclick="applyFilters()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
-                    <i class="fas fa-filter mr-1"></i> Filter
+                <button type="button" onclick="applyFilters()" 
+                        class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center">
+                    <i class="fas fa-filter mr-2"></i> Filter
                 </button>
             </div>
         </form>
@@ -339,9 +328,9 @@ $availableOfficers = $conn ? getAvailableOfficers($conn) : [];
             <h3 class="text-xl font-bold text-gray-800">Case Reports</h3>
             <div class="text-sm text-gray-600">
                 Showing 
-                <span id="currentPage">1</span> 
+                <span id="currentPage"><?php echo $page; ?></span> 
                 of 
-                <span id="totalPages">1</span> 
+                <span id="totalPages"><?php echo $total_pages; ?></span> 
                 pages
             </div>
         </div>
@@ -775,146 +764,217 @@ $availableOfficers = $conn ? getAvailableOfficers($conn) : [];
 </div>
 
 <style>
-    /* Pagination Styles */
-    .pagination-btn {
-        @apply w-10 h-10 flex items-center justify-center rounded-lg border border-gray-300 bg-white text-gray-700 hover:bg-gray-100 transition-colors shadow-sm;
-    }
-    
-    .pagination-btn.active {
-        @apply bg-blue-600 text-white border-blue-600 font-bold;
-    }
-    
-    .pagination-btn:disabled {
-        @apply opacity-50 cursor-not-allowed;
-    }
-
     /* Status Badges */
     .status-badge {
-        @apply px-3 py-1 rounded-full text-xs font-medium;
+        padding: 0.25rem 0.75rem;
+        border-radius: 9999px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
     }
     
     .status-pending {
-        @apply bg-yellow-100 text-yellow-800;
+        background-color: #fef3c7;
+        color: #92400e;
     }
     
     .status-pending_field_verification {
-        @apply bg-orange-100 text-orange-800;
+        background-color: #fef3c7;
+        color: #92400e;
+        border: 1px solid #f59e0b;
     }
     
     .status-assigned {
-        @apply bg-blue-100 text-blue-800;
+        background-color: #dbeafe;
+        color: #1e40af;
     }
     
     .status-investigating {
-        @apply bg-purple-100 text-purple-800;
+        background-color: #e0e7ff;
+        color: #3730a3;
     }
     
     .status-resolved {
-        @apply bg-green-100 text-green-800;
+        background-color: #d1fae5;
+        color: #065f46;
     }
     
     .status-referred {
-        @apply bg-indigo-100 text-indigo-800;
+        background-color: #ede9fe;
+        color: #5b21b6;
     }
     
     .status-closed {
-        @apply bg-gray-100 text-gray-800;
+        background-color: #f3f4f6;
+        color: #374151;
     }
     
     /* Category Badges */
     .category-badge {
-        @apply px-3 py-1 rounded-full text-xs font-medium capitalize;
+        padding: 0.25rem 0.75rem;
+        border-radius: 9999px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: capitalize;
     }
     
-    .category-incident {
-        @apply bg-red-100 text-red-800;
-    }
-    
-    .category-complaint {
-        @apply bg-yellow-100 text-yellow-800;
-    }
-    
-    .category-blotter {
-        @apply bg-blue-100 text-blue-800;
-    }
-
     .category-barangay {
-        @apply bg-blue-100 text-blue-800;
+        background-color: #dbeafe;
+        color: #1e40af;
     }
     
     .category-police {
-        @apply bg-red-100 text-red-800;
+        background-color: #fee2e2;
+        color: #991b1b;
     }
     
     .category-criminal {
-        @apply bg-purple-100 text-purple-800;
+        background-color: #ede9fe;
+        color: #5b21b6;
     }
     
     .category-civil {
-        @apply bg-green-100 text-green-800;
+        background-color: #d1fae5;
+        color: #065f46;
     }
     
     .category-vawc {
-        @apply bg-pink-100 text-pink-800;
+        background-color: #fce7f3;
+        color: #9d174d;
     }
     
     .category-minor {
-        @apply bg-yellow-100 text-yellow-800;
+        background-color: #fef3c7;
+        color: #92400e;
     }
     
     .category-other {
-        @apply bg-gray-100 text-gray-800;
+        background-color: #f3f4f6;
+        color: #374151;
+    }
+    
+    /* Pagination Styles */
+    .pagination-btn {
+        width: 2.5rem;
+        height: 2.5rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 0.5rem;
+        border: 1px solid #d1d5db;
+        background-color: white;
+        color: #374151;
+        transition: all 0.2s;
+        box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    }
+    
+    .pagination-btn:hover {
+        background-color: #f9fafb;
+    }
+    
+    .pagination-btn.active {
+        background-color: #2563eb;
+        color: white;
+        border-color: #2563eb;
+        font-weight: bold;
+    }
+    
+    .pagination-btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
     }
     
     /* Assignment Modal Styles */
     .assignment-option {
-        @apply border-2 border-gray-200 rounded-xl p-4 cursor-pointer transition-all hover:border-blue-300;
+        border: 2px solid #e5e7eb;
+        border-radius: 0.75rem;
+        padding: 1rem;
+        cursor: pointer;
+        transition: all 0.3s;
+    }
+    
+    .assignment-option:hover {
+        border-color: #93c5fd;
     }
     
     .assignment-option.active {
-        @apply border-blue-500 bg-blue-50;
+        border-color: #3b82f6;
+        background-color: #eff6ff;
     }
     
     .officer-item {
-        @apply border border-gray-200 rounded-xl p-4 cursor-pointer transition-all hover:border-blue-300 hover:bg-blue-50;
+        border: 1px solid #e5e7eb;
+        border-radius: 0.75rem;
+        padding: 1rem;
+        cursor: pointer;
+        transition: all 0.3s;
+    }
+    
+    .officer-item:hover {
+        border-color: #93c5fd;
+        background-color: #f0f9ff;
     }
     
     .officer-item.active {
-        @apply border-blue-500 bg-blue-50;
+        border-color: #3b82f6;
+        background-color: #eff6ff;
     }
     
     .role-badge {
-        @apply px-2 py-1 rounded-full text-xs font-medium;
+        padding: 0.25rem 0.5rem;
+        border-radius: 9999px;
+        font-size: 0.75rem;
+        font-weight: 600;
     }
     
     .role-badge.lupon {
-        @apply bg-green-100 text-green-800;
+        background-color: #d1fae5;
+        color: #065f46;
     }
     
     .role-badge.tanod {
-        @apply bg-blue-100 text-blue-800;
+        background-color: #dbeafe;
+        color: #1e40af;
     }
     
     /* Glass Card Effect */
     .glass-card {
-        @apply bg-white bg-opacity-80 backdrop-blur-sm border border-gray-200;
+        background-color: rgba(255, 255, 255, 0.8);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.2);
     }
     
     /* Table Styles */
     .case-table {
-        @apply min-w-full divide-y divide-gray-200;
+        min-width: 100%;
+        border-collapse: separate;
+        border-spacing: 0;
     }
     
     .case-table thead tr th {
-        @apply text-left text-xs font-medium text-gray-500 uppercase tracking-wider;
+        text-align: left;
+        font-size: 0.75rem;
+        font-weight: 500;
+        color: #6b7280;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        padding: 0.75rem 1rem;
     }
     
     .case-table tbody tr {
-        @apply hover:bg-gray-50;
+        border-bottom: 1px solid #e5e7eb;
+    }
+    
+    .case-table tbody tr:hover {
+        background-color: #f9fafb;
     }
     
     .case-table tbody tr td {
-        @apply px-6 py-4 whitespace-nowrap text-sm text-gray-900;
+        padding: 1rem;
+        white-space: nowrap;
+        font-size: 0.875rem;
+        color: #1f2937;
     }
 </style>
 
@@ -936,7 +996,9 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('totalPages').textContent = totalPages;
     
     // Set initial officer selection based on what's visible
-    updateOfficerTypeSelection(document.querySelector('.assignment-option.active'), 'lupon');
+    if (document.querySelector('.assignment-option.active')) {
+        updateOfficerTypeSelection(document.querySelector('.assignment-option.active'), 'lupon');
+    }
 });
 
 // --- Major Page Navigation and Filtering ---
@@ -945,44 +1007,42 @@ function applyFilters() {
     console.log('applyFilters called');
     const form = document.getElementById('filterForm');
     const formData = new FormData(form);
-    const params = new URLSearchParams(window.location.search);
-
-    // Update params with form data
-    formData.forEach((value, key) => {
-        if (value) {
-            params.set(key, value);
-        } else {
-            params.delete(key);
-        }
-    });
+    
+    // Build query string
+    const params = new URLSearchParams();
+    
+    // Add module parameter
+    params.set('module', 'case');
+    
+    // Add all form values
+    if (formData.get('status')) params.set('status', formData.get('status'));
+    if (formData.get('category')) params.set('category', formData.get('category'));
+    if (formData.get('from_date')) params.set('from_date', formData.get('from_date'));
+    if (formData.get('to_date')) params.set('to_date', formData.get('to_date'));
     
     // Always reset to page 1 when applying a new filter
     params.set('page', '1');
     
+    console.log('Applying filters:', params.toString());
+    
     // Reload the page with the new query string
-    window.location.search = params.toString();
+    window.location.href = window.location.pathname + '?' + params.toString();
 }
 
 function resetFilters() {
     console.log('resetFilters called');
-    const params = new URLSearchParams(window.location.search);
-    
-    // Keep essential parameters like 'module', remove filter-related ones
-    params.delete('status');
-    params.delete('category');
-    params.delete('from_date');
-    params.delete('to_date');
-    params.delete('page');
-    
-    // Reload the page
-    window.location.search = params.toString();
+    // Just reload the page with only module parameter
+    window.location.href = window.location.pathname + '?module=case';
 }
 
 function changePage(page) {
     if (page < 1 || page > totalPages) return;
+    
     const params = new URLSearchParams(window.location.search);
     params.set('page', page);
-    window.location.search = params.toString();
+    params.set('module', 'case');
+    
+    window.location.href = window.location.pathname + '?' + params.toString();
 }
 
 function retryConnection() {
@@ -1021,7 +1081,10 @@ function openAssignmentModal(caseId) {
     selectedCaseId = caseId;
     
     // Set default selection to 'lupon' and update the list
-    updateOfficerTypeSelection(document.querySelector('.assignment-option[data-type="lupon"]'), 'lupon');
+    const luponOption = document.querySelector('.assignment-option[data-type="lupon"]');
+    if (luponOption) {
+        updateOfficerTypeSelection(luponOption, 'lupon');
+    }
     
     const modal = document.getElementById('assignmentModal');
     modal.classList.remove('hidden');
@@ -1036,75 +1099,96 @@ function closeAssignmentModal() {
 
 function updateOfficerTypeSelection(element, type) {
     console.log('updateOfficerTypeSelection called with type:', type);
+    
     // Update active style on type selector
-    document.querySelectorAll('.assignment-option').forEach(opt => opt.classList.remove('active'));
+    document.querySelectorAll('.assignment-option').forEach(opt => {
+        opt.classList.remove('active');
+    });
     element.classList.add('active');
     
     selectedOfficerType = type;
-    updateOfficerListForType(type);
+    filterOfficersByType(type);
+    
+    // Auto-select the first available officer of this type
+    autoSelectFirstOfficer(type);
 }
 
-function updateOfficerListForType(type) {
-    console.log('updateOfficerListForType called with type:', type);
-    const officerList = document.getElementById('officerList');
-    const items = officerList.querySelectorAll('.officer-item');
-    let visibleCount = 0;
-    console.log('Found', items.length, 'officer items');
+function filterOfficersByType(type) {
+    const officerItems = document.querySelectorAll('.officer-item');
+    let hasVisibleOfficers = false;
     
-    // Hide or show officers based on the selected type
-    items.forEach(item => {
-        if (item.getAttribute('data-officer-type') === type) {
+    officerItems.forEach(item => {
+        const itemType = item.getAttribute('data-officer-type');
+        if (itemType === type) {
             item.style.display = 'block';
-            visibleCount++;
+            hasVisibleOfficers = true;
         } else {
             item.style.display = 'none';
         }
     });
-    console.log('Visible officers:', visibleCount);
-
-    // Remove any existing "empty" message
-    const emptyMsg = officerList.querySelector('.empty-list-message');
-    if (emptyMsg) emptyMsg.remove();
-
-    // If no officers for this type, show a message
-    if (visibleCount === 0) {
-        const msgDiv = document.createElement('div');
-        msgDiv.className = 'empty-list-message text-center py-4 text-gray-500';
-        msgDiv.innerHTML = `<i class="fas fa-user-slash text-3xl mb-2"></i><p>No available officers of type '${type}'.</p>`;
-        officerList.appendChild(msgDiv);
-        selectedOfficerId = null; // Clear selection
-    } else {
-        // Auto-select the first visible officer in the list
-        const firstVisible = officerList.querySelector('.officer-item:not([style*="display: none"])');
-        if (firstVisible) {
-            selectOfficer(firstVisible);
+    
+    // Show message if no officers of this type
+    const officerList = document.getElementById('officerList');
+    const emptyMessage = officerList.querySelector('.no-officers-message');
+    
+    if (!hasVisibleOfficers) {
+        if (!emptyMessage) {
+            const msgDiv = document.createElement('div');
+            msgDiv.className = 'no-officers-message text-center py-4 text-gray-500';
+            msgDiv.innerHTML = `
+                <i class="fas fa-users-slash text-3xl mb-2"></i>
+                <p>No available ${type === 'lupon' ? 'Lupon Members' : 'Tanod'} at the moment.</p>
+            `;
+            officerList.appendChild(msgDiv);
         }
+        selectedOfficerId = null;
+    } else if (emptyMessage) {
+        emptyMessage.remove();
     }
     
     updateSelectionInfo();
 }
 
-function selectOfficer(element) {
-    // Update active style for the selected officer
-    document.querySelectorAll('.officer-item').forEach(item => item.classList.remove('active'));
-    element.classList.add('active');
+function autoSelectFirstOfficer(type) {
+    const firstOfficer = document.querySelector(`.officer-item[data-officer-type="${type}"]`);
+    if (firstOfficer) {
+        selectOfficer(firstOfficer);
+    } else {
+        // Clear selection if no officers
+        document.querySelectorAll('.officer-item').forEach(item => {
+            item.classList.remove('active');
+        });
+        selectedOfficerId = null;
+        updateSelectionInfo();
+    }
+}
 
-    // Store selected officer's data
+function selectOfficer(element) {
+    // Update active style for all officers
+    document.querySelectorAll('.officer-item').forEach(item => {
+        item.classList.remove('active');
+    });
+    
+    // Set active for selected officer
+    element.classList.add('active');
+    
+    // Store selected officer data
     selectedOfficerId = element.getAttribute('data-officer-id');
     selectedOfficerRole = element.getAttribute('data-officer-role');
-
+    
+    console.log('Selected officer:', selectedOfficerId, selectedOfficerRole);
     updateSelectionInfo();
 }
 
 function updateSelectionInfo() {
     const infoDiv = document.getElementById('selectionInfo');
     const selectedOfficerElement = document.querySelector('.officer-item.active');
-
-    if (selectedOfficerId && selectedOfficerElement) {
+    
+    if (selectedOfficerElement && selectedOfficerId) {
         const officerName = selectedOfficerElement.querySelector('.officer-name').textContent;
         const roleDisplay = selectedOfficerElement.querySelector('.role-badge').textContent;
-        const roleClass = selectedOfficerElement.querySelector('.role-badge').className.replace('role-badge', '');
-
+        const roleClass = selectedOfficerElement.querySelector('.role-badge').className;
+        
         infoDiv.innerHTML = `
             <div class="bg-green-50 p-4 rounded-lg">
                 <div class="flex items-center flex-wrap">
@@ -1117,7 +1201,11 @@ function updateSelectionInfo() {
                 </div>
             </div>`;
     } else {
-        infoDiv.innerHTML = '<div class="bg-yellow-50 p-4 rounded-lg text-center text-yellow-800">Please select an officer from the list.</div>';
+        infoDiv.innerHTML = `
+            <div class="bg-yellow-50 p-4 rounded-lg text-center">
+                <i class="fas fa-exclamation-circle text-yellow-600 mr-2"></i>
+                <span class="text-yellow-800">Please select an officer from the list.</span>
+            </div>`;
     }
 }
 
@@ -1199,9 +1287,12 @@ function getStatusClass($status) {
 
 function getCategoryClass($category) {
     $classes = [
-        'incident' => 'category-incident',
-        'complaint' => 'category-complaint',
-        'blotter' => 'category-blotter',
+        'Barangay Matter' => 'category-barangay',
+        'Police Matter' => 'category-police',
+        'Criminal' => 'category-criminal',
+        'Civil' => 'category-civil',
+        'VAWC' => 'category-vawc',
+        'Minor' => 'category-minor',
         'barangay matter' => 'category-barangay',
         'police matter' => 'category-police',
         'criminal' => 'category-criminal',
@@ -1209,6 +1300,6 @@ function getCategoryClass($category) {
         'vawc' => 'category-vawc',
         'minor' => 'category-minor',
     ];
-    return $classes[strtolower($category)] ?? 'category-other';
+    return $classes[$category] ?? 'category-other';
 }
 ?>
