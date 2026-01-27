@@ -24,7 +24,7 @@ try {
 
 // Handle module switching
 $module = isset($_GET['module']) ? $_GET['module'] : 'dashboard';
-$valid_modules = ['dashboard', 'case', 'compliance', 'referral', 'profile'];
+$valid_modules = ['dashboard', 'case', 'compliance', 'documents', 'referral', 'profile'];
 if (!in_array($module, $valid_modules)) {
     $module = 'dashboard';
 }
@@ -121,7 +121,8 @@ function getModuleTitle($module) {
     $titles = [
         'dashboard' => 'Dashboard Overview',
         'case' => 'Case & Blotter Management',
-        'compliance' => 'Document Generation',
+        'compliance' => 'Compliance Monitoring',
+        'documents' => 'Document Generation',
         'referral' => 'External Referral Desk',
         'profile' => 'Profile Account'
     ];
@@ -133,7 +134,8 @@ function getModuleSubtitle($module) {
     $subtitles = [
         'dashboard' => 'Overview of all secretary functions and quick actions',
         'case' => 'Manage cases, assign blotter numbers, and track case progress',
-        'compliance' => 'Generate legal documents and forms for barangay proceedings',
+        'compliance' => 'Monitor case deadlines and RA 7160 compliance',
+        'documents' => 'Generate legal documents and forms for barangay proceedings',
         'referral' => 'Handle VAWC, minor cases, and external agency referrals',
         'profile' => 'Manage your account information and activity log'
     ];
@@ -508,6 +510,10 @@ function getModuleSubtitle($module) {
                     <?php endif; ?>
                 </a>
                 <a href="?module=compliance" class="sidebar-link block p-3 text-white rounded-lg <?php echo $module == 'compliance' ? 'active' : ''; ?>">
+                    <i class="fas fa-clock mr-3"></i>
+                    Compliance Monitoring
+                </a>
+                <a href="?module=documents" class="sidebar-link block p-3 text-white rounded-lg <?php echo $module == 'documents' ? 'active' : ''; ?>">
                     <i class="fas fa-file-pdf mr-3"></i>
                     Document Generation
                 </a>

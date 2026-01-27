@@ -437,8 +437,6 @@ $availableOfficers = $conn ? getAvailableOfficers($conn) : [];
                                 echo '<span class="font-medium text-blue-600">#' . $case['id'] . '</span>';
                                 if (!empty($case['blotter_number'])) {
                                     echo '<p class="text-xs text-green-600 mt-1">' . htmlspecialchars($case['blotter_number']) . '</p>';
-                                } else {
-                                    echo '<p class="text-xs text-gray-500 mt-1">Needs blotter number</p>';
                                 }
                                 echo '</td>';
                                 echo '<td class="py-3 px-4">' . date('M d, Y', strtotime($case['created_at'])) . '</td>';
@@ -594,8 +592,19 @@ $availableOfficers = $conn ? getAvailableOfficers($conn) : [];
                 <?php if (!$db_error && $conn): ?>
                 <div class="mb-6">
                     <h4 class="font-medium text-gray-800 mb-3">Select Officer Type</h4>
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-6" id="officerTypeSelection">
-                        <div class="assignment-option active" data-type="lupon" onclick="updateOfficerTypeSelection(this, 'lupon')">
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-3 mb-6" id="officerTypeSelection">
+                        <div class="assignment-option active" data-type="all" onclick="updateOfficerTypeSelection(this, 'all')">
+                            <div class="flex items-center">
+                                <div class="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center mr-3">
+                                    <i class="fas fa-users text-gray-600"></i>
+                                </div>
+                                <div>
+                                    <h5 class="font-medium">All Officers</h5>
+                                    <p class="text-sm text-gray-600">Show everyone</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="assignment-option" data-type="lupon" onclick="updateOfficerTypeSelection(this, 'lupon')">
                             <div class="flex items-center">
                                 <div class="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center mr-3">
                                     <i class="fas fa-user-tie text-green-600"></i>
@@ -695,11 +704,10 @@ $availableOfficers = $conn ? getAvailableOfficers($conn) : [];
                                 
                                 $isOnline = !empty($officer['is_online']);
                         ?>
-                        <div class="officer-item <?php echo $firstOfficer && $officerType == 'lupon' ? 'active' : ''; ?>" 
+                        <div class="officer-item <?php echo $firstOfficer ? 'active' : ''; ?>" 
                              data-officer-id="<?php echo $officer['id']; ?>" 
                              data-officer-type="<?php echo $officerType; ?>"
                              data-officer-role="<?php echo $role; ?>"
-                             style="<?php echo $officerType == 'tanod' ? 'display: none;' : ''; ?>"
                              onclick="selectOfficer(this)">
                             <div class="flex items-center justify-between">
                                 <div>
@@ -799,21 +807,34 @@ $availableOfficers = $conn ? getAvailableOfficers($conn) : [];
 </div>
 
 <style>
-    /* Status Badges */
+    /* Status Badges - Text Only with Dot */
     .status-badge {
+        padding: 0;
         font-size: 0.75rem;
         font-weight: 600;
         text-transform: uppercase;
         letter-spacing: 0.5px;
         white-space: nowrap;
+        display: inline-flex;
+        align-items: center;
+        background: none !important;
+        border: none !important;
+    }
+
+    .status-badge::before {
+        content: '';
         display: inline-block;
-        /* Removed background and border as requested */
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        margin-right: 6px;
     }
     
     .status-pending {
         color: #c2410c;
-        font-size: 0.7rem; /* Smaller font */
+        font-size: 0.7rem; /* Smaller font for pending */
     }
+    .status-pending::before { background-color: #f97316; }
     
     .status-pending_field_verification {
         color: #ea580c;
@@ -821,77 +842,115 @@ $availableOfficers = $conn ? getAvailableOfficers($conn) : [];
         text-align: left;
         max-width: 140px;
         line-height: 1.1;
-        display: inline-block;
+        display: inline-flex;
         font-size: 0.7rem; /* Smaller font */
     }
+    .status-pending_field_verification::before { background-color: #f97316; margin-right: 6px; flex-shrink: 0; }
     
-    .status-assigned {
-        color: #1d4ed8;
-    }
+    .status-assigned { color: #1d4ed8; }
+    .status-assigned::before { background-color: #3b82f6; }
     
-    .status-investigating {
-        color: #4338ca;
-    }
+    .status-investigating { color: #4338ca; }
+    .status-investigating::before { background-color: #6366f1; }
     
-    .status-resolved {
-        color: #15803d;
-    }
+    .status-resolved { color: #15803d; }
+    .status-resolved::before { background-color: #22c55e; }
     
-    .status-referred {
-        color: #7e22ce;
-    }
+    .status-referred { color: #7e22ce; }
+    .status-referred::before { background-color: #a855f7; }
     
-    .status-closed {
-        color: #374151;
-    }
+    .status-closed { color: #374151; }
+    .status-closed::before { background-color: #6b7280; }
     
-    /* Category Badges */
+    /* Category Badges - Text Only with Dot */
     .category-badge {
+        padding: 0;
         font-size: 0.75rem;
         font-weight: 600;
         text-transform: capitalize;
+        display: inline-flex;
+        align-items: center;
+        background: none !important;
+        border: none !important;
+    }
+
+    .category-badge::before {
+        content: '';
         display: inline-block;
-        /* Removed background and border as requested */
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        margin-right: 6px;
     }
     
-    .category-barangay {
-        color: #1e40af;
-    }
+    /* User requested colors: incident (red), complain (blue), blotter (green) */
+    .category-incident, .category-police, .category-criminal, .category-vawc { color: #b91c1c; }
+    .category-incident::before, .category-police::before, .category-criminal::before, .category-vawc::before { background-color: #ef4444; } /* Red */
     
-    .category-police {
-        color: #b91c1c;
-    }
+    .category-complain, .category-barangay, .category-civil { color: #1e40af; }
+    .category-complain::before, .category-barangay::before, .category-civil::before { background-color: #3b82f6; } /* Blue */
     
-    .category-criminal {
-        color: #6b21a8;
-    }
+    .category-blotter, .category-minor { color: #166534; }
+    .category-blotter::before, .category-minor::before { background-color: #22c55e; } /* Green */
     
-    .category-civil {
-        color: #166534;
+    .category-other { color: #4b5563; }
+    .category-other::before { background-color: #9ca3af; }
+
+    /* Online Indicators */
+    .online-indicator {
+        display: inline-block;
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        margin-right: 8px;
+        border: 2px solid #fff;
+        box-shadow: 0 0 0 1px #e5e7eb;
     }
-    
-    .category-vawc {
-        color: #be185d;
+    .online-active {
+        background-color: #22c55e; /* Green */
+        box-shadow: 0 0 0 1px #22c55e;
+    }
+    .online-offline {
+        background-color: #9ca3af; /* Gray */
+    }
+
+    /* Officer Selection Styles */
+    .assignment-option {
+        border: 1px solid #e5e7eb;
+        border: 1px solid #f472b6;
     }
     
     .category-minor {
+        background-color: #fffbeb;
         color: #b45309;
+        border: 1px solid #fbbf24;
     }
 
+    /* Incident - Red */
     .category-incident {
-        color: #92400e;
-    }
-    
-    .category-blotter {
-        color: #0369a1;
-    }
-    
-    .category-complain {
+        background-color: #fee2e2;
         color: #991b1b;
+        border: 1px solid #ef4444;
+    }
+    
+    /* Blotter - Green */
+    .category-blotter {
+        background-color: #dcfce7;
+        color: #15803d;
+        border: 1px solid #4ade80;
+    }
+    
+    /* Complain - Blue */
+    .category-complain {
+        background-color: #dbeafe;
+        color: #1d4ed8;
+        border: 1px solid #60a5fa;
     }
     
     .category-other {
+        background-color: #f3f4f6;
         color: #374151;
+        border: 1px solid #d1d5db;
     }
     
     /* Online Status Indicator */
@@ -1041,8 +1100,79 @@ $availableOfficers = $conn ? getAvailableOfficers($conn) : [];
     }
 </style>
 
+<!-- Blotter Number Modal -->
+<div id="blotterModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-2xl max-w-md w-full">
+        <div class="flex justify-between items-center p-6 border-b">
+            <h3 class="text-xl font-bold text-gray-800">Set Blotter Number</h3>
+            <button onclick="closeBlotterModal()" class="text-gray-400 hover:text-gray-600">
+                <i class="fas fa-times text-2xl"></i>
+            </button>
+        </div>
+        <div class="p-6">
+            <input type="hidden" id="blotterCaseId">
+            <div class="mb-4">
+                <label class="block text-gray-700 text-sm font-bold mb-2">Blotter Number</label>
+                <input type="text" id="blotterNumberInput" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Enter blotter number">
+                <p class="text-xs text-gray-500 mt-1">Format: YYYY-MM-XXXX</p>
+            </div>
+            <div class="flex justify-end space-x-3">
+                <button onclick="closeBlotterModal()" class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200">Cancel</button>
+                <button onclick="saveBlotterNumber()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Save</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
 console.log('case.php script loaded at ' + new Date().toLocaleTimeString());
+
+// Blotter Number Functions
+function openBlotterModal(caseId, currentNumber = '') {
+    document.getElementById('blotterCaseId').value = caseId;
+    document.getElementById('blotterNumberInput').value = currentNumber;
+    const modal = document.getElementById('blotterModal');
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+}
+
+function closeBlotterModal() {
+    const modal = document.getElementById('blotterModal');
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+}
+
+function saveBlotterNumber() {
+    const caseId = document.getElementById('blotterCaseId').value;
+    const number = document.getElementById('blotterNumberInput').value;
+    
+    if (!number) {
+        alert('Please enter a blotter number');
+        return;
+    }
+    
+    const formData = new FormData();
+    formData.append('case_id', caseId);
+    formData.append('blotter_number', number);
+    
+    fetch('../../sec/modules/update_blotter.php', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('Blotter number updated successfully');
+            location.reload();
+        } else {
+            alert('Error: ' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('An error occurred');
+    });
+}
 // Page state variables, initialized by PHP
 let currentPage = <?php echo isset($page) ? $page : 1; ?>;
 let totalPages = <?php echo isset($total_pages) ? $total_pages : 1; ?>;
@@ -1069,10 +1199,10 @@ document.addEventListener('DOMContentLoaded', function() {
 function initializeOfficerSelection() {
     console.log('Initializing officer selection');
     
-    // Set default selection to lupon
-    const luponOption = document.querySelector('.assignment-option[data-type="lupon"]');
-    if (luponOption) {
-        updateOfficerTypeSelection(luponOption, 'lupon');
+    // Set default selection to all
+    const allOption = document.querySelector('.assignment-option[data-type="all"]');
+    if (allOption) {
+        updateOfficerTypeSelection(allOption, 'all');
     }
     
     // Set up click handlers for officer items
@@ -1198,7 +1328,7 @@ function updateOfficerTypeSelection(element, type) {
     
     officerItems.forEach(item => {
         const itemType = item.getAttribute('data-officer-type');
-        if (itemType === type) {
+        if (type === 'all' || itemType === type) {
             item.style.display = 'block';
             hasVisibleOfficers = true;
         } else {
