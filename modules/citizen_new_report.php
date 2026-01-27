@@ -17,8 +17,39 @@ if (!$user_id) {
 $error = '';
 $success = '';
 
+// Define getRateLimitInfo function if it doesn't exist (same as in citizen_dashboard.php)
+if (!function_exists('getRateLimitInfo')) {
+    function getRateLimitInfo($user_id) {
+        try {
+            $conn = getDbConnection();
+            
+            // Count reports in the last hour
+            $query = "SELECT COUNT(*) as count, MAX(created_at) as last_report 
+                      FROM reports 
+                      WHERE user_id = :user_id 
+                      AND created_at >= DATE_SUB(NOW(), INTERVAL 1 HOUR)";
+            $stmt = $conn->prepare($query);
+            $stmt->bindParam(':user_id', $user_id);
+            $stmt->execute();
+            $result = $stmt->fetch(PDO::FETCH_ASSOC);
+            
+            return [
+                'count' => $result['count'] ?? 0,
+                'last_report' => $result['last_report'] ?? null
+            ];
+        } catch (Exception $e) {
+            error_log("Error getting rate limit info: " . $e->getMessage());
+            return [
+                'count' => 0,
+                'last_report' => null
+            ];
+        }
+    }
+}
+
 // Check rate limit before processing
-if (!checkRateLimit($user_id)) {
+$rate_limit_info = getRateLimitInfo($user_id);
+if ($rate_limit_info['count'] >= 5) {
     $error = "You have submitted too many reports recently. Please wait 1 hour before submitting another report.";
 }
 
@@ -51,7 +82,8 @@ try {
 // Handle form submission
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['submit_report'])) {
     // Check rate limit again
-    if (!checkRateLimit($user_id)) {
+    $rate_limit_info = getRateLimitInfo($user_id);
+    if ($rate_limit_info['count'] >= 5) {
         $error = "Rate limit exceeded. Please wait before submitting another report.";
     } else {
         try {
