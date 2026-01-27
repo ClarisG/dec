@@ -1,5 +1,7 @@
 <?php
 // register.php - Citizen Registration Only
+require_once 'config/database.php';
+require_once 'send_verification_email.php';
 session_start();
 
 // Check if user is already logged in
