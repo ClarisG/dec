@@ -24,7 +24,7 @@ try {
 
 // Handle module switching
 $module = isset($_GET['module']) ? $_GET['module'] : 'dashboard';
-$valid_modules = ['dashboard', 'case', 'compliance', 'documents', 'referral', 'profile'];
+$valid_modules = ['dashboard', 'case', 'compliance', 'documents', 'referral', 'profile', 'classification_review'];
 if (!in_array($module, $valid_modules)) {
     $module = 'dashboard';
 }
@@ -124,6 +124,7 @@ function getModuleTitle($module) {
         'compliance' => 'Compliance Monitoring',
         'documents' => 'Document Generation',
         'referral' => 'External Referral Desk',
+        'classification_review' => 'Report Classification Review',
         'profile' => 'Profile Account'
     ];
     return $titles[$module] ?? 'Dashboard';
@@ -137,6 +138,7 @@ function getModuleSubtitle($module) {
         'compliance' => 'Monitor case deadlines and RA 7160 compliance',
         'documents' => 'Generate legal documents and forms for barangay proceedings',
         'referral' => 'Handle VAWC, minor cases, and external agency referrals',
+        'classification_review' => 'Review and correct AI-predicted jurisdiction for reports',
         'profile' => 'Manage your account information and activity log'
     ];
     return $subtitles[$module] ?? '';
@@ -520,6 +522,10 @@ function getModuleSubtitle($module) {
                 <a href="?module=referral" class="sidebar-link block p-3 text-white rounded-lg <?php echo $module == 'referral' ? 'active' : ''; ?>">
                     <i class="fas fa-exchange-alt mr-3"></i>
                     External Referral Desk
+                </a>
+                <a href="?module=classification_review" class="sidebar-link block p-3 text-white rounded-lg <?php echo $module == 'classification_review' ? 'active' : ''; ?>">
+                    <i class="fas fa-robot mr-3"></i>
+                    Classification Review
                 </a>
             </nav>
             

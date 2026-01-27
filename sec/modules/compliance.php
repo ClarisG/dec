@@ -7,6 +7,29 @@ if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'secretary') {
     exit('Access denied');
 }
 
+// Ensure database connection is available
+if (!isset($conn)) {
+    // Try to include database configuration
+    $possible_paths = [
+        dirname(dirname(dirname(__DIR__))) . '/config/database.php',
+        dirname(dirname(__DIR__)) . '/config/database.php',
+        $_SERVER['DOCUMENT_ROOT'] . '/config/database.php'
+    ];
+    
+    foreach ($possible_paths as $path) {
+        if (file_exists($path)) {
+            require_once $path;
+            break;
+        }
+    }
+    
+    if (function_exists('getDbConnection')) {
+        $conn = getDbConnection();
+    }
+}
+
+/** @var PDO $conn */
+
 try {
     // Fetch active cases
     $query = "SELECT r.*, 

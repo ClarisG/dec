@@ -807,9 +807,10 @@ $availableOfficers = $conn ? getAvailableOfficers($conn) : [];
 </div>
 
 <style>
-    /* Status Badges - Text Only with Dot */
+    /* Status Badges - Pill Style */
     .status-badge {
-        padding: 0;
+        padding: 0.25rem 0.75rem;
+        border-radius: 9999px;
         font-size: 0.75rem;
         font-weight: 600;
         text-transform: uppercase;
@@ -817,84 +818,103 @@ $availableOfficers = $conn ? getAvailableOfficers($conn) : [];
         white-space: nowrap;
         display: inline-flex;
         align-items: center;
-        background: none !important;
-        border: none !important;
+        justify-content: center;
+        border: 1px solid transparent;
     }
 
     .status-badge::before {
-        content: '';
-        display: inline-block;
-        width: 8px;
-        height: 8px;
-        border-radius: 50%;
-        margin-right: 6px;
+        display: none;
     }
     
     .status-pending {
+        background-color: #fff7ed;
         color: #c2410c;
-        font-size: 0.7rem; /* Smaller font for pending */
+        border-color: #fdba74;
+        font-size: 0.65rem; /* Smaller font for pending */
     }
-    .status-pending::before { background-color: #f97316; }
     
     .status-pending_field_verification {
+        background-color: #fff7ed;
         color: #ea580c;
+        border-color: #fdba74;
         white-space: normal;
-        text-align: left;
+        text-align: center;
         max-width: 140px;
         line-height: 1.1;
-        display: inline-flex;
-        font-size: 0.7rem; /* Smaller font */
+        font-size: 0.65rem; /* Smaller font */
     }
-    .status-pending_field_verification::before { background-color: #f97316; margin-right: 6px; flex-shrink: 0; }
     
-    .status-assigned { color: #1d4ed8; }
-    .status-assigned::before { background-color: #3b82f6; }
+    .status-assigned { 
+        background-color: #eff6ff;
+        color: #1d4ed8; 
+        border-color: #93c5fd;
+    }
     
-    .status-investigating { color: #4338ca; }
-    .status-investigating::before { background-color: #6366f1; }
+    .status-investigating { 
+        background-color: #eef2ff;
+        color: #4338ca; 
+        border-color: #a5b4fc;
+    }
     
-    .status-resolved { color: #15803d; }
-    .status-resolved::before { background-color: #22c55e; }
+    .status-resolved { 
+        background-color: #f0fdf4;
+        color: #15803d; 
+        border-color: #86efac;
+    }
     
-    .status-referred { color: #7e22ce; }
-    .status-referred::before { background-color: #a855f7; }
+    .status-referred { 
+        background-color: #faf5ff;
+        color: #7e22ce; 
+        border-color: #d8b4fe;
+    }
     
-    .status-closed { color: #374151; }
-    .status-closed::before { background-color: #6b7280; }
+    .status-closed { 
+        background-color: #f3f4f6;
+        color: #374151; 
+        border-color: #d1d5db;
+    }
     
-    /* Category Badges - Text Only with Dot */
+    /* Category Badges - Pill Style */
     .category-badge {
-        padding: 0;
+        padding: 0.25rem 0.75rem;
+        border-radius: 9999px;
         font-size: 0.75rem;
         font-weight: 600;
         text-transform: capitalize;
         display: inline-flex;
         align-items: center;
-        background: none !important;
-        border: none !important;
+        justify-content: center;
+        border: 1px solid transparent;
     }
 
     .category-badge::before {
-        content: '';
-        display: inline-block;
-        width: 8px;
-        height: 8px;
-        border-radius: 50%;
-        margin-right: 6px;
+        display: none;
     }
     
     /* User requested colors: incident (red), complain (blue), blotter (green) */
-    .category-incident, .category-police, .category-criminal, .category-vawc { color: #b91c1c; }
-    .category-incident::before, .category-police::before, .category-criminal::before, .category-vawc::before { background-color: #ef4444; } /* Red */
+    .category-incident, .category-police, .category-criminal, .category-vawc { 
+        background-color: #fee2e2;
+        color: #991b1b;
+        border-color: #ef4444;
+    }
     
-    .category-complain, .category-barangay, .category-civil { color: #1e40af; }
-    .category-complain::before, .category-barangay::before, .category-civil::before { background-color: #3b82f6; } /* Blue */
+    .category-complain, .category-barangay, .category-civil { 
+        background-color: #dbeafe;
+        color: #1e40af;
+        border-color: #3b82f6;
+    }
     
-    .category-blotter, .category-minor { color: #166534; }
-    .category-blotter::before, .category-minor::before { background-color: #22c55e; } /* Green */
+    .category-blotter, .category-minor { 
+        background-color: #dcfce7;
+        color: #166534;
+        border-color: #22c55e;
+    }
     
-    .category-other { color: #4b5563; }
-    .category-other::before { background-color: #9ca3af; }
+    .category-other { 
+        background-color: #f3f4f6;
+        color: #4b5563;
+        border-color: #d1d5db;
+    }
 
     /* Online Indicators */
     .online-indicator {
