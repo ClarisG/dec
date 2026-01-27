@@ -47,7 +47,7 @@ if (!function_exists('getRateLimitInfo')) {
     }
 }
 
-// Check rate limit before processing
+// Check rate limit before processing - FIXED: Using getRateLimitInfo() instead of checkRateLimit()
 $rate_limit_info = getRateLimitInfo($user_id);
 if ($rate_limit_info['count'] >= 5) {
     $error = "You have submitted too many reports recently. Please wait 1 hour before submitting another report.";
