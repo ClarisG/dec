@@ -32,6 +32,7 @@ try {
             $officer_role = 'lupon';
             break;
         case 'lupon_chairman':
+        case 'barangay_captain':
             $update_column = 'assigned_lupon_chairman';
             $officer_role = 'lupon_chairman';
             break;

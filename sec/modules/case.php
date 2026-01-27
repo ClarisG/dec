@@ -690,7 +690,7 @@ $availableOfficers = $conn ? getAvailableOfficers($conn) : [];
                                 try {
                                     $countColumn = ($officerType == 'tanod') ? 'assigned_tanod' : 'assigned_lupon';
                                     // Also check assigned_lupon_chairman if applicable
-                                    if ($role == 'lupon_chairman') {
+                                    if ($role == 'lupon_chairman' || $role == 'barangay_captain') {
                                         $countColumn = 'assigned_lupon_chairman';
                                     }
                                     
