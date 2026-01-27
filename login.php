@@ -88,12 +88,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                         $_SESSION['phone'] = $user['contact_number'];
                         $_SESSION['master_code_verified'] = true;
                         
-                        // Update master code usage
-                        $update_query = "UPDATE users SET 
-                            is_master_code_used = 1, 
-                            master_code_used_at = NOW(), 
-                            last_login = NOW() 
-                            WHERE id = :id";
+                        // Update last login only (master code is required every time)
+                        $update_query = "UPDATE users SET last_login = NOW() WHERE id = :id";
                         $update_stmt = $conn->prepare($update_query);
                         $update_stmt->bindParam(':id', $user['id']);
                         $update_stmt->execute();
@@ -101,7 +97,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                         // Also update barangay_personnel_registrations if exists
                         try {
                             $update_reg_query = "UPDATE barangay_personnel_registrations 
-                                                SET master_code_used = 1, master_code_used_at = NOW() 
+                                                SET last_login = NOW() 
                                                 WHERE user_id = :user_id";
                             $update_reg_stmt = $conn->prepare($update_reg_query);
                             $update_reg_stmt->bindParam(':user_id', $user['id']);
@@ -167,39 +163,16 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                                 if (in_array($user['role'], $personnel_roles)) {
                                     error_log("User is personnel with role: " . $user['role']);
                                     error_log("Master code in DB: " . ($user['master_code'] ?: 'NOT SET'));
-                                    error_log("Master code used: " . $user['is_master_code_used']);
                                     
-                                    // Check if user has a master code and hasn't used it yet
-                                    if (!empty($user['master_code']) && $user['is_master_code_used'] == 0) {
+                                    // ALWAYS require master code for personnel (every login)
+                                    if (!empty($user['master_code'])) {
                                         // Store user data temporarily for master code verification
                                         $_SESSION['temp_user_id'] = $user['id'];
                                         $_SESSION['temp_role'] = $user['role'];
                                         $_SESSION['temp_username'] = $user['username'];
                                         $_SESSION['temp_name'] = $user['first_name'] . ' ' . $user['last_name'];
                                         $showPinModal = true;
-                                        error_log("Showing PIN modal for personnel");
-                                    } else if (!empty($user['master_code']) && $user['is_master_code_used'] == 1) {
-                                        // Master code already used, proceed to login
-                                        error_log("Master code already used, logging in directly");
-                                        
-                                        $_SESSION['user_id'] = $user['id'];
-                                        $_SESSION['username'] = $user['username'];
-                                        $_SESSION['email'] = $user['email'];
-                                        $_SESSION['first_name'] = $user['first_name'];
-                                        $_SESSION['last_name'] = $user['last_name'];
-                                        $_SESSION['role'] = $user['role'];
-                                        $_SESSION['barangay'] = $user['barangay'];
-                                        $_SESSION['phone'] = $user['contact_number'];
-                                        $_SESSION['master_code_verified'] = true;
-                                        
-                                        // Update last login
-                                        $update_query = "UPDATE users SET last_login = NOW() WHERE id = :id";
-                                        $update_stmt = $conn->prepare($update_query);
-                                        $update_stmt->bindParam(':id', $user['id']);
-                                        $update_stmt->execute();
-                                        
-                                        // Redirect based on role
-                                        redirectUser($user['role']);
+                                        error_log("Showing PIN modal for personnel (master code required every login)");
                                     } else {
                                         // No master code set
                                         $error = "No master code assigned. Please contact administrator.";
@@ -1096,6 +1069,13 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 <div class="alert alert-success">
                     <i class="fas fa-check-circle"></i>
                     Email verified successfully! You can now login.
+                </div>
+            <?php endif; ?>
+            
+            <?php if (isset($_GET['logout'])): ?>
+                <div class="alert alert-success">
+                    <i class="fas fa-check-circle"></i>
+                    You have been successfully logged out.
                 </div>
             <?php endif; ?>
             
