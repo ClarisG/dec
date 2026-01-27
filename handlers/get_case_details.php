@@ -28,7 +28,7 @@ try {
               u.first_name, u.last_name, 
               u.permanent_address as address,
               u.email, 
-              u.mobile_number as phone,  // Changed from u.phone
+              u.mobile_number as phone,
               u.barangay as user_barangay,
               (SELECT COUNT(*) FROM report_attachments ra WHERE ra.report_id = r.id) as attachment_count
               FROM reports r 

@@ -83,8 +83,9 @@ try {
 }
 
 // Set current filter values from GET parameters
+$default_view = !isset($_GET['status']) && !isset($_GET['category']) && !isset($_GET['from_date']);
 $currentFilter = [
-    'status' => $_GET['status'] ?? '', // Default to empty (All) if not set, but we might change this logic below
+    'status' => $_GET['status'] ?? ($default_view ? 'pending' : ''),
     'category' => $_GET['category'] ?? '',
     'from_date' => $_GET['from_date'] ?? '',
     'to_date' => $_GET['to_date'] ?? ''
@@ -839,6 +840,15 @@ $availableOfficers = $conn ? getAvailableOfficers($conn) : [];
         background-color: #ffedd5;
         color: #ea580c;
         border: 1px solid #fb923c;
+        white-space: normal;
+        text-align: center;
+        max-width: 140px;
+        line-height: 1.1;
+        padding: 0.35rem 0.5rem;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        height: auto;
     }
     
     .status-assigned {
@@ -915,6 +925,24 @@ $availableOfficers = $conn ? getAvailableOfficers($conn) : [];
         background-color: #fffbeb;
         color: #b45309;
         border: 1px solid #fbbf24;
+    }
+
+    .category-incident {
+        background-color: #fef3c7;
+        color: #92400e;
+        border: 1px solid #f59e0b;
+    }
+    
+    .category-blotter {
+        background-color: #e0f2fe;
+        color: #0369a1;
+        border: 1px solid #0ea5e9;
+    }
+    
+    .category-complain {
+        background-color: #fee2e2;
+        color: #991b1b;
+        border: 1px solid #ef4444;
     }
     
     .category-other {
@@ -1390,12 +1418,18 @@ function getCategoryClass($category) {
         'Civil' => 'category-civil',
         'VAWC' => 'category-vawc',
         'Minor' => 'category-minor',
+        'Incident' => 'category-incident',
+        'Blotter' => 'category-blotter',
+        'Complain' => 'category-complain',
         'barangay matter' => 'category-barangay',
         'police matter' => 'category-police',
         'criminal' => 'category-criminal',
         'civil' => 'category-civil',
         'vawc' => 'category-vawc',
         'minor' => 'category-minor',
+        'incident' => 'category-incident',
+        'blotter' => 'category-blotter',
+        'complain' => 'category-complain',
     ];
     return $classes[$category] ?? 'category-other';
 }

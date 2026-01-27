@@ -19,7 +19,8 @@ if (!isset($_SESSION['user_id']) || !in_array($_SESSION['role'], $allowed_roles)
 }
 
 try {
-    $db = Database::getConnection();
+    // Get database connection
+    $db = isset($conn) ? $conn : getDbConnection();
     
     // Validate required fields
     $required = ['report_id', 'hearing_date', 'hearing_time', 'location', 'recipients', 'issuing_officer'];
