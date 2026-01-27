@@ -23,13 +23,13 @@ try {
     $conn->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
     
     // Get case details with user information
-    // FIXED: Changed 'u.phone' to 'u.mobile_number' based on your error
+    // FIXED: Changed 'u.phone' to 'u.contact_number' based on schema
     $query = "SELECT r.*, 
               u.first_name, u.last_name, 
               u.permanent_address as address,
-              u.email, 
-              u.mobile_number as phone,
-              u.barangay as user_barangay,
+               u.email, 
+               u.contact_number as phone,
+               u.barangay as user_barangay,
               (SELECT COUNT(*) FROM report_attachments ra WHERE ra.report_id = r.id) as attachment_count
               FROM reports r 
               LEFT JOIN users u ON r.user_id = u.id 
