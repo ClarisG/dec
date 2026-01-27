@@ -427,7 +427,7 @@ $availableOfficers = $conn ? getAvailableOfficers($conn) : [];
                         if (count($cases) > 0) {
                             foreach ($cases as $case) {
                                 $status_class = getStatusClass($case['status']);
-                                $status_text = ucwords(str_replace('_', ' ', $case['status']));
+                                $status_text = getStatusText($case['status']);
                                 $category_class = getCategoryClass($case['category'] ?? '');
                                 
                                 echo '<tr class="hover:bg-gray-50 transition-colors">';
@@ -623,6 +623,20 @@ $availableOfficers = $conn ? getAvailableOfficers($conn) : [];
                     <div id="officerList" class="space-y-3">
                         <?php 
                         if (count($availableOfficers) > 0): 
+                            $luponOfficers = [];
+                            $tanodOfficers = [];
+                            
+                            // Separate officers by type
+                            foreach ($availableOfficers as $officer) {
+                                $role = $officer['role'];
+                                if ($role == 'lupon' || $role == 'lupon_chairman' || $role == 'barangay_captain') {
+                                    $luponOfficers[] = $officer;
+                                } elseif ($role == 'tanod') {
+                                    $tanodOfficers[] = $officer;
+                                }
+                            }
+                            
+                            // Display officers
                             $firstOfficer = true;
                             foreach ($availableOfficers as $officer): 
                                 $officerName = htmlspecialchars($officer['first_name'] . ' ' . $officer['last_name']);
@@ -686,7 +700,12 @@ $availableOfficers = $conn ? getAvailableOfficers($conn) : [];
                                 </div>
                                 <div class="text-right">
                                     <span class="text-sm text-gray-500">Contact</span>
-                                    <div class="text-blue-600 font-medium text-sm"><?php echo htmlspecialchars($officer['phone'] ?? $officer['email'] ?? 'N/A'); ?></div>
+                                    <div class="text-blue-600 font-medium text-sm">
+                                        <?php 
+                                        $contact = $officer['phone'] ?? $officer['email'] ?? 'N/A';
+                                        echo htmlspecialchars($contact);
+                                        ?>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -772,42 +791,50 @@ $availableOfficers = $conn ? getAvailableOfficers($conn) : [];
         font-weight: 600;
         text-transform: uppercase;
         letter-spacing: 0.5px;
+        white-space: nowrap;
+        display: inline-block;
     }
     
     .status-pending {
         background-color: #fef3c7;
         color: #92400e;
+        border: 1px solid #f59e0b;
     }
     
     .status-pending_field_verification {
-        background-color: #fef3c7;
-        color: #92400e;
-        border: 1px solid #f59e0b;
+        background-color: #fed7aa;
+        color: #9a3412;
+        border: 1px solid #ea580c;
     }
     
     .status-assigned {
         background-color: #dbeafe;
         color: #1e40af;
+        border: 1px solid #60a5fa;
     }
     
     .status-investigating {
         background-color: #e0e7ff;
         color: #3730a3;
+        border: 1px solid #818cf8;
     }
     
     .status-resolved {
         background-color: #d1fae5;
         color: #065f46;
+        border: 1px solid #34d399;
     }
     
     .status-referred {
         background-color: #ede9fe;
         color: #5b21b6;
+        border: 1px solid #a78bfa;
     }
     
     .status-closed {
         background-color: #f3f4f6;
         color: #374151;
+        border: 1px solid #d1d5db;
     }
     
     /* Category Badges */
@@ -817,41 +844,49 @@ $availableOfficers = $conn ? getAvailableOfficers($conn) : [];
         font-size: 0.75rem;
         font-weight: 600;
         text-transform: capitalize;
+        display: inline-block;
     }
     
     .category-barangay {
         background-color: #dbeafe;
         color: #1e40af;
+        border: 1px solid #60a5fa;
     }
     
     .category-police {
         background-color: #fee2e2;
         color: #991b1b;
+        border: 1px solid #f87171;
     }
     
     .category-criminal {
         background-color: #ede9fe;
         color: #5b21b6;
+        border: 1px solid #a78bfa;
     }
     
     .category-civil {
         background-color: #d1fae5;
         color: #065f46;
+        border: 1px solid #34d399;
     }
     
     .category-vawc {
         background-color: #fce7f3;
         color: #9d174d;
+        border: 1px solid #f472b6;
     }
     
     .category-minor {
         background-color: #fef3c7;
         color: #92400e;
+        border: 1px solid #f59e0b;
     }
     
     .category-other {
         background-color: #f3f4f6;
         color: #374151;
+        border: 1px solid #d1d5db;
     }
     
     /* Pagination Styles */
@@ -867,6 +902,7 @@ $availableOfficers = $conn ? getAvailableOfficers($conn) : [];
         color: #374151;
         transition: all 0.2s;
         box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+        cursor: pointer;
     }
     
     .pagination-btn:hover {
@@ -896,6 +932,7 @@ $availableOfficers = $conn ? getAvailableOfficers($conn) : [];
     
     .assignment-option:hover {
         border-color: #93c5fd;
+        background-color: #f0f9ff;
     }
     
     .assignment-option.active {
@@ -909,6 +946,7 @@ $availableOfficers = $conn ? getAvailableOfficers($conn) : [];
         padding: 1rem;
         cursor: pointer;
         transition: all 0.3s;
+        display: none;
     }
     
     .officer-item:hover {
@@ -919,6 +957,11 @@ $availableOfficers = $conn ? getAvailableOfficers($conn) : [];
     .officer-item.active {
         border-color: #3b82f6;
         background-color: #eff6ff;
+        display: block !important;
+    }
+    
+    .officer-item[style*="display: block"] {
+        display: block !important;
     }
     
     .role-badge {
@@ -926,16 +969,19 @@ $availableOfficers = $conn ? getAvailableOfficers($conn) : [];
         border-radius: 9999px;
         font-size: 0.75rem;
         font-weight: 600;
+        display: inline-block;
     }
     
     .role-badge.lupon {
         background-color: #d1fae5;
         color: #065f46;
+        border: 1px solid #34d399;
     }
     
     .role-badge.tanod {
         background-color: #dbeafe;
         color: #1e40af;
+        border: 1px solid #60a5fa;
     }
     
     /* Glass Card Effect */
@@ -975,6 +1021,7 @@ $availableOfficers = $conn ? getAvailableOfficers($conn) : [];
         white-space: nowrap;
         font-size: 0.875rem;
         color: #1f2937;
+        vertical-align: middle;
     }
 </style>
 
@@ -990,16 +1037,35 @@ let selectedOfficerId = null;
 let selectedOfficerType = 'lupon'; // Default to lupon
 let selectedOfficerRole = null;
 
+// Initialize on page load
 document.addEventListener('DOMContentLoaded', function() {
+    console.log('DOM Content Loaded');
+    
     // Update pagination display
     document.getElementById('currentPage').textContent = currentPage;
     document.getElementById('totalPages').textContent = totalPages;
     
-    // Set initial officer selection based on what's visible
-    if (document.querySelector('.assignment-option.active')) {
-        updateOfficerTypeSelection(document.querySelector('.assignment-option.active'), 'lupon');
-    }
+    // Initialize officer selection
+    initializeOfficerSelection();
 });
+
+// Initialize officer selection
+function initializeOfficerSelection() {
+    console.log('Initializing officer selection');
+    
+    // Set default selection to lupon
+    const luponOption = document.querySelector('.assignment-option[data-type="lupon"]');
+    if (luponOption) {
+        updateOfficerTypeSelection(luponOption, 'lupon');
+    }
+    
+    // Set up click handlers for officer items
+    document.querySelectorAll('.officer-item').forEach(item => {
+        item.addEventListener('click', function() {
+            selectOfficer(this);
+        });
+    });
+}
 
 // --- Major Page Navigation and Filtering ---
 
@@ -1078,6 +1144,7 @@ function closeCaseDetailsModal() {
 // --- Case Assignment Logic ---
 
 function openAssignmentModal(caseId) {
+    console.log('Opening assignment modal for case:', caseId);
     selectedCaseId = caseId;
     
     // Set default selection to 'lupon' and update the list
@@ -1095,6 +1162,7 @@ function closeAssignmentModal() {
     document.getElementById('assignmentModal').classList.add('hidden');
     selectedCaseId = null;
     selectedOfficerId = null;
+    selectedOfficerType = 'lupon';
 }
 
 function updateOfficerTypeSelection(element, type) {
@@ -1107,13 +1175,8 @@ function updateOfficerTypeSelection(element, type) {
     element.classList.add('active');
     
     selectedOfficerType = type;
-    filterOfficersByType(type);
     
-    // Auto-select the first available officer of this type
-    autoSelectFirstOfficer(type);
-}
-
-function filterOfficersByType(type) {
+    // Show/hide officers based on type
     const officerItems = document.querySelectorAll('.officer-item');
     let hasVisibleOfficers = false;
     
@@ -1127,43 +1190,22 @@ function filterOfficersByType(type) {
         }
     });
     
-    // Show message if no officers of this type
-    const officerList = document.getElementById('officerList');
-    const emptyMessage = officerList.querySelector('.no-officers-message');
-    
-    if (!hasVisibleOfficers) {
-        if (!emptyMessage) {
-            const msgDiv = document.createElement('div');
-            msgDiv.className = 'no-officers-message text-center py-4 text-gray-500';
-            msgDiv.innerHTML = `
-                <i class="fas fa-users-slash text-3xl mb-2"></i>
-                <p>No available ${type === 'lupon' ? 'Lupon Members' : 'Tanod'} at the moment.</p>
-            `;
-            officerList.appendChild(msgDiv);
+    // Auto-select the first visible officer
+    if (hasVisibleOfficers) {
+        const firstVisible = document.querySelector('.officer-item[style*="display: block"]');
+        if (firstVisible) {
+            selectOfficer(firstVisible);
         }
-        selectedOfficerId = null;
-    } else if (emptyMessage) {
-        emptyMessage.remove();
-    }
-    
-    updateSelectionInfo();
-}
-
-function autoSelectFirstOfficer(type) {
-    const firstOfficer = document.querySelector(`.officer-item[data-officer-type="${type}"]`);
-    if (firstOfficer) {
-        selectOfficer(firstOfficer);
     } else {
-        // Clear selection if no officers
-        document.querySelectorAll('.officer-item').forEach(item => {
-            item.classList.remove('active');
-        });
+        // Clear selection if no officers of this type
         selectedOfficerId = null;
         updateSelectionInfo();
     }
 }
 
 function selectOfficer(element) {
+    console.log('selectOfficer called');
+    
     // Update active style for all officers
     document.querySelectorAll('.officer-item').forEach(item => {
         item.classList.remove('active');
@@ -1222,20 +1264,28 @@ function submitAssignment() {
     formData.append('officer_id', selectedOfficerId);
     formData.append('officer_type', selectedOfficerType);
 
-    fetch('../../handlers/assign_case.php', { method: 'POST', body: formData })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                alert('Case assigned successfully!');
-                location.reload();
-            } else {
-                alert('Assignment failed: ' + (data.message || 'Unknown error.'));
-            }
-        })
-        .catch(error => {
-            console.error('Assignment error:', error);
-            alert('An error occurred during assignment. See console for details.');
-        });
+    fetch('../../handlers/assign_case.php', { 
+        method: 'POST', 
+        body: formData 
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error('Network response was not ok');
+        }
+        return response.json();
+    })
+    .then(data => {
+        if (data.success) {
+            alert('Case assigned successfully!');
+            location.reload();
+        } else {
+            alert('Assignment failed: ' + (data.message || 'Unknown error.'));
+        }
+    })
+    .catch(error => {
+        console.error('Assignment error:', error);
+        alert('An error occurred during assignment. See console for details.');
+    });
 }
 
 // --- Utility and Event Handlers ---
@@ -1253,7 +1303,7 @@ function viewAttachments(reportId) {
 }
 
 // Global event listeners for closing modals
-window.addEventListener('click', function(event) {
+document.addEventListener('click', function(event) {
     if (event.target == document.getElementById('caseDetailsModal')) {
         closeCaseDetailsModal();
     }
@@ -1283,6 +1333,19 @@ function getStatusClass($status) {
         'closed' => 'status-closed',
     ];
     return $classes[$status] ?? 'status-pending';
+}
+
+function getStatusText($status) {
+    $texts = [
+        'pending' => 'Pending',
+        'pending_field_verification' => 'Pending Field Verification',
+        'assigned' => 'Assigned',
+        'investigating' => 'Investigating',
+        'resolved' => 'Resolved',
+        'referred' => 'Referred',
+        'closed' => 'Closed',
+    ];
+    return $texts[$status] ?? ucwords(str_replace('_', ' ', $status));
 }
 
 function getCategoryClass($category) {

@@ -1,6 +1,6 @@
 <?php
+// handlers/get_case_details.php
 session_start();
-require_once '../config/database.php';
 
 if (!isset($_SESSION['user_id'])) {
     header('HTTP/1.1 401 Unauthorized');
@@ -16,13 +16,19 @@ if (!$case_id) {
 }
 
 try {
-    $conn = getDbConnection();
+    // Database connection
+    $dsn = "mysql:host=153.92.15.81;port=3306;dbname=u514031374_leir;charset=utf8mb4";
+    $conn = new PDO($dsn, 'u514031374_leir', 'leirP@55w0rd');
+    $conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+    $conn->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
     
     // Get case details with user information
+    // FIXED: Changed 'u.phone' to 'u.mobile_number' based on your error
     $query = "SELECT r.*, 
               u.first_name, u.last_name, 
               u.permanent_address as address,
-              u.email, u.phone,
+              u.email, 
+              u.mobile_number as phone,  // Changed from u.phone
               u.barangay as user_barangay,
               (SELECT COUNT(*) FROM report_attachments ra WHERE ra.report_id = r.id) as attachment_count
               FROM reports r 
