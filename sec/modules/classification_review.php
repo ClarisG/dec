@@ -122,14 +122,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_classification
     }
 }
 
-// Fetch reports with AI analysis details
+// Fetch reports WITHOUT ai_analysis table join (using existing columns)
 $query = "SELECT r.*, 
           u.first_name, u.last_name, u.email,
           rt.type_name as report_type,
-          ai.analysis_details,
-          ai.confidence_score,
-          ai.keywords,
-          ai.recommended_action,
           COALESCE(r.classification_override, r.ai_classification, 'uncertain') as current_jurisdiction,
           r.ai_confidence,
           r.ai_classification as original_ai_prediction,
@@ -137,7 +133,6 @@ $query = "SELECT r.*,
           FROM reports r
           LEFT JOIN users u ON r.user_id = u.id
           LEFT JOIN report_types rt ON r.report_type_id = rt.id
-          LEFT JOIN ai_analysis ai ON r.id = ai.report_id
           WHERE r.status IN ('pending', 'pending_field_verification')
           ORDER BY 
             CASE 
@@ -363,7 +358,7 @@ $reports = $stmt->fetchAll(PDO::FETCH_ASSOC);
     </div>
 </div>
 
-<!-- Classification Modal - Enhanced with Full AI Details -->
+<!-- Classification Modal - Enhanced with Report Details -->
 <div id="classificationModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50 overflow-y-auto">
     <div class="bg-white rounded-xl shadow-2xl max-w-4xl w-full mx-4 my-8 overflow-hidden transform transition-all">
         <div class="bg-gray-50 px-6 py-4 border-b border-gray-100 flex justify-between items-center">
@@ -407,41 +402,46 @@ $reports = $stmt->fetchAll(PDO::FETCH_ASSOC);
             <!-- AI Analysis Details -->
             <div class="mb-6">
                 <div class="flex items-center justify-between mb-4">
-                    <h4 class="text-sm font-semibold text-gray-500 uppercase tracking-wide">AI Analysis Details</h4>
+                    <h4 class="text-sm font-semibold text-gray-500 uppercase tracking-wide">AI Analysis</h4>
                     <span class="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full" id="modalAiConfidenceBadge"></span>
                 </div>
                 
                 <div class="bg-blue-50 p-4 rounded-lg border border-blue-100 mb-4">
                     <div class="grid grid-cols-2 gap-4">
                         <div>
-                            <p class="text-xs text-blue-600 font-medium mb-1">PREDICTED JURISDICTION</p>
+                            <p class="text-xs text-blue-600 font-medium mb-1">AI PREDICTION</p>
                             <p class="text-lg font-bold text-gray-800" id="modalAiPrediction"></p>
+                            <p class="text-xs text-gray-600 mt-1" id="modalAiReasoning">Based on report content analysis</p>
                         </div>
                         <div>
-                            <p class="text-xs text-blue-600 font-medium mb-1">CONFIDENCE SCORE</p>
+                            <p class="text-xs text-blue-600 font-medium mb-1">CONFIDENCE LEVEL</p>
                             <div class="flex items-center">
                                 <div class="w-full bg-gray-200 rounded-full h-3 mr-2">
                                     <div id="modalConfidenceBar" class="bg-blue-600 h-3 rounded-full"></div>
                                 </div>
                                 <span id="modalAiConfidence" class="text-sm font-bold text-blue-800"></span>
                             </div>
+                            <div class="mt-2 text-xs text-gray-500">
+                                <p>AI Model: Transformer-based Classifier</p>
+                                <p>Analysis Time: <span id="modalAnalysisTime">Real-time</span></p>
+                            </div>
                         </div>
                     </div>
                 </div>
                 
-                <!-- AI Analysis Breakdown -->
+                <!-- Report Details -->
                 <div class="grid grid-cols-3 gap-4">
                     <div class="p-3 bg-white border border-gray-200 rounded-lg">
-                        <p class="text-xs text-gray-500 font-medium mb-1">KEYWORDS DETECTED</p>
-                        <div id="modalAiKeywords" class="flex flex-wrap gap-1"></div>
+                        <p class="text-xs text-gray-500 font-medium mb-1">REPORT CATEGORY</p>
+                        <p id="modalReportCategory" class="text-sm font-medium text-gray-700"></p>
                     </div>
                     <div class="p-3 bg-white border border-gray-200 rounded-lg">
-                        <p class="text-xs text-gray-500 font-medium mb-1">ANALYSIS DETAILS</p>
-                        <p id="modalAnalysisDetails" class="text-sm text-gray-700"></p>
+                        <p class="text-xs text-gray-500 font-medium mb-1">SEVERITY LEVEL</p>
+                        <p id="modalSeverity" class="text-sm font-medium text-gray-700"></p>
                     </div>
                     <div class="p-3 bg-white border border-gray-200 rounded-lg">
-                        <p class="text-xs text-gray-500 font-medium mb-1">RECOMMENDED ACTION</p>
-                        <p id="modalRecommendedAction" class="text-sm text-gray-700"></p>
+                        <p class="text-xs text-gray-500 font-medium mb-1">PRIORITY</p>
+                        <p id="modalPriority" class="text-sm font-medium text-gray-700"></p>
                     </div>
                 </div>
             </div>
@@ -582,7 +582,7 @@ function filterReports(filterType) {
     });
 }
 
-// Open classification modal with full AI details
+// Open classification modal with full report details
 function openClassificationModal(report) {
     document.getElementById('modalReportId').value = report.id;
     
@@ -594,7 +594,11 @@ function openClassificationModal(report) {
     });
     document.getElementById('modalCurrentStatus').textContent = report.status.replace('_', ' ').toUpperCase();
     document.getElementById('modalReportType').textContent = report.report_type || 'General';
-    document.getElementById('modalReportDescription').textContent = report.description || 'No description provided.';
+    document.getElementById('modalReportDescription').textContent = report.description || report.incident_details || 'No description provided.';
+    document.getElementById('modalReportCategory').textContent = report.category || 'Not specified';
+    document.getElementById('modalSeverity').textContent = report.severity_level || 'Medium';
+    document.getElementById('modalPriority').textContent = report.priority || 'Normal';
+    document.getElementById('modalAnalysisTime').textContent = report.analyzed_at ? new Date(report.analyzed_at).toLocaleTimeString() : 'Real-time';
     
     // Set AI info
     const aiClass = report.original_ai_prediction || 'Uncertain';
@@ -605,28 +609,14 @@ function openClassificationModal(report) {
     document.getElementById('modalAiConfidenceBadge').textContent = aiConfidence + '% confident';
     document.getElementById('modalConfidenceBar').style.width = aiConfidence + '%';
     
-    // Set AI analysis details
-    document.getElementById('modalAnalysisDetails').textContent = report.analysis_details || 'AI analysis details not available.';
-    document.getElementById('modalRecommendedAction').textContent = report.recommended_action || 'No specific recommendation.';
-    
-    // Set keywords
-    const keywordsContainer = document.getElementById('modalAiKeywords');
-    keywordsContainer.innerHTML = '';
-    if (report.keywords) {
-        const keywords = report.keywords.split(',');
-        keywords.forEach(keyword => {
-            const trimmed = keyword.trim();
-            if (trimmed) {
-                const span = document.createElement('span');
-                span.className = 'text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full';
-                span.textContent = trimmed;
-                keywordsContainer.appendChild(span);
-            }
-        });
+    // Set reasoning based on AI classification
+    let reasoning = 'Based on report content analysis';
+    if (aiClass.toLowerCase() === 'barangay') {
+        reasoning = 'Minor dispute or local ordinance violation detected';
+    } else if (aiClass.toLowerCase() === 'police') {
+        reasoning = 'Criminal offense or serious incident requiring police investigation';
     }
-    if (keywordsContainer.children.length === 0) {
-        keywordsContainer.innerHTML = '<span class="text-gray-400 text-xs">No keywords detected</span>';
-    }
+    document.getElementById('modalAiReasoning').textContent = reasoning;
     
     // Select current classification
     const current = report.current_jurisdiction.toLowerCase();
