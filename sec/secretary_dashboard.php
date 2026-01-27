@@ -79,6 +79,13 @@ if ($module == 'dashboard') {
     $pending_stmt = $conn->prepare($pending_query);
     $pending_stmt->execute();
     $stats['pending_cases'] = $pending_stmt->fetchColumn();
+        // Add classification review stats
+    $review_stats_query = "SELECT COUNT(*) as count FROM reports 
+                          WHERE (ai_classification IS NOT NULL AND classification_override IS NULL) 
+                          AND status IN ('pending', 'pending_field_verification')";
+    $review_stats_stmt = $conn->prepare($review_stats_query);
+    $review_stats_stmt->execute();
+    $stats['pending_reviews'] = $review_stats_stmt->fetchColumn();
     
     // Approaching deadline (cases filed > 12 days ago)
     $deadline_query = "SELECT COUNT(*) as count FROM reports WHERE status IN ('pending', 'assigned', 'investigating') 
@@ -502,6 +509,34 @@ function getModuleSubtitle($module) {
                     <i class="fas fa-tachometer-alt mr-3"></i>
                     Dashboard Overview
                 </a>
+
+                  <!-- NEW: Classification Review as second module -->
+    <a href="?module=classification_review" class="sidebar-link block p-3 text-white rounded-lg <?php echo $module == 'classification_review' ? 'active' : ''; ?>">
+        <i class="fas fa-robot mr-3"></i>
+        Classification Review
+        <!-- Add notification badge if there are pending reviews -->
+        <?php
+        // Check for reports needing review
+        if ($module == 'dashboard' || $module == 'classification_review') {
+            try {
+                $review_query = "SELECT COUNT(*) as count FROM reports 
+                                WHERE (ai_classification IS NOT NULL AND classification_override IS NULL) 
+                                AND status IN ('pending', 'pending_field_verification')";
+                $review_stmt = $conn->prepare($review_query);
+                $review_stmt->execute();
+                $pending_reviews = $review_stmt->fetchColumn();
+                
+                if ($pending_reviews > 0): ?>
+                    <span class="float-right bg-yellow-500 text-white text-xs rounded-full w-6 h-6 flex items-center justify-center">
+                        <?php echo min($pending_reviews, 9); ?>
+                    </span>
+                <?php endif;
+            } catch (Exception $e) {
+                // Silently handle error
+            }
+        }
+        ?>
+    </a>
                 <a href="?module=case" class="sidebar-link block p-3 text-white rounded-lg <?php echo $module == 'case' ? 'active' : ''; ?>">
                     <i class="fas fa-gavel mr-3"></i>
                     Case-Blotter Management
@@ -678,6 +713,14 @@ function getModuleSubtitle($module) {
                 <i class="fas fa-home text-xl"></i>
                 <span class="text-xs mt-1">Home</span>
             </a>
+                    <!-- NEW: Classification Review as second in mobile -->
+        <a href="?module=classification_review" class="flex flex-col items-center text-gray-600 <?php echo $module == 'classification_review' ? 'mobile-nav-active' : ''; ?>">
+            <i class="fas fa-robot text-xl"></i>
+            <span class="text-xs mt-1">Review AI</span>
+            <?php if (isset($pending_reviews) && $pending_reviews > 0): ?>
+                <span class="mobile-nav-badge"><?php echo min($pending_reviews, 9); ?></span>
+            <?php endif; ?>
+        </a>
             
             <a href="?module=case" class="flex flex-col items-center text-gray-600 <?php echo $module == 'case' ? 'mobile-nav-active' : ''; ?>">
                 <i class="fas fa-gavel text-xl"></i>
