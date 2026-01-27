@@ -83,9 +83,8 @@ try {
 }
 
 // Set current filter values from GET parameters
-$default_view = !isset($_GET['status']) && !isset($_GET['category']) && !isset($_GET['from_date']);
 $currentFilter = [
-    'status' => $_GET['status'] ?? ($default_view ? 'pending' : ''),
+    'status' => $_GET['status'] ?? '',
     'category' => $_GET['category'] ?? '',
     'from_date' => $_GET['from_date'] ?? '',
     'to_date' => $_GET['to_date'] ?? ''
@@ -101,19 +100,18 @@ function getAvailableOfficers($conn) {
     $officers = [];
     try {
         // Get users with officer roles (lupon, tanod, etc.)
-        $query = "SELECT id, first_name, last_name, role, email, phone 
+        // Show all officers regardless of status (active/offline)
+        $query = "SELECT id, first_name, last_name, role, email, phone, is_online 
                   FROM users 
-                  WHERE role IN ('lupon', 'lupon_member', 'tanod', 'barangay_tanod', 'lupon_chairman', 'barangay_captain')
-                  AND status = 'active'
+                  WHERE role IN ('lupon', 'lupon_member', 'tanod', 'barangay_tanod', 'barangay_captain')
                   ORDER BY 
                     CASE role
                         WHEN 'barangay_captain' THEN 1
-                        WHEN 'lupon_chairman' THEN 2
-                        WHEN 'lupon' THEN 3
-                        WHEN 'lupon_member' THEN 3
-                        WHEN 'tanod' THEN 4
-                        WHEN 'barangay_tanod' THEN 4
-                        ELSE 5
+                        WHEN 'lupon' THEN 2
+                        WHEN 'lupon_member' THEN 2
+                        WHEN 'tanod' THEN 3
+                        WHEN 'barangay_tanod' THEN 3
+                        ELSE 4
                     END, 
                     last_name, first_name";
         
@@ -359,11 +357,7 @@ $availableOfficers = $conn ? getAvailableOfficers($conn) : [];
                         // Get filter parameters from URL
                         $page = isset($_GET['page']) ? max(1, intval($_GET['page'])) : 1;
                         
-                        // Default to pending cases if no filters are set
-                        // This fixes "Pending Cases disappear" - ensures they are the default view
-                        $default_view = !isset($_GET['status']) && !isset($_GET['category']) && !isset($_GET['from_date']);
-                        
-                        $status = $_GET['status'] ?? ($default_view ? 'pending' : '');
+                        $status = $_GET['status'] ?? '';
                         $category = $_GET['category'] ?? '';
                         $from_date = $_GET['from_date'] ?? '';
                         $to_date = $_GET['to_date'] ?? '';
@@ -376,13 +370,8 @@ $availableOfficers = $conn ? getAvailableOfficers($conn) : [];
                         $params = [];
                         
                         if (!empty($status)) {
-                            if ($status === 'pending' && $default_view) {
-                                // Default view shows pending and verification
-                                $where_clauses[] = "r.status IN ('pending', 'pending_field_verification')";
-                            } else {
-                                $where_clauses[] = "r.status = :status";
-                                $params[':status'] = $status;
-                            }
+                            $where_clauses[] = "r.status = :status";
+                            $params[':status'] = $status;
                         }
                         
                         if (!empty($category)) {
@@ -647,19 +636,6 @@ $availableOfficers = $conn ? getAvailableOfficers($conn) : [];
                     <div id="officerList" class="space-y-3">
                         <?php 
                         if (count($availableOfficers) > 0): 
-                            $luponOfficers = [];
-                            $tanodOfficers = [];
-                            
-                            // Separate officers by type
-                            foreach ($availableOfficers as $officer) {
-                                $role = $officer['role'];
-                                if ($role == 'lupon' || $role == 'lupon_member' || $role == 'lupon_chairman' || $role == 'barangay_captain') {
-                                    $luponOfficers[] = $officer;
-                                } elseif ($role == 'tanod' || $role == 'barangay_tanod') {
-                                    $tanodOfficers[] = $officer;
-                                }
-                            }
-                            
                             // Display officers
                             $firstOfficer = true;
                             foreach ($availableOfficers as $officer): 
@@ -707,7 +683,6 @@ $availableOfficers = $conn ? getAvailableOfficers($conn) : [];
                                     }
                                     
                                     // Check if column exists or handle generic assignment
-                                    // Ideally we check schema, but for now we assume columns exist as per assign_case.php
                                     $countQuery = "SELECT COUNT(*) as count FROM reports WHERE $countColumn = :officer_id AND status NOT IN ('closed', 'resolved')";
                                     $countStmt = $conn->prepare($countQuery);
                                     $countStmt->bindValue(':officer_id', $officer['id']);
@@ -717,6 +692,8 @@ $availableOfficers = $conn ? getAvailableOfficers($conn) : [];
                                 } catch (Exception $e) {
                                     // Silently continue
                                 }
+                                
+                                $isOnline = !empty($officer['is_online']);
                         ?>
                         <div class="officer-item <?php echo $firstOfficer && $officerType == 'lupon' ? 'active' : ''; ?>" 
                              data-officer-id="<?php echo $officer['id']; ?>" 
@@ -726,7 +703,11 @@ $availableOfficers = $conn ? getAvailableOfficers($conn) : [];
                              onclick="selectOfficer(this)">
                             <div class="flex items-center justify-between">
                                 <div>
-                                    <h5 class="font-medium officer-name"><?php echo $officerName; ?></h5>
+                                    <h5 class="font-medium officer-name flex items-center">
+                                        <span class="online-indicator <?php echo $isOnline ? 'online-active' : 'online-offline'; ?>" 
+                                              title="<?php echo $isOnline ? 'Online' : 'Offline'; ?>"></span>
+                                        <?php echo $officerName; ?>
+                                    </h5>
                                     <div class="flex items-center mt-1">
                                         <span class="<?php echo $roleClass; ?> mr-2"><?php echo $roleDisplay; ?></span>
                                         <span class="text-sm text-gray-600"><?php echo $assignedCount; ?> case(s) assigned</span>
@@ -820,136 +801,109 @@ $availableOfficers = $conn ? getAvailableOfficers($conn) : [];
 <style>
     /* Status Badges */
     .status-badge {
-        padding: 0.25rem 0.75rem;
-        border-radius: 9999px;
         font-size: 0.75rem;
         font-weight: 600;
         text-transform: uppercase;
         letter-spacing: 0.5px;
         white-space: nowrap;
         display: inline-block;
+        /* Removed background and border as requested */
     }
     
     .status-pending {
-        background-color: #ffedd5;
         color: #c2410c;
-        border: 1px solid #fdba74;
+        font-size: 0.7rem; /* Smaller font */
     }
     
     .status-pending_field_verification {
-        background-color: #ffedd5;
         color: #ea580c;
-        border: 1px solid #fb923c;
         white-space: normal;
-        text-align: center;
+        text-align: left;
         max-width: 140px;
         line-height: 1.1;
-        padding: 0.35rem 0.5rem;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        height: auto;
+        display: inline-block;
+        font-size: 0.7rem; /* Smaller font */
     }
     
     .status-assigned {
-        background-color: #dbeafe;
         color: #1d4ed8;
-        border: 1px solid #60a5fa;
     }
     
     .status-investigating {
-        background-color: #e0e7ff;
         color: #4338ca;
-        border: 1px solid #818cf8;
     }
     
     .status-resolved {
-        background-color: #dcfce7;
         color: #15803d;
-        border: 1px solid #4ade80;
     }
     
     .status-referred {
-        background-color: #f3e8ff;
         color: #7e22ce;
-        border: 1px solid #c084fc;
     }
     
     .status-closed {
-        background-color: #f3f4f6;
         color: #374151;
-        border: 1px solid #9ca3af;
     }
     
     /* Category Badges */
     .category-badge {
-        padding: 0.25rem 0.75rem;
-        border-radius: 9999px;
         font-size: 0.75rem;
         font-weight: 600;
         text-transform: capitalize;
         display: inline-block;
+        /* Removed background and border as requested */
     }
     
     .category-barangay {
-        background-color: #eff6ff;
         color: #1e40af;
-        border: 1px solid #60a5fa;
     }
     
     .category-police {
-        background-color: #fef2f2;
         color: #b91c1c;
-        border: 1px solid #f87171;
     }
     
     .category-criminal {
-        background-color: #faf5ff;
         color: #6b21a8;
-        border: 1px solid #a855f7;
     }
     
     .category-civil {
-        background-color: #f0fdf4;
         color: #166534;
-        border: 1px solid #4ade80;
     }
     
     .category-vawc {
-        background-color: #fdf2f8;
         color: #be185d;
-        border: 1px solid #f472b6;
     }
     
     .category-minor {
-        background-color: #fffbeb;
         color: #b45309;
-        border: 1px solid #fbbf24;
     }
 
     .category-incident {
-        background-color: #fef3c7;
         color: #92400e;
-        border: 1px solid #f59e0b;
     }
     
     .category-blotter {
-        background-color: #e0f2fe;
         color: #0369a1;
-        border: 1px solid #0ea5e9;
     }
     
     .category-complain {
-        background-color: #fee2e2;
         color: #991b1b;
-        border: 1px solid #ef4444;
     }
     
     .category-other {
-        background-color: #f3f4f6;
         color: #374151;
-        border: 1px solid #d1d5db;
     }
+    
+    /* Online Status Indicator */
+    .online-indicator {
+        height: 8px;
+        width: 8px;
+        border-radius: 50%;
+        display: inline-block;
+        margin-right: 6px;
+    }
+    .online-active { background-color: #10b981; } /* Green */
+    .online-offline { background-color: #9ca3af; } /* Gray */
     
     /* Pagination Styles */
     .pagination-btn {
