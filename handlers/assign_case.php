@@ -34,7 +34,7 @@ try {
         case 'lupon_chairman':
         case 'barangay_captain':
             $update_column = 'assigned_lupon_chairman';
-            $officer_role = 'lupon_chairman';
+            $officer_role = 'barangay_captain';
             break;
         case 'tanod':
             $update_column = 'assigned_tanod';

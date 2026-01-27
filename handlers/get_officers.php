@@ -32,11 +32,11 @@ try {
                            AND u.is_active = 1
                            AND u.is_chairman = 0
                            ORDER BY u.first_name, u.last_name";
-    } elseif ($type === 'lupon_chairman') {
-        $role = 'lupon_chairman';
-        $role_name = 'Lupon Chairman';
+    } elseif ($type === 'barangay_captain') {
+        $role = 'barangay_captain';
+        $role_name = 'Barangay Captain';
         $badge_class = 'role-badge lupon';
-        // Fetch active lupon chairman
+        // Fetch active barangay captain
         $officers_query = "SELECT u.id, u.first_name, u.last_name, u.contact_number, 
                            u.barangay, u.status, u.is_online,
                            (SELECT COUNT(*) FROM reports WHERE assigned_lupon_chairman = u.id AND status != 'closed') as assigned_cases

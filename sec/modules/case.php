@@ -604,7 +604,7 @@ $availableOfficers = $conn ? getAvailableOfficers($conn) : [];
                 <?php if (!$db_error && $conn): ?>
                 <div class="mb-6">
                     <h4 class="font-medium text-gray-800 mb-3">Select Officer Type</h4>
-                    <div class="grid grid-cols-2 gap-3 mb-6" id="officerTypeSelection">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-6" id="officerTypeSelection">
                         <div class="assignment-option active" data-type="lupon" onclick="updateOfficerTypeSelection(this, 'lupon')">
                             <div class="flex items-center">
                                 <div class="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center mr-3">
@@ -613,6 +613,17 @@ $availableOfficers = $conn ? getAvailableOfficers($conn) : [];
                                 <div>
                                     <h5 class="font-medium">Lupon Members</h5>
                                     <p class="text-sm text-gray-600">Assign to barangay lupon</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="assignment-option" data-type="barangay_captain" onclick="updateOfficerTypeSelection(this, 'barangay_captain')">
+                            <div class="flex items-center">
+                                <div class="w-10 h-10 bg-yellow-100 rounded-lg flex items-center justify-center mr-3">
+                                    <i class="fas fa-user-tie text-yellow-600"></i>
+                                </div>
+                                <div>
+                                    <h5 class="font-medium">Barangay Captain</h5>
+                                    <p class="text-sm text-gray-600">Assign to Captain</p>
                                 </div>
                             </div>
                         </div>
@@ -665,8 +676,8 @@ $availableOfficers = $conn ? getAvailableOfficers($conn) : [];
                                         break;
                                     case 'lupon_chairman':
                                         $roleClass .= 'lupon';
-                                        $roleDisplay = 'Lupon Chairman';
-                                        $officerType = 'lupon';
+                                        $roleDisplay = 'Barangay Captain'; // Fallback mapping
+                                        $officerType = 'barangay_captain';
                                         break;
                                     case 'tanod':
                                     case 'barangay_tanod':
@@ -677,7 +688,7 @@ $availableOfficers = $conn ? getAvailableOfficers($conn) : [];
                                     case 'barangay_captain':
                                         $roleClass .= 'lupon';
                                         $roleDisplay = 'Barangay Captain';
-                                        $officerType = 'lupon';
+                                        $officerType = 'barangay_captain';
                                         break;
                                     default:
                                         $roleClass .= 'lupon';
@@ -771,7 +782,7 @@ $availableOfficers = $conn ? getAvailableOfficers($conn) : [];
                             <span class="ml-2 px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800" id="selectedOfficerRole">
                                 <?php 
                                 $role = $defaultOfficer['role'];
-                                if ($role === 'lupon_chairman') echo 'Lupon Chairman';
+                                if ($role === 'lupon_chairman') echo 'Barangay Captain';
                                 elseif ($role === 'barangay_captain') echo 'Barangay Captain';
                                 elseif ($role === 'tanod' || $role === 'barangay_tanod') echo 'Tanod';
                                 else echo 'Lupon Member';

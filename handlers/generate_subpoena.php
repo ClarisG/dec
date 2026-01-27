@@ -11,7 +11,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 }
 
 // Check authorization
-$allowed_roles = ['secretary', 'admin', 'captain', 'lupon_chairman', 'super_admin'];
+$allowed_roles = ['secretary', 'admin', 'captain', 'super_admin'];
 if (!isset($_SESSION['user_id']) || !in_array($_SESSION['role'], $allowed_roles)) {
     http_response_code(403);
     echo json_encode(['success' => false, 'message' => 'Unauthorized access']);
