@@ -21,3 +21,9 @@ Options -Indexes
 Header set X-Content-Type-Options "nosniff"
 Header set X-Frame-Options "SAMEORIGIN"
 Header set X-XSS-Protection "1; mode=block"
+
+# Protect cleanup script
+<Files "cleanup_password_resets.php">
+    Order Deny,Allow
+    Deny from all
+    Allow from 127.0.0.1

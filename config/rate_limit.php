@@ -1,38 +1,32 @@
 <?php
 // config/rate_limit.php - Rate limiting functions
 
-function checkRateLimit($user_id) {
-    $conn = getDbConnection();
-    $hour_ago = date('Y-m-d H:i:s', strtotime('-1 hour'));
+function check_rate_limit($key, $limit = 5, $timeframe = 3600) {
+    $ip = $_SERVER['REMOTE_ADDR'];
+    $cache_key = "rate_limit_{$key}_{$ip}";
     
-    $query = "SELECT COUNT(*) as count 
-              FROM reports 
-              WHERE user_id = :user_id 
-              AND created_at > :hour_ago";
+    if (!isset($_SESSION[$cache_key])) {
+        $_SESSION[$cache_key] = [
+            'count' => 1,
+            'time' => time()
+        ];
+        return true;
+    }
     
-    $stmt = $conn->prepare($query);
-    $stmt->execute([':user_id' => $user_id, ':hour_ago' => $hour_ago]);
-    $result = $stmt->fetch(PDO::FETCH_ASSOC);
+    $data = $_SESSION[$cache_key];
     
-    // Limit to 5 reports per hour
-    if ($result['count'] >= 5) {
+    if (time() - $data['time'] > $timeframe) {
+        $_SESSION[$cache_key] = [
+            'count' => 1,
+            'time' => time()
+        ];
+        return true;
+    }
+    
+    if ($data['count'] >= $limit) {
         return false;
     }
+    
+    $_SESSION[$cache_key]['count']++;
     return true;
 }
-
-function getRateLimitInfo($user_id) {
-    $conn = getDbConnection();
-    $hour_ago = date('Y-m-d H:i:s', strtotime('-1 hour'));
-    
-    $query = "SELECT COUNT(*) as count, 
-              MAX(created_at) as last_report 
-              FROM reports 
-              WHERE user_id = :user_id 
-              AND created_at > :hour_ago";
-    
-    $stmt = $conn->prepare($query);
-    $stmt->execute([':user_id' => $user_id, ':hour_ago' => $hour_ago]);
-    return $stmt->fetch(PDO::FETCH_ASSOC);
-}
-?>

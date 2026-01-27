@@ -10,14 +10,14 @@ ini_set('display_errors', 1);
 define('SMTP_HOST', 'smtp.gmail.com');
 define('SMTP_PORT', 587);
 define('SMTP_USERNAME', 'lgulawenforcement@gmail.com');
-define('SMTP_PASSWORD', 'your-app-specific-password'); // Use app-specific password
+define('SMTP_PASSWORD', 'lgu4pass123.'); // Use app-specific password
 define('SMTP_FROM_EMAIL', 'lgulawenforcement@gmail.com');
 define('SMTP_FROM_NAME', 'LEIR System');
 define('SMTP_SECURE', 'tls'); // tls or ssl
 
 // Password reset settings
 define('RESET_TOKEN_EXPIRY', '1 hour'); // Token expiry time
-define('BASE_URL', 'http://localhost/dec'); // Change to your actual URL
+define('BASE_URL', 'https://leir.jampzdev.com/login.php'); // Change to your actual URL
 
 // Function to send email
 function sendPasswordResetEmail($toEmail, $toName, $resetToken) {
