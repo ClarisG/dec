@@ -21,7 +21,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_classification
         $conn->beginTransaction();
         
         // Get current report details for logging and routing
-        $stmt = $conn->prepare("SELECT r.*, u.id as user_id, u.email, u.phone 
+        $stmt = $conn->prepare("SELECT r.*, u.id as user_id, u.email, u.phone, u.first_name, u.last_name 
                                FROM reports r 
                                LEFT JOIN users u ON r.user_id = u.id 
                                WHERE r.id = :id");
@@ -37,7 +37,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_classification
             overridden_by = :user_id,
             overridden_at = NOW(),
             last_status_change = NOW(),
-            routing_updated = 1, -- Flag for routing system
+            routing_updated = 1,
             category = CASE 
                 WHEN :classification = 'barangay' THEN 'Barangay Matter'
                 WHEN :classification = 'police' THEN 'Police Matter'
@@ -66,7 +66,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_classification
         ]);
         
         // Update routing flags for immediate queue reflection
-        // This would trigger notifications or queue updates
         $routing_stmt = $conn->prepare("
             UPDATE report_routing 
             SET needs_update = 1, 
@@ -81,22 +80,41 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_classification
         
         // Create notification for citizen about classification change
         if ($current['user_id']) {
+            $new_jurisdiction = $new_classification == 'barangay' ? 'Barangay Matter' : 'Police Matter';
+            $message = "Your report #" . ($current['report_number'] ?? $current['id']) . " has been reclassified to: $new_jurisdiction. ";
+            $message .= "Reason: " . (!empty($notes) ? $notes : 'Classification correction by secretary');
+            
             $notification_stmt = $conn->prepare("
                 INSERT INTO notifications 
                 (user_id, title, message, type, related_id, created_at) 
                 VALUES (:user_id, 'Report Classification Updated', 
-                        'Your report has been reclassified. New jurisdiction: ' || :classification, 
+                        :message, 
                         'classification_change', :report_id, NOW())
             ");
             $notification_stmt->execute([
                 ':user_id' => $current['user_id'],
-                ':classification' => $new_classification == 'barangay' ? 'Barangay Matter' : 'Police Matter',
+                ':message' => $message,
                 ':report_id' => $report_id
             ]);
+            
+            // Also send email notification to citizen
+            require_once __DIR__ . '/../../includes/mailer.php';
+            $mail_subject = "Report Classification Update - Report #" . ($current['report_number'] ?? $current['id']);
+            $mail_body = "
+            <h3>Report Classification Updated</h3>
+            <p>Dear " . htmlspecialchars($current['first_name'] . ' ' . $current['last_name']) . ",</p>
+            <p>Your report has been reviewed and reclassified by our secretary.</p>
+            <p><strong>New Classification:</strong> $new_jurisdiction</p>
+            <p><strong>Reason for change:</strong> " . htmlspecialchars($notes) . "</p>
+            <p><strong>Report Status:</strong> The report has been moved to the appropriate department for processing.</p>
+            <p>Thank you for using our reporting system.</p>
+            ";
+            
+            sendEmail($current['email'], $mail_subject, $mail_body);
         }
         
         $conn->commit();
-        $success_message = "Report classification updated successfully! Changes are reflected immediately.";
+        $success_message = "Report classification updated successfully! Citizen has been notified.";
         
     } catch (PDOException $e) {
         $conn->rollBack();
@@ -104,10 +122,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_classification
     }
 }
 
-// Fetch reports needing review or all reports
+// Fetch reports with AI analysis details
 $query = "SELECT r.*, 
           u.first_name, u.last_name, u.email,
           rt.type_name as report_type,
+          ai.analysis_details,
+          ai.confidence_score,
+          ai.keywords,
+          ai.recommended_action,
           COALESCE(r.classification_override, r.ai_classification, 'uncertain') as current_jurisdiction,
           r.ai_confidence,
           r.ai_classification as original_ai_prediction,
@@ -115,6 +137,7 @@ $query = "SELECT r.*,
           FROM reports r
           LEFT JOIN users u ON r.user_id = u.id
           LEFT JOIN report_types rt ON r.report_type_id = rt.id
+          LEFT JOIN ai_analysis ai ON r.id = ai.report_id
           WHERE r.status IN ('pending', 'pending_field_verification')
           ORDER BY 
             CASE 
@@ -134,8 +157,7 @@ $reports = $stmt->fetchAll(PDO::FETCH_ASSOC);
     <div class="glass-card rounded-xl p-6">
         <div class="flex justify-between items-center mb-6">
             <div>
-                <h2 class="text-2xl font-bold text-gray-800">Report Classification Review</h2>
-                <p class="text-gray-500 text-sm">Review and correct AI-predicted jurisdiction. Changes are immediately reflected in Citizen status and relevant user queues.</p>
+                <h2 class="text-2xl font-bold text-gray-800">Classification Review</h2>
             </div>
             
             <!-- Stats -->
@@ -157,7 +179,7 @@ $reports = $stmt->fetchAll(PDO::FETCH_ASSOC);
                     </span>
                 </div>
                 <div class="bg-green-50 px-4 py-3 rounded-lg border border-green-100">
-                    <span class="block text-xs text-green-600 font-semibold uppercase">Already Reviewed</span>
+                    <span class="block text-xs text-green-600 font-semibold uppercase">Reviewed</span>
                     <span class="text-xl font-bold text-green-800">
                         <?php 
                         $reviewed = 0;
@@ -193,7 +215,7 @@ $reports = $stmt->fetchAll(PDO::FETCH_ASSOC);
                 <i class="fas fa-check-circle mr-3 text-green-500 text-xl"></i>
                 <div>
                     <p class="font-medium"><?php echo $success_message; ?></p>
-                    <p class="text-sm mt-1">The classification has been updated and all relevant queues have been notified.</p>
+                    <p class="text-sm mt-1">Citizen has been notified via email and notification.</p>
                 </div>
             </div>
         </div>
@@ -217,9 +239,9 @@ $reports = $stmt->fetchAll(PDO::FETCH_ASSOC);
                         <th class="p-4 font-semibold">Report Info</th>
                         <th class="p-4 font-semibold">Citizen</th>
                         <th class="p-4 font-semibold">AI Prediction</th>
-                        <th class="p-4 font-semibold">Current Classification</th>
-                        <th class="p-4 font-semibold">Queue Status</th>
-                        <th class="p-4 font-semibold">Change Log</th>
+                        <th class="p-4 font-semibold">Current</th>
+                        <th class="p-4 font-semibold">Status</th>
+                        <th class="p-4 font-semibold">History</th>
                         <th class="p-4 font-semibold">Action</th>
                     </tr>
                 </thead>
@@ -256,12 +278,12 @@ $reports = $stmt->fetchAll(PDO::FETCH_ASSOC);
                                 ?>
                                 <div class="flex flex-col space-y-1">
                                     <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium <?php echo $badge_color; ?>">
-                                        <i class="fas fa-robot mr-1"></i> <?php echo ucfirst($ai_class); ?> Matter
+                                        <i class="fas fa-robot mr-1"></i> <?php echo ucfirst($ai_class); ?>
                                     </span>
                                     <div class="w-full bg-gray-200 rounded-full h-2">
                                         <div class="bg-blue-600 h-2 rounded-full" style="width: <?php echo min($ai_conf, 100); ?>%"></div>
                                     </div>
-                                    <span class="text-xs text-gray-400">Confidence: <?php echo $ai_conf; ?>%</span>
+                                    <span class="text-xs text-gray-400"><?php echo $ai_conf; ?>% confident</span>
                                 </div>
                             </td>
                             <td class="p-4 align-top">
@@ -277,11 +299,11 @@ $reports = $stmt->fetchAll(PDO::FETCH_ASSOC);
                                         <?php if ($is_overridden): ?>
                                             <i class="fas fa-user-edit mr-1"></i>
                                         <?php endif; ?>
-                                        <?php echo ucfirst($current); ?> Matter
+                                        <?php echo ucfirst($current); ?>
                                     </span>
                                     <?php if ($is_overridden): ?>
                                         <span class="text-xs text-amber-600">
-                                            <i class="fas fa-edit mr-1"></i>Manually Edited
+                                            <i class="fas fa-edit mr-1"></i>Edited
                                         </span>
                                     <?php endif; ?>
                                 </div>
@@ -319,7 +341,7 @@ $reports = $stmt->fetchAll(PDO::FETCH_ASSOC);
                             <td class="p-4 align-top">
                                 <button onclick="openClassificationModal(<?php echo htmlspecialchars(json_encode($report)); ?>)" 
                                         class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors">
-                                    <i class="fas fa-edit mr-1"></i> Review & Edit
+                                    <i class="fas fa-eye mr-1"></i> View & Review
                                 </button>
                             </td>
                         </tr>
@@ -331,7 +353,6 @@ $reports = $stmt->fetchAll(PDO::FETCH_ASSOC);
                                 <div class="flex flex-col items-center">
                                     <i class="fas fa-clipboard-check text-4xl mb-3 text-gray-300"></i>
                                     <p>No reports found needing review.</p>
-                                    <p class="text-sm mt-1">All reports have been classified.</p>
                                 </div>
                             </td>
                         </tr>
@@ -342,11 +363,11 @@ $reports = $stmt->fetchAll(PDO::FETCH_ASSOC);
     </div>
 </div>
 
-<!-- Classification Modal -->
-<div id="classificationModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
-    <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full mx-4 overflow-hidden transform transition-all">
+<!-- Classification Modal - Enhanced with Full AI Details -->
+<div id="classificationModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50 overflow-y-auto">
+    <div class="bg-white rounded-xl shadow-2xl max-w-4xl w-full mx-4 my-8 overflow-hidden transform transition-all">
         <div class="bg-gray-50 px-6 py-4 border-b border-gray-100 flex justify-between items-center">
-            <h3 class="text-lg font-bold text-gray-800">Review & Correct Classification</h3>
+            <h3 class="text-lg font-bold text-gray-800">Report Classification Review</h3>
             <button onclick="closeClassificationModal()" class="text-gray-400 hover:text-gray-600 transition-colors">
                 <i class="fas fa-times"></i>
             </button>
@@ -356,135 +377,157 @@ $reports = $stmt->fetchAll(PDO::FETCH_ASSOC);
             <input type="hidden" name="report_id" id="modalReportId">
             <input type="hidden" name="update_classification" value="1">
             
-            <!-- Report Info -->
-            <div class="mb-6 p-4 bg-gray-50 rounded-lg">
-                <h4 class="font-semibold text-gray-700 mb-2">Report Information</h4>
-                <div class="grid grid-cols-2 gap-4 text-sm">
-                    <div>
-                        <span class="text-gray-600">Report ID:</span>
-                        <span class="font-medium ml-2" id="modalReportNumber"></span>
+            <!-- Report Header Info -->
+            <div class="mb-6 grid grid-cols-2 gap-4 p-4 bg-gray-50 rounded-lg">
+                <div>
+                    <h4 class="text-sm font-semibold text-gray-500 mb-1">REPORT DETAILS</h4>
+                    <div class="text-sm">
+                        <p><span class="font-medium">ID:</span> <span id="modalReportNumber" class="font-mono"></span></p>
+                        <p><span class="font-medium">Citizen:</span> <span id="modalCitizenName"></span></p>
+                        <p><span class="font-medium">Date Filed:</span> <span id="modalDateFiled"></span></p>
                     </div>
-                    <div>
-                        <span class="text-gray-600">Citizen:</span>
-                        <span class="font-medium ml-2" id="modalCitizenName"></span>
-                    </div>
-                    <div>
-                        <span class="text-gray-600">Date Filed:</span>
-                        <span class="font-medium ml-2" id="modalDateFiled"></span>
-                    </div>
-                    <div>
-                        <span class="text-gray-600">Current Status:</span>
-                        <span class="font-medium ml-2" id="modalCurrentStatus"></span>
+                </div>
+                <div>
+                    <h4 class="text-sm font-semibold text-gray-500 mb-1">CURRENT STATUS</h4>
+                    <div class="text-sm">
+                        <p><span class="font-medium">Status:</span> <span id="modalCurrentStatus"></span></p>
+                        <p><span class="font-medium">Type:</span> <span id="modalReportType"></span></p>
                     </div>
                 </div>
             </div>
             
-            <!-- AI Analysis -->
-            <div class="mb-6 bg-blue-50 p-4 rounded-lg border border-blue-100">
-                <div class="flex justify-between mb-2">
-                    <span class="text-xs font-bold text-blue-600 uppercase tracking-wide">AI Analysis (Transformer Model)</span>
-                    <span class="text-xs text-blue-600" id="modalAiConfidence"></span>
-                </div>
-                <p class="text-lg font-bold text-gray-800 mb-1" id="modalAiPrediction"></p>
-                <p class="text-sm text-gray-600 mb-2">This prediction was generated by the AI model based on report content analysis.</p>
-            </div>
-            
-            <!-- Classification Selection -->
+            <!-- Report Description Section -->
             <div class="mb-6">
-                <label class="block text-sm font-medium text-gray-700 mb-3">Correct Jurisdiction Classification *</label>
-                <p class="text-sm text-gray-600 mb-4">Changing this will immediately update the citizen's status and move the report to the appropriate queue.</p>
+                <h4 class="text-sm font-semibold text-gray-500 mb-2 uppercase tracking-wide">Report Description</h4>
+                <div class="p-4 bg-gray-50 rounded-lg border border-gray-200 max-h-48 overflow-y-auto">
+                    <p id="modalReportDescription" class="text-gray-700 whitespace-pre-line"></p>
+                </div>
+            </div>
+            
+            <!-- AI Analysis Details -->
+            <div class="mb-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h4 class="text-sm font-semibold text-gray-500 uppercase tracking-wide">AI Analysis Details</h4>
+                    <span class="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full" id="modalAiConfidenceBadge"></span>
+                </div>
                 
-                <div class="grid grid-cols-2 gap-4">
-                    <label class="cursor-pointer relative">
-                        <input type="radio" name="classification" value="barangay" class="peer sr-only" id="radioBarangay">
-                        <div class="p-4 rounded-lg border-2 border-gray-200 peer-checked:border-green-500 peer-checked:bg-green-50 transition-all text-center h-full">
-                            <i class="fas fa-home text-2xl mb-2 text-gray-400 peer-checked:text-green-600"></i>
-                            <div class="font-bold text-gray-700 peer-checked:text-green-800">Barangay Matter</div>
-                            <div class="text-xs text-gray-500 mt-1">
-                                <ul class="text-left mt-2 space-y-1">
-                                    <li class="flex items-start">
-                                        <i class="fas fa-check text-green-500 text-xs mr-1 mt-0.5"></i>
-                                        <span>Local dispute resolution</span>
-                                    </li>
-                                    <li class="flex items-start">
-                                        <i class="fas fa-check text-green-500 text-xs mr-1 mt-0.5"></i>
-                                        <span>Lupon/Tanod assignment</span>
-                                    </li>
-                                    <li class="flex items-start">
-                                        <i class="fas fa-check text-green-500 text-xs mr-1 mt-0.5"></i>
-                                        <span>Barangay hearing required</span>
-                                    </li>
-                                </ul>
+                <div class="bg-blue-50 p-4 rounded-lg border border-blue-100 mb-4">
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <p class="text-xs text-blue-600 font-medium mb-1">PREDICTED JURISDICTION</p>
+                            <p class="text-lg font-bold text-gray-800" id="modalAiPrediction"></p>
+                        </div>
+                        <div>
+                            <p class="text-xs text-blue-600 font-medium mb-1">CONFIDENCE SCORE</p>
+                            <div class="flex items-center">
+                                <div class="w-full bg-gray-200 rounded-full h-3 mr-2">
+                                    <div id="modalConfidenceBar" class="bg-blue-600 h-3 rounded-full"></div>
+                                </div>
+                                <span id="modalAiConfidence" class="text-sm font-bold text-blue-800"></span>
                             </div>
                         </div>
-                    </label>
-                    
-                    <label class="cursor-pointer relative">
-                        <input type="radio" name="classification" value="police" class="peer sr-only" id="radioPolice">
-                        <div class="p-4 rounded-lg border-2 border-gray-200 peer-checked:border-red-500 peer-checked:bg-red-50 transition-all text-center h-full">
-                            <i class="fas fa-shield-alt text-2xl mb-2 text-gray-400 peer-checked:text-red-600"></i>
-                            <div class="font-bold text-gray-700 peer-checked:text-red-800">Police Matter</div>
-                            <div class="text-xs text-gray-500 mt-1">
-                                <ul class="text-left mt-2 space-y-1">
-                                    <li class="flex items-start">
-                                        <i class="fas fa-check text-red-500 text-xs mr-1 mt-0.5"></i>
-                                        <span>Criminal offense</span>
-                                    </li>
-                                    <li class="flex items-start">
-                                        <i class="fas fa-check text-red-500 text-xs mr-1 mt-0.5"></i>
-                                        <span>Requires police investigation</span>
-                                    </li>
-                                    <li class="flex items-start">
-                                        <i class="fas fa-check text-red-500 text-xs mr-1 mt-0.5"></i>
-                                        <span>PNP turnover required</span>
-                                    </li>
-                                </ul>
-                            </div>
-                        </div>
-                    </label>
+                    </div>
                 </div>
-            </div>
-            
-            <!-- Change Reason -->
-            <div class="mb-6">
-                <label class="block text-sm font-medium text-gray-700 mb-2">Reason for Correction *</label>
-                <textarea name="notes" id="modalNotes" rows="3" required 
-                          class="w-full rounded-lg border-gray-300 border p-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow" 
-                          placeholder="Explain why you are changing the classification. This will be logged and visible to supervisors."></textarea>
-                <p class="text-xs text-gray-500 mt-1">This explanation will be saved in the change log and may be reviewed by supervisors.</p>
-            </div>
-            
-            <!-- Immediate Effects Notice -->
-            <div class="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-                <div class="flex items-start">
-                    <i class="fas fa-exclamation-triangle text-yellow-600 mt-0.5 mr-3"></i>
-                    <div>
-                        <h4 class="font-medium text-yellow-800">Immediate Effects</h4>
-                        <ul class="text-sm text-yellow-700 mt-1 space-y-1">
-                            <li class="flex items-start">
-                                <i class="fas fa-arrow-right text-xs mr-2 mt-0.5"></i>
-                                <span>Citizen's status will be updated immediately</span>
-                            </li>
-                            <li class="flex items-start">
-                                <i class="fas fa-arrow-right text-xs mr-2 mt-0.5"></i>
-                                <span>Report will be moved to appropriate officer queue</span>
-                            </li>
-                            <li class="fas fa-arrow-right text-xs mr-2 mt-0.5">
-                                <span>All related users will be notified of the change</span>
-                            </li>
-                        </ul>
+                
+                <!-- AI Analysis Breakdown -->
+                <div class="grid grid-cols-3 gap-4">
+                    <div class="p-3 bg-white border border-gray-200 rounded-lg">
+                        <p class="text-xs text-gray-500 font-medium mb-1">KEYWORDS DETECTED</p>
+                        <div id="modalAiKeywords" class="flex flex-wrap gap-1"></div>
+                    </div>
+                    <div class="p-3 bg-white border border-gray-200 rounded-lg">
+                        <p class="text-xs text-gray-500 font-medium mb-1">ANALYSIS DETAILS</p>
+                        <p id="modalAnalysisDetails" class="text-sm text-gray-700"></p>
+                    </div>
+                    <div class="p-3 bg-white border border-gray-200 rounded-lg">
+                        <p class="text-xs text-gray-500 font-medium mb-1">RECOMMENDED ACTION</p>
+                        <p id="modalRecommendedAction" class="text-sm text-gray-700"></p>
                     </div>
                 </div>
             </div>
             
-            <div class="flex justify-end space-x-3">
+            <!-- Secretary Review Section -->
+            <div class="mb-6">
+                <div class="flex items-center mb-4">
+                    <div class="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center mr-3">
+                        <i class="fas fa-user-edit text-indigo-600"></i>
+                    </div>
+                    <div>
+                        <h4 class="text-sm font-semibold text-gray-500 uppercase tracking-wide">Secretary Review & Correction</h4>
+                        <p class="text-xs text-gray-500">Review AI analysis and correct if necessary</p>
+                    </div>
+                </div>
+                
+                <!-- Classification Selection -->
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-3">Select Correct Jurisdiction:</label>
+                    
+                    <div class="grid grid-cols-2 gap-4">
+                        <label class="cursor-pointer relative">
+                            <input type="radio" name="classification" value="barangay" class="peer sr-only" id="radioBarangay">
+                            <div class="p-4 rounded-lg border-2 border-gray-200 peer-checked:border-green-500 peer-checked:bg-green-50 transition-all text-center h-full">
+                                <i class="fas fa-home text-2xl mb-2 text-gray-400 peer-checked:text-green-600"></i>
+                                <div class="font-bold text-gray-700 peer-checked:text-green-800">Barangay Matter</div>
+                                <div class="text-xs text-gray-500 mt-1">Local disputes, minor offenses</div>
+                            </div>
+                        </label>
+                        
+                        <label class="cursor-pointer relative">
+                            <input type="radio" name="classification" value="police" class="peer sr-only" id="radioPolice">
+                            <div class="p-4 rounded-lg border-2 border-gray-200 peer-checked:border-red-500 peer-checked:bg-red-50 transition-all text-center h-full">
+                                <i class="fas fa-shield-alt text-2xl mb-2 text-gray-400 peer-checked:text-red-600"></i>
+                                <div class="font-bold text-gray-700 peer-checked:text-red-800">Police Matter</div>
+                                <div class="text-xs text-gray-500 mt-1">Criminal offenses, investigations</div>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+                
+                <!-- Correction Reason -->
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Reason for Correction:</label>
+                    <textarea name="notes" id="modalNotes" rows="3" required 
+                              class="w-full rounded-lg border-gray-300 border p-3 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-shadow" 
+                              placeholder="Explain why you are changing the AI classification. This will be sent to the citizen."></textarea>
+                    <p class="text-xs text-gray-500 mt-1">This explanation will be included in the notification sent to the citizen.</p>
+                </div>
+                
+                <!-- Citizen Notification -->
+                <div class="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                    <div class="flex items-start">
+                        <i class="fas fa-bell text-yellow-600 mt-0.5 mr-3"></i>
+                        <div>
+                            <h4 class="font-medium text-yellow-800">Citizen Notification</h4>
+                            <p class="text-sm text-yellow-700 mt-1">
+                                When you save changes, the citizen will receive:
+                            </p>
+                            <ul class="text-sm text-yellow-700 mt-2 space-y-1">
+                                <li class="flex items-start">
+                                    <i class="fas fa-envelope text-xs mr-2 mt-0.5"></i>
+                                    <span>Email notification about the classification change</span>
+                                </li>
+                                <li class="flex items-start">
+                                    <i class="fas fa-bell text-xs mr-2 mt-0.5"></i>
+                                    <span>In-app notification with your explanation</span>
+                                </li>
+                                <li class="flex items-start">
+                                    <i class="fas fa-sync-alt text-xs mr-2 mt-0.5"></i>
+                                    <span>Updated status in their report dashboard</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="flex justify-end space-x-3 pt-4 border-t border-gray-200">
                 <button type="button" onclick="closeClassificationModal()" 
                         class="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg font-medium transition-colors">
                     Cancel
                 </button>
                 <button type="submit" 
-                        class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium shadow-sm transition-colors">
-                    <i class="fas fa-save mr-2"></i> Save & Update Classification
+                        class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium shadow-sm transition-colors">
+                    <i class="fas fa-save mr-2"></i> Save Correction & Notify Citizen
                 </button>
             </div>
         </form>
@@ -539,20 +582,51 @@ function filterReports(filterType) {
     });
 }
 
-// Open classification modal
+// Open classification modal with full AI details
 function openClassificationModal(report) {
     document.getElementById('modalReportId').value = report.id;
     
     // Set report info
     document.getElementById('modalReportNumber').textContent = report.report_number || '#' + report.id;
     document.getElementById('modalCitizenName').textContent = report.first_name + ' ' + report.last_name;
-    document.getElementById('modalDateFiled').textContent = new Date(report.created_at).toLocaleDateString();
+    document.getElementById('modalDateFiled').textContent = new Date(report.created_at).toLocaleDateString('en-US', {
+        year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit'
+    });
     document.getElementById('modalCurrentStatus').textContent = report.status.replace('_', ' ').toUpperCase();
+    document.getElementById('modalReportType').textContent = report.report_type || 'General';
+    document.getElementById('modalReportDescription').textContent = report.description || 'No description provided.';
     
     // Set AI info
     const aiClass = report.original_ai_prediction || 'Uncertain';
+    const aiConfidence = report.ai_confidence || 0;
+    
     document.getElementById('modalAiPrediction').textContent = aiClass.charAt(0).toUpperCase() + aiClass.slice(1) + ' Matter';
-    document.getElementById('modalAiConfidence').textContent = (report.ai_confidence || 0) + '% Confidence';
+    document.getElementById('modalAiConfidence').textContent = aiConfidence + '%';
+    document.getElementById('modalAiConfidenceBadge').textContent = aiConfidence + '% confident';
+    document.getElementById('modalConfidenceBar').style.width = aiConfidence + '%';
+    
+    // Set AI analysis details
+    document.getElementById('modalAnalysisDetails').textContent = report.analysis_details || 'AI analysis details not available.';
+    document.getElementById('modalRecommendedAction').textContent = report.recommended_action || 'No specific recommendation.';
+    
+    // Set keywords
+    const keywordsContainer = document.getElementById('modalAiKeywords');
+    keywordsContainer.innerHTML = '';
+    if (report.keywords) {
+        const keywords = report.keywords.split(',');
+        keywords.forEach(keyword => {
+            const trimmed = keyword.trim();
+            if (trimmed) {
+                const span = document.createElement('span');
+                span.className = 'text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full';
+                span.textContent = trimmed;
+                keywordsContainer.appendChild(span);
+            }
+        });
+    }
+    if (keywordsContainer.children.length === 0) {
+        keywordsContainer.innerHTML = '<span class="text-gray-400 text-xs">No keywords detected</span>';
+    }
     
     // Select current classification
     const current = report.current_jurisdiction.toLowerCase();
@@ -571,6 +645,7 @@ function openClassificationModal(report) {
     
     document.getElementById('modalNotes').value = report.override_notes || '';
     
+    // Show modal
     document.getElementById('classificationModal').classList.remove('hidden');
     document.getElementById('classificationModal').classList.add('flex');
 }
