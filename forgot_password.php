@@ -47,31 +47,25 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             if ($stmt->rowCount() == 1) {
                 $user = $stmt->fetch(PDO::FETCH_ASSOC);
                 
-                // Generate reset token
-                $token = bin2hex(random_bytes(32));
-                $token_hash = password_hash($token, PASSWORD_DEFAULT);
-                $expiry = date("Y-m-d H:i:s", strtotime("+1 hour"));
+                // Generate 6-digit OTP code
+                $otp = str_pad(random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+                $otp_hash = password_hash($otp, PASSWORD_DEFAULT);
+                $expiry = date("Y-m-d H:i:s", strtotime("+10 minutes")); // OTP valid for 10 minutes
                 
-                // Store token in database
+                // Store OTP in database
                 $update_query = "UPDATE users 
-                                SET reset_token = :token_hash, 
+                                SET reset_token = :otp_hash, 
                                     reset_token_expiry = :expiry 
                                 WHERE id = :id";
                 $update_stmt = $conn->prepare($update_query);
-                $update_stmt->bindParam(':token_hash', $token_hash);
+                $update_stmt->bindParam(':otp_hash', $otp_hash);
                 $update_stmt->bindParam(':expiry', $expiry);
                 $update_stmt->bindParam(':id', $user['id']);
                 
                 if ($update_stmt->execute()) {
-                    // Create reset link
-                    $reset_link = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" : "http") . 
-                                  "://$_SERVER[HTTP_HOST]" . 
-                                  dirname($_SERVER['PHP_SELF']) . 
-                                  "/reset_password.php?token=" . urlencode($token) . "&id=" . $user['id'];
-                    
-                    // Prepare email content
+                    // Prepare email content with OTP
                     $to = $user['email'];
-                    $subject = "Password Reset Request - LEIR System";
+                    $subject = "Password Reset OTP - LEIR System";
                     $message = "
                     <!DOCTYPE html>
                     <html>
@@ -81,7 +75,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                             .container { max-width: 600px; margin: 0 auto; padding: 20px; }
                             .header { background: linear-gradient(135deg, #1e3a8a 0%, #1d4ed8 100%); padding: 20px; color: white; text-align: center; border-radius: 10px 10px 0 0; }
                             .content { background: #f8fafc; padding: 30px; border-radius: 0 0 10px 10px; border: 1px solid #e2e8f0; }
-                            .btn { display: inline-block; padding: 12px 24px; background: linear-gradient(to right, #1e40af, #1d4ed8); color: white; text-decoration: none; border-radius: 8px; font-weight: 600; margin: 20px 0; }
+                            .otp-box { background: #ffffff; border: 2px dashed #1d4ed8; padding: 20px; text-align: center; margin: 20px 0; border-radius: 8px; }
+                            .otp-code { font-size: 32px; font-weight: bold; color: #1d4ed8; letter-spacing: 10px; margin: 15px 0; }
                             .warning { background: #fff5f5; border-left: 4px solid #e53e3e; padding: 15px; margin: 20px 0; }
                             .footer { margin-top: 30px; padding-top: 20px; border-top: 1px solid #e2e8f0; color: #718096; font-size: 14px; }
                         </style>
@@ -95,17 +90,20 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                                 <h3>Hello " . htmlspecialchars($user['first_name']) . ",</h3>
                                 <p>We received a request to reset your password for your LEIR account.</p>
                                 
-                                <p>To reset your password, click the button below:</p>
+                                <p>Use the OTP code below to reset your password:</p>
                                 
-                                <a href='$reset_link' class='btn'>Reset Password</a>
-                                
-                                <p>Or copy and paste this link into your browser:</p>
-                                <p><code>$reset_link</code></p>
+                                <div class='otp-box'>
+                                    <p>Your One-Time Password (OTP):</p>
+                                    <div class='otp-code'>" . $otp . "</div>
+                                    <p>Enter this code on the password reset page</p>
+                                </div>
                                 
                                 <div class='warning'>
-                                    <p><strong>Important:</strong> This password reset link will expire in 1 hour.</p>
+                                    <p><strong>Important:</strong> This OTP will expire in 10 minutes.</p>
                                     <p>If you didn't request a password reset, please ignore this email or contact support if you have concerns.</p>
                                 </div>
+                                
+                                <p>After entering the OTP, you'll be able to set a new password for your account.</p>
                                 
                                 <div class='footer'>
                                     <p>This is an automated message, please do not reply to this email.</p>
@@ -120,8 +118,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     // Additional plain text version
                     $plain_message = "Hello " . $user['first_name'] . ",\n\n";
                     $plain_message .= "We received a request to reset your password for your LEIR account.\n\n";
-                    $plain_message .= "To reset your password, visit this link: $reset_link\n\n";
-                    $plain_message .= "This link will expire in 1 hour.\n\n";
+                    $plain_message .= "Your One-Time Password (OTP) is: " . $otp . "\n\n";
+                    $plain_message .= "Enter this code on the password reset page.\n\n";
+                    $plain_message .= "This OTP will expire in 10 minutes.\n\n";
                     $plain_message .= "If you didn't request this, please ignore this email.\n\n";
                     $plain_message .= "Best regards,\nLEIR System";
                     
@@ -134,7 +133,13 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     
                     // Send email
                     if (mail($to, $subject, $message, $headers)) {
-                        $success = "Password reset link has been sent to your email address. Please check your inbox (and spam folder).";
+                        // Store user ID in session for OTP verification page
+                        $_SESSION['otp_user_id'] = $user['id'];
+                        $_SESSION['otp_email'] = $email;
+                        
+                        // Redirect to OTP verification page
+                        header("Location: verify_otp.php");
+                        exit();
                     } else {
                         $error = "Failed to send email. Please try again later.";
                     }
@@ -143,7 +148,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 }
             } else {
                 // Don't reveal if email exists or not for security
-                $success = "If your email exists in our system, you will receive a password reset link shortly.";
+                $success = "If your email exists in our system, you will receive an OTP code shortly.";
             }
         } catch(PDOException $e) {
             $error = "Database error: " . $e->getMessage();
@@ -704,7 +709,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     
     <div class="loading-overlay" id="loadingOverlay">
         <div class="spinner"></div>
-        <p class="text-gray-600 font-medium">Sending reset link...</p>
+        <p class="text-gray-600 font-medium">Sending OTP code...</p>
     </div>
     
     <div class="login-container hidden md:flex">
@@ -724,13 +729,13 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             <div class="right-content">
                 <div class="form-header">
                     <h2>Reset Password</h2>
-                    <p>Enter your email to receive a reset link</p>
+                    <p>Enter your email to receive an OTP code</p>
                 </div>
                 
                 <div class="info-box">
                     <i class="fas fa-info-circle"></i>
-                    Enter your email address and we'll send you a link to reset your password.
-                    The link will expire in 1 hour.
+                    Enter your email address and we'll send you a 6-digit OTP code to reset your password.
+                    The OTP will expire in 10 minutes.
                 </div>
                 
                 <?php if ($error): ?>
@@ -762,7 +767,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     </div>
                     
                     <button type="submit" class="btn-submit">
-                        <i class="fas fa-paper-plane"></i> Send Reset Link
+                        <i class="fas fa-paper-plane"></i> Send OTP Code
                     </button>
                     
                     <a href="login.php" class="btn-secondary">
@@ -794,13 +799,13 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         <div class="mobile-form-container">
             <div class="mobile-form-header">
                 <h2>Reset Password</h2>
-                <p>Enter your email to receive a reset link</p>
+                <p>Enter your email to receive an OTP code</p>
             </div>
             
             <div class="info-box">
                 <i class="fas fa-info-circle"></i>
-                Enter your email address and we'll send you a link to reset your password.
-                The link will expire in 1 hour.
+                Enter your email address and we'll send you a 6-digit OTP code to reset your password.
+                The OTP will expire in 10 minutes.
             </div>
             
             <?php if ($error): ?>
@@ -831,7 +836,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 </div>
                 
                 <button type="submit" class="btn-submit">
-                    <i class="fas fa-paper-plane"></i> Send Reset Link
+                    <i class="fas fa-paper-plane"></i> Send OTP Code
                 </button>
                 
                 <a href="login.php" class="btn-secondary">
@@ -863,7 +868,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 
                 if (submitBtn) {
                     submitBtn.disabled = true;
-                    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending...';
+                    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending OTP...';
                     
                     // Show loading overlay
                     document.getElementById('loadingOverlay').style.display = 'flex';
