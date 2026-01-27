@@ -1,0 +1,3 @@
+[submodule "hsi"]
+	path = hsi
+	url = https://github.com/jampz-dev/hsi
