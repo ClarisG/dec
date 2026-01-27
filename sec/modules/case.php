@@ -562,7 +562,7 @@ $availableOfficers = $conn ? getAvailableOfficers($conn) : [];
 
 <!-- Case Details Modal -->
 <div id="caseDetailsModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50 p-4">
-    <div class="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
+    <div class="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
         <div class="flex justify-between items-center p-6 border-b">
             <h3 class="text-xl font-bold text-gray-800">Case Details</h3>
             <button onclick="closeCaseDetailsModal()" class="text-gray-400 hover:text-gray-600">
@@ -570,11 +570,11 @@ $availableOfficers = $conn ? getAvailableOfficers($conn) : [];
             </button>
         </div>
         
-        <div class="p-6 overflow-y-auto max-h-[70vh]" id="caseDetailsContent">
+        <div class="p-6 overflow-y-auto" id="caseDetailsContent">
             <!-- Content will be loaded via AJAX -->
         </div>
         
-        <div class="p-6 border-t bg-gray-50 flex justify-end space-x-3">
+        <div class="p-6 border-t bg-gray-50 flex justify-end space-x-3 mt-auto">
             <button onclick="closeCaseDetailsModal()" 
                     class="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors">
                 Close
@@ -589,7 +589,7 @@ $availableOfficers = $conn ? getAvailableOfficers($conn) : [];
 
 <!-- Assignment Modal -->
 <div id="assignmentModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50 p-4">
-    <div class="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden">
+    <div class="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col">
         <div class="flex justify-between items-center p-6 border-b">
             <h3 class="text-xl font-bold text-gray-800">Assign Case to Officer</h3>
             <button onclick="closeAssignmentModal()" class="text-gray-400 hover:text-gray-600">
@@ -597,7 +597,7 @@ $availableOfficers = $conn ? getAvailableOfficers($conn) : [];
             </button>
         </div>
         
-        <div class="p-6 overflow-y-auto max-h-[70vh]" id="assignmentModalContent">
+        <div class="p-6 overflow-y-auto" id="assignmentModalContent">
             <!-- Content will be loaded directly from PHP -->
             <div id="assignmentContent">
                 <?php if (!$db_error && $conn): ?>
@@ -761,7 +761,7 @@ $availableOfficers = $conn ? getAvailableOfficers($conn) : [];
             </div>
         </div>
         
-        <div class="p-6 border-t bg-gray-50 flex justify-end space-x-3">
+        <div class="p-6 border-t bg-gray-50 flex justify-end space-x-3 mt-auto">
             <button onclick="closeAssignmentModal()" 
                     class="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors">
                 Cancel
@@ -777,13 +777,17 @@ $availableOfficers = $conn ? getAvailableOfficers($conn) : [];
 <style>
     /* Pagination Styles */
     .pagination-btn {
-        @apply w-10 h-10 flex items-center justify-center rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 transition-colors;
+        @apply w-10 h-10 flex items-center justify-center rounded-lg border border-gray-300 bg-white text-gray-700 hover:bg-gray-100 transition-colors shadow-sm;
     }
     
     .pagination-btn.active {
-        @apply bg-blue-600 text-white border-blue-600;
+        @apply bg-blue-600 text-white border-blue-600 font-bold;
     }
     
+    .pagination-btn:disabled {
+        @apply opacity-50 cursor-not-allowed;
+    }
+
     /* Status Badges */
     .status-badge {
         @apply px-3 py-1 rounded-full text-xs font-medium;
@@ -819,9 +823,21 @@ $availableOfficers = $conn ? getAvailableOfficers($conn) : [];
     
     /* Category Badges */
     .category-badge {
-        @apply px-3 py-1 rounded-full text-xs font-medium;
+        @apply px-3 py-1 rounded-full text-xs font-medium capitalize;
     }
     
+    .category-incident {
+        @apply bg-red-100 text-red-800;
+    }
+    
+    .category-complaint {
+        @apply bg-yellow-100 text-yellow-800;
+    }
+    
+    .category-blotter {
+        @apply bg-blue-100 text-blue-800;
+    }
+
     .category-barangay {
         @apply bg-blue-100 text-blue-800;
     }
@@ -903,6 +919,7 @@ $availableOfficers = $conn ? getAvailableOfficers($conn) : [];
 </style>
 
 <script>
+console.log('case.php script loaded at ' + new Date().toLocaleTimeString());
 // Page state variables, initialized by PHP
 let currentPage = <?php echo isset($page) ? $page : 1; ?>;
 let totalPages = <?php echo isset($total_pages) ? $total_pages : 1; ?>;
@@ -925,6 +942,7 @@ document.addEventListener('DOMContentLoaded', function() {
 // --- Major Page Navigation and Filtering ---
 
 function applyFilters() {
+    console.log('applyFilters called');
     const form = document.getElementById('filterForm');
     const formData = new FormData(form);
     const params = new URLSearchParams(window.location.search);
@@ -946,6 +964,7 @@ function applyFilters() {
 }
 
 function resetFilters() {
+    console.log('resetFilters called');
     const params = new URLSearchParams(window.location.search);
     
     // Keep essential parameters like 'module', remove filter-related ones
@@ -1016,6 +1035,7 @@ function closeAssignmentModal() {
 }
 
 function updateOfficerTypeSelection(element, type) {
+    console.log('updateOfficerTypeSelection called with type:', type);
     // Update active style on type selector
     document.querySelectorAll('.assignment-option').forEach(opt => opt.classList.remove('active'));
     element.classList.add('active');
@@ -1025,9 +1045,11 @@ function updateOfficerTypeSelection(element, type) {
 }
 
 function updateOfficerListForType(type) {
+    console.log('updateOfficerListForType called with type:', type);
     const officerList = document.getElementById('officerList');
     const items = officerList.querySelectorAll('.officer-item');
     let visibleCount = 0;
+    console.log('Found', items.length, 'officer items');
     
     // Hide or show officers based on the selected type
     items.forEach(item => {
@@ -1038,6 +1060,7 @@ function updateOfficerListForType(type) {
             item.style.display = 'none';
         }
     });
+    console.log('Visible officers:', visibleCount);
 
     // Remove any existing "empty" message
     const emptyMsg = officerList.querySelector('.empty-list-message');
@@ -1176,13 +1199,16 @@ function getStatusClass($status) {
 
 function getCategoryClass($category) {
     $classes = [
-        'Barangay Matter' => 'category-barangay',
-        'Police Matter' => 'category-police',
-        'Criminal' => 'category-criminal',
-        'Civil' => 'category-civil',
-        'VAWC' => 'category-vawc',
-        'Minor' => 'category-minor',
+        'incident' => 'category-incident',
+        'complaint' => 'category-complaint',
+        'blotter' => 'category-blotter',
+        'barangay matter' => 'category-barangay',
+        'police matter' => 'category-police',
+        'criminal' => 'category-criminal',
+        'civil' => 'category-civil',
+        'vawc' => 'category-vawc',
+        'minor' => 'category-minor',
     ];
-    return $classes[$category] ?? 'category-other';
+    return $classes[strtolower($category)] ?? 'category-other';
 }
 ?>
