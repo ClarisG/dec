@@ -2,15 +2,26 @@
 // Fixed path: from modules folder to config folder
 require_once __DIR__ . '/../../config/database.php';
 
-// Start session if not already started
-if (session_status() === PHP_SESSION_NONE) {
+// Only start session if not already started and not being included
+if (!isset($_SESSION) && session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
 // Check if user is logged in and is a tanod
+// But only redirect if not being included in another dashboard
 if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'tanod') {
-    header('Location: ../../index.php');
-    exit();
+    // Check if we're being included as a module
+    $is_included = (strpos($_SERVER['PHP_SELF'], 'secretary_dashboard.php') !== false) 
+                   || (strpos($_SERVER['PHP_SELF'], 'modules/case.php') !== false);
+    
+    if (!$is_included) {
+        header('Location: ../../index.php');
+        exit();
+    } else {
+        // If included but not a tanod, just show access denied
+        echo "<div class='alert alert-danger'>Access Denied: Tanod privileges required.</div>";
+        exit();
+    }
 }
 
 $tanod_id = $_SESSION['user_id'];
@@ -30,6 +41,13 @@ $error_message = '';
 $handovers = [];
 $recipients = [];
 $cases = [];
+
+// Pagination variables
+$page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
+$per_page = 10;
+$offset = ($page - 1) * $per_page;
+$total_records = 0;
+$total_pages = 1;
 
 // Check if cases table exists, if not, show warning
 try {
@@ -159,7 +177,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_handover'])) {
 // Fetch relevant handover records based on user role
 try {
     if ($user_role === 'tanod') {
-        // Tanods see their own handovers
+        // Get total count for pagination
+        $count_stmt = $pdo->prepare("
+            SELECT COUNT(*) as total
+            FROM evidence_handovers eh
+            WHERE eh.tanod_id = ?
+        ");
+        $count_stmt->execute([$tanod_id]);
+        $total_result = $count_stmt->fetch(PDO::FETCH_ASSOC);
+        $total_records = $total_result['total'];
+        $total_pages = ceil($total_records / $per_page);
+        
+        // Tanods see their own handovers with pagination
         $stmt = $pdo->prepare("
             SELECT eh.*, 
                    u_tanod.first_name as tanod_first, u_tanod.last_name as tanod_last,
@@ -175,9 +204,12 @@ try {
             LEFT JOIN cases c ON eh.case_id = c.id
             WHERE eh.tanod_id = ?
             ORDER BY eh.handover_date DESC
-            LIMIT 50
+            LIMIT ? OFFSET ?
         ");
-        $stmt->execute([$tanod_id]);
+        $stmt->bindValue(1, $tanod_id, PDO::PARAM_INT);
+        $stmt->bindValue(2, $per_page, PDO::PARAM_INT);
+        $stmt->bindValue(3, $offset, PDO::PARAM_INT);
+        $stmt->execute();
         $handovers = $stmt->fetchAll(PDO::FETCH_ASSOC);
         
         // Fetch secretaries and admins for dropdown (Tanod only)
@@ -217,7 +249,7 @@ try {
 
 // Get statistics
 $stats = [
-    'total' => count($handovers),
+    'total' => $total_records,
     'pending' => count(array_filter($handovers, function($h) { 
         return $h['status'] === 'pending_acknowledgement'; 
     })),
@@ -244,6 +276,13 @@ function addActivityLog($pdo, $user_id, $action, $description) {
     } catch (PDOException $e) {
         error_log("Activity Log Error: " . $e->getMessage());
     }
+}
+
+// Generate pagination URL
+function generatePageUrl($page) {
+    $query = $_GET;
+    $query['page'] = $page;
+    return '?' . http_build_query($query);
 }
 ?>
 <!DOCTYPE html>
@@ -517,6 +556,39 @@ function addActivityLog($pdo, $user_id, $action, $description) {
                 border: 1px solid #000 !important;
                 box-shadow: none !important;
             }
+        }
+        
+        .pagination {
+            display: flex;
+            justify-content: center;
+            margin-top: 20px;
+        }
+        
+        .pagination a, .pagination span {
+            display: inline-block;
+            padding: 8px 16px;
+            margin: 0 4px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            text-decoration: none;
+            color: #333;
+        }
+        
+        .pagination a:hover {
+            background-color: #3b82f6;
+            color: white;
+            border-color: #3b82f6;
+        }
+        
+        .pagination .active {
+            background-color: #3b82f6;
+            color: white;
+            border-color: #3b82f6;
+        }
+        
+        .pagination .disabled {
+            color: #ccc;
+            pointer-events: none;
         }
     </style>
 </head>
@@ -835,7 +907,8 @@ function addActivityLog($pdo, $user_id, $action, $description) {
                             </h2>
                             <div class="flex flex-wrap items-center gap-3">
                                 <p class="text-gray-600">
-                                    Showing <?php echo count($handovers); ?> record<?php echo count($handovers) != 1 ? 's' : ''; ?>
+                                    Showing <?php echo count($handovers); ?> of <?php echo $total_records; ?> record<?php echo $total_records != 1 ? 's' : ''; ?>
+                                    (Page <?php echo $page; ?> of <?php echo $total_pages; ?>)
                                 </p>
                                 <?php if ($stats['pending'] > 0): ?>
                                     <span class="px-3 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs font-medium flex items-center gap-1">
@@ -1054,6 +1127,49 @@ function addActivityLog($pdo, $user_id, $action, $description) {
                             </div>
                             <?php endforeach; ?>
                         </div>
+                        
+                        <!-- Pagination -->
+                        <?php if ($total_pages > 1): ?>
+                        <div class="mt-8">
+                            <div class="flex flex-col md:flex-row justify-between items-center">
+                                <div class="text-gray-600 text-sm mb-4 md:mb-0">
+                                    Showing <?php echo (($page - 1) * $per_page) + 1; ?> to <?php echo min($page * $per_page, $total_records); ?> of <?php echo $total_records; ?> entries
+                                </div>
+                                <div class="pagination">
+                                    <?php if ($page > 1): ?>
+                                        <a href="<?php echo generatePageUrl($page - 1); ?>" class="px-3 py-1 bg-white border border-gray-300 rounded-l-md hover:bg-gray-50">
+                                            <i class="fas fa-chevron-left"></i>
+                                        </a>
+                                    <?php else: ?>
+                                        <span class="px-3 py-1 bg-gray-100 border border-gray-300 rounded-l-md text-gray-400">
+                                            <i class="fas fa-chevron-left"></i>
+                                        </span>
+                                    <?php endif; ?>
+                                    
+                                    <?php
+                                    $start = max(1, $page - 2);
+                                    $end = min($total_pages, $page + 2);
+                                    
+                                    for ($i = $start; $i <= $end; $i++):
+                                    ?>
+                                        <a href="<?php echo generatePageUrl($i); ?>" class="px-3 py-1 <?php echo $i == $page ? 'bg-primary-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'; ?> border border-gray-300">
+                                            <?php echo $i; ?>
+                                        </a>
+                                    <?php endfor; ?>
+                                    
+                                    <?php if ($page < $total_pages): ?>
+                                        <a href="<?php echo generatePageUrl($page + 1); ?>" class="px-3 py-1 bg-white border border-gray-300 rounded-r-md hover:bg-gray-50">
+                                            <i class="fas fa-chevron-right"></i>
+                                        </a>
+                                    <?php else: ?>
+                                        <span class="px-3 py-1 bg-gray-100 border border-gray-300 rounded-r-md text-gray-400">
+                                            <i class="fas fa-chevron-right"></i>
+                                        </span>
+                                    <?php endif; ?>
+                                </div>
+                            </div>
+                        </div>
+                        <?php endif; ?>
                     <?php endif; ?>
                     
                     <!-- Footer -->
