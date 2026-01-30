@@ -348,36 +348,7 @@ function addActivityLog($pdo, $user_id, $action, $description) {
 </head>
 <body class="bg-gradient-to-br from-gray-50 via-white to-gray-100 min-h-screen p-2 md:p-4">
     <div class="max-w-7xl mx-auto">
-        <!-- Header -->
-        <div class="mb-4 md:mb-6">
-            <div class="glass-morphism rounded-2xl p-4 md:p-6">
-                <div class="flex flex-col md:flex-row md:items-center justify-between">
-                    <div class="mb-4 md:mb-0">
-                        <h1 class="text-2xl font-bold text-gray-800">
-                            <i class="fas fa-boxes text-purple-600 mr-2"></i>
-                            Evidence Handover
-                        </h1>
-                        <p class="text-gray-600 text-sm mt-1">Securely transfer evidence with digital trail</p>
-                    </div>
-                    
-                    <!-- Stats -->
-                    <div class="flex flex-wrap gap-2">
-                        <div class="bg-white rounded-xl px-4 py-3 shadow-sm border border-gray-100">
-                            <div class="text-2xl font-bold text-gray-800"><?php echo $stats['total']; ?></div>
-                            <div class="text-xs text-gray-500">Total</div>
-                        </div>
-                        <div class="bg-white rounded-xl px-4 py-3 shadow-sm border border-gray-100">
-                            <div class="text-2xl font-bold text-yellow-600"><?php echo $stats['pending']; ?></div>
-                            <div class="text-xs text-gray-500">Pending</div>
-                        </div>
-                        <div class="bg-white rounded-xl px-4 py-3 shadow-sm border border-gray-100">
-                            <div class="text-2xl font-bold text-green-600"><?php echo $stats['acknowledged']; ?></div>
-                            <div class="text-xs text-gray-500">Acknowledged</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
+        <!-- REMOVED THE HEADER SECTION COMPLETELY -->
         
         <!-- Alerts -->
         <?php if ($success_message): ?>
