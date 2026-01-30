@@ -1,1356 +1,1540 @@
 <?php
-// Fixed path: from modules folder to config folder
-require_once __DIR__ . '/../../config/database.php';
+// sec/modules/case.php - Fixed Database Connection
 
-// Only start session if not already started and not being included
-if (!isset($_SESSION) && session_status() === PHP_SESSION_NONE) {
-    session_start();
+// Check if user is logged in
+if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'secretary') {
+    header('Location: ../../index.php');
+    exit();
 }
 
-// Check if user is logged in and is a tanod
-// But only redirect if not being included in another dashboard
-if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'tanod') {
-    // Check if we're being included as a module
-    $is_included = (strpos($_SERVER['PHP_SELF'], 'secretary_dashboard.php') !== false) 
-                   || (strpos($_SERVER['PHP_SELF'], 'modules/case.php') !== false);
-    
-    if (!$is_included) {
-        header('Location: ../../index.php');
-        exit();
-    } else {
-        // If included but not a tanod, just show access denied
-        echo "<div class='alert alert-danger'>Access Denied: Tanod privileges required.</div>";
-        exit();
-    }
-}
+// Include database configuration
+$db_error = null;
+$conn = null;
 
-$tanod_id = $_SESSION['user_id'];
-$tanod_name = $_SESSION['first_name'] . ' ' . $_SESSION['last_name'];
-$user_role = $_SESSION['role'];
-
-// Get database connection
-try {
-    $pdo = getDbConnection();
-} catch (PDOException $e) {
-    die("Database connection failed: " . $e->getMessage());
-}
-
-// Initialize variables
-$success_message = '';
-$error_message = '';
-$handovers = [];
-$recipients = [];
-$cases = [];
-
-// Pagination variables
-$page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
-$per_page = 10;
-$offset = ($page - 1) * $per_page;
-$total_records = 0;
-$total_pages = 1;
-
-// Check if cases table exists, if not, show warning
-try {
-    $table_check = $pdo->query("SHOW TABLES LIKE 'cases'");
-    $cases_table_exists = $table_check->rowCount() > 0;
-} catch (PDOException $e) {
-    $cases_table_exists = false;
-}
-
-// Handle form submission for new evidence handover (Tanod only)
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_handover'])) {
-    if ($user_role !== 'tanod') {
-        $error_message = "Only Tanods can submit evidence handovers.";
-    } else {
-        $item_description = trim($_POST['item_description']);
-        $item_type = trim($_POST['item_type']);
-        $handover_to = intval($_POST['handover_to']);
-        $handover_date = date('Y-m-d H:i:s');
-        $chain_of_custody = trim($_POST['chain_of_custody']);
-        $evidence_location = trim($_POST['evidence_location'] ?? '');
-        $witnesses = trim($_POST['witnesses'] ?? '');
-        $case_id = intval($_POST['case_id'] ?? 0);
-        
-        // Validate required fields
-        if (empty($item_description) || empty($handover_to) || empty($item_type)) {
-            $error_message = "Please fill in all required fields marked with *.";
-        } elseif (strlen($item_description) < 20) {
-            $error_message = "Evidence description must be at least 20 characters long.";
-        } else {
-            try {
-                // Begin transaction
-                $pdo->beginTransaction();
-                
-                // Insert evidence handover
-                $stmt = $pdo->prepare("
-                    INSERT INTO evidence_handovers 
-                    (tanod_id, item_description, item_type, handover_to, handover_date, 
-                     chain_of_custody, evidence_location, witnesses, case_id, status, created_at) 
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending_acknowledgement', NOW())
-                ");
-                $stmt->execute([
-                    $tanod_id, 
-                    $item_description, 
-                    $item_type, 
-                    $handover_to, 
-                    $handover_date, 
-                    $chain_of_custody,
-                    $evidence_location,
-                    $witnesses,
-                    $case_id
-                ]);
-                
-                $handover_id = $pdo->lastInsertId();
-                
-                // Create notification for recipient
-                $notif_stmt = $pdo->prepare("
-                    INSERT INTO notifications 
-                    (user_id, title, message, related_type, related_id, priority, is_read, created_at) 
-                    VALUES (?, ?, ?, 'evidence_handover', ?, 'high', 0, NOW())
-                ");
-                
-                // Get recipient name for notification
-                $recipient_stmt = $pdo->prepare("
-                    SELECT CONCAT(first_name, ' ', last_name) as name, role 
-                    FROM users WHERE id = ?
-                ");
-                $recipient_stmt->execute([$handover_to]);
-                $recipient = $recipient_stmt->fetch();
-                $recipient_name = $recipient ? $recipient['name'] : 'Recipient';
-                $recipient_role = $recipient ? $recipient['role'] : 'unknown';
-                
-                $evidence_code = 'EVID-' . str_pad($handover_id, 5, '0', STR_PAD_LEFT);
-                
-                $notif_stmt->execute([
-                    $handover_to,
-                    '📦 New Evidence Handover',
-                    "Tanod $tanod_name has submitted evidence for your acknowledgement ($evidence_code)",
-                    $handover_id
-                ]);
-                
-                // Also notify admin/super admin
-                $admin_stmt = $pdo->prepare("
-                    SELECT id FROM users 
-                    WHERE role IN ('admin', 'super_admin') AND status = 'active'
-                ");
-                $admin_stmt->execute();
-                $admins = $admin_stmt->fetchAll();
-                
-                foreach ($admins as $admin) {
-                    $notif_stmt->execute([
-                        $admin['id'],
-                        '📦 Evidence Handover Submitted',
-                        "Tanod $tanod_name submitted evidence to $recipient_name ($evidence_code)",
-                        $handover_id
-                    ]);
-                }
-                
-                // Log activity
-                addActivityLog($pdo, $tanod_id, 'evidence_handover', 
-                    "Submitted evidence handover #$handover_id: $item_type");
-                
-                // If case_id is provided and cases table exists, update case evidence count
-                if ($case_id > 0 && $cases_table_exists) {
-                    $case_stmt = $pdo->prepare("
-                        UPDATE cases SET evidence_count = evidence_count + 1 WHERE id = ?
-                    ");
-                    $case_stmt->execute([$case_id]);
-                }
-                
-                // Commit transaction
-                $pdo->commit();
-                
-                $success_message = "✅ Evidence handover logged successfully (ID: $evidence_code). Waiting for recipient acknowledgement.";
-                
-                // Clear form data
-                unset($_POST);
-                
-            } catch (PDOException $e) {
-                $pdo->rollBack();
-                error_log("Evidence Handover Error: " . $e->getMessage());
-                $error_message = "❌ Error logging handover: " . $e->getMessage();
-            }
-        }
-    }
-}
-
-// Fetch relevant handover records based on user role
-try {
-    if ($user_role === 'tanod') {
-        // Get total count for pagination
-        $count_stmt = $pdo->prepare("
-            SELECT COUNT(*) as total
-            FROM evidence_handovers eh
-            WHERE eh.tanod_id = ?
-        ");
-        $count_stmt->execute([$tanod_id]);
-        $total_result = $count_stmt->fetch(PDO::FETCH_ASSOC);
-        $total_records = $total_result['total'];
-        $total_pages = ceil($total_records / $per_page);
-        
-        // Tanods see their own handovers with pagination
-        $stmt = $pdo->prepare("
-            SELECT eh.*, 
-                   u_tanod.first_name as tanod_first, u_tanod.last_name as tanod_last,
-                   u_recipient.first_name as recipient_first, u_recipient.last_name as recipient_last,
-                   u_recipient.role as recipient_role,
-                   u_recipient.barangay_position as recipient_position,
-                   u_acknowledged.first_name as acknowledged_first, u_acknowledged.last_name as acknowledged_last,
-                   c.case_number, c.title as case_title
-            FROM evidence_handovers eh
-            JOIN users u_tanod ON eh.tanod_id = u_tanod.id
-            JOIN users u_recipient ON eh.handover_to = u_recipient.id
-            LEFT JOIN users u_acknowledged ON eh.acknowledged_by = u_acknowledged.id
-            LEFT JOIN cases c ON eh.case_id = c.id
-            WHERE eh.tanod_id = ?
-            ORDER BY eh.handover_date DESC
-            LIMIT ? OFFSET ?
-        ");
-        $stmt->bindValue(1, $tanod_id, PDO::PARAM_INT);
-        $stmt->bindValue(2, $per_page, PDO::PARAM_INT);
-        $stmt->bindValue(3, $offset, PDO::PARAM_INT);
-        $stmt->execute();
-        $handovers = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        
-        // Fetch secretaries and admins for dropdown (Tanod only)
-        $recipient_stmt = $pdo->prepare("
-            SELECT id, CONCAT(first_name, ' ', last_name) as full_name, role, barangay_position 
-            FROM users 
-            WHERE role IN ('secretary', 'admin', 'captain') AND status = 'active'
-            ORDER BY 
-                CASE role 
-                    WHEN 'captain' THEN 1
-                    WHEN 'admin' THEN 2
-                    WHEN 'secretary' THEN 3
-                    ELSE 4
-                END,
-                last_name, first_name
-        ");
-        $recipient_stmt->execute();
-        $recipients = $recipient_stmt->fetchAll(PDO::FETCH_ASSOC);
-        
-        // Fetch active cases for dropdown if table exists
-        if ($cases_table_exists) {
-            $case_stmt = $pdo->prepare("
-                SELECT id, case_number, title 
-                FROM cases 
-                WHERE status IN ('open', 'investigating', 'assigned') 
-                ORDER BY created_at DESC
-                LIMIT 20
-            ");
-            $case_stmt->execute();
-            $cases = $case_stmt->fetchAll(PDO::FETCH_ASSOC);
-        }
-    }
-} catch (PDOException $e) {
-    error_log("Error fetching handover records: " . $e->getMessage());
-    $error_message = "❌ Error fetching handover records: " . $e->getMessage();
-}
-
-// Get statistics
-$stats = [
-    'total' => $total_records,
-    'pending' => count(array_filter($handovers, function($h) { 
-        return $h['status'] === 'pending_acknowledgement'; 
-    })),
-    'acknowledged' => count(array_filter($handovers, function($h) { 
-        return $h['status'] === 'acknowledged' && !$h['released']; 
-    })),
-    'released' => count(array_filter($handovers, function($h) { 
-        return $h['released']; 
-    }))
+// Try multiple paths to find the database configuration
+$possible_paths = [
+    dirname(dirname(dirname(__DIR__))) . '/config/database.php', // public_html/config/database.php
+    dirname(dirname(__DIR__)) . '/config/database.php', // sec/config/database.php
+    $_SERVER['DOCUMENT_ROOT'] . '/config/database.php',
+    $_SERVER['DOCUMENT_ROOT'] . '/../config/database.php',
+    __DIR__ . '/../../../config/database.php',
+    __DIR__ . '/../../../../config/database.php'
 ];
 
-// Activity log function
-function addActivityLog($pdo, $user_id, $action, $description) {
-    try {
-        $ip_address = $_SERVER['REMOTE_ADDR'] ?? 'Unknown';
-        $user_agent = $_SERVER['HTTP_USER_AGENT'] ?? 'Unknown';
-        
-        $stmt = $pdo->prepare("
-            INSERT INTO activity_logs 
-            (user_id, action, description, ip_address, user_agent, created_at) 
-            VALUES (?, ?, ?, ?, ?, NOW())
-        ");
-        $stmt->execute([$user_id, $action, $description, $ip_address, $user_agent]);
-    } catch (PDOException $e) {
-        error_log("Activity Log Error: " . $e->getMessage());
+$config_found = false;
+$db_config_path = '';
+
+foreach ($possible_paths as $path) {
+    if (file_exists($path)) {
+        $config_found = true;
+        $db_config_path = $path;
+        break;
     }
 }
 
-// Generate pagination URL
-function generatePageUrl($page) {
-    $query = $_GET;
-    $query['page'] = $page;
-    return '?' . http_build_query($query);
+try {
+    if ($config_found) {
+        require_once $db_config_path;
+        
+        // Check if connection was established by database.php
+        if (!isset($conn) || !$conn) {
+            // If database.php didn't create connection, try to create it
+            if (function_exists('getDbConnection')) {
+                $conn = getDbConnection();
+            } else {
+                // Create connection using constants from database.php
+                $conn = new PDO("mysql:host=153.92.15.81;port=3306;dbname=u514031374_leir;charset=utf8mb4", 
+                              'u514031374_leir', 
+                              'leirP@55w0rd');
+                $conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+                $conn->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
+            }
+        }
+        
+        // Test connection
+        $test_query = "SELECT 1 as test";
+        $test_stmt = $conn->query($test_query);
+        $test_result = $test_stmt->fetch();
+        
+    } else {
+        // Direct connection
+        $conn = new PDO("mysql:host=153.92.15.81;port=3306;dbname=u514031374_leir;charset=utf8mb4", 
+                       'u514031374_leir', 
+                       'leirP@55w0rd');
+        $conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+        $conn->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
+    }
+    
+} catch (Exception $e) {
+    $db_error = $e->getMessage();
+    error_log("Database connection error in case.php: " . $e->getMessage());
+    
+    // Try one more time with direct connection
+    try {
+        $conn = new PDO("mysql:host=153.92.15.81;port=3306;dbname=u514031374_leir;charset=utf8mb4", 
+                       'u514031374_leir', 
+                       'leirP@55w0rd');
+        $conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+        $conn->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
+        $db_error = null;
+    } catch (Exception $e2) {
+        $db_error = $e2->getMessage();
+    }
 }
+
+// Set current filter values from GET parameters
+$currentFilter = [
+    'status' => $_GET['status'] ?? '',
+    'category' => $_GET['category'] ?? '',
+    'from_date' => $_GET['from_date'] ?? '',
+    'to_date' => $_GET['to_date'] ?? ''
+];
+
+// Initialize variables for pagination
+$page = isset($_GET['page']) ? max(1, intval($_GET['page'])) : 1;
+$total_pages = 1;
+$total_records = 0;
+
+// Function to get available officers
+function getAvailableOfficers($conn) {
+    $officers = [];
+    try {
+        // Get users with officer roles (lupon, tanod, etc.)
+        // Show all officers regardless of status (active/offline)
+        $query = "SELECT id, first_name, last_name, role, email, phone, is_online 
+                  FROM users 
+                  WHERE role IN ('lupon', 'lupon_member', 'tanod', 'barangay_tanod', 'barangay_captain')
+                  ORDER BY 
+                    CASE role
+                        WHEN 'barangay_captain' THEN 1
+                        WHEN 'lupon' THEN 2
+                        WHEN 'lupon_member' THEN 2
+                        WHEN 'tanod' THEN 3
+                        WHEN 'barangay_tanod' THEN 3
+                        ELSE 4
+                    END, 
+                    last_name, first_name";
+        
+        $stmt = $conn->prepare($query);
+        $stmt->execute();
+        $officers = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+    } catch (Exception $e) {
+        error_log("Error getting officers: " . $e->getMessage());
+    }
+    return $officers;
+}
+
+// Get officers for the current session
+$availableOfficers = $conn ? getAvailableOfficers($conn) : [];
 ?>
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Evidence Handover Log - Barangay LEIR System</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        primary: {
-                            50: '#eff6ff',
-                            100: '#dbeafe',
-                            200: '#bfdbfe',
-                            300: '#93c5fd',
-                            400: '#60a5fa',
-                            500: '#3b82f6',
-                            600: '#2563eb',
-                            700: '#1d4ed8',
-                            800: '#1e40af',
-                            900: '#1e3a8a',
-                        },
-                        secondary: {
-                            50: '#f8fafc',
-                            100: '#f1f5f9',
-                            200: '#e2e8f0',
-                            300: '#cbd5e1',
-                            400: '#94a3b8',
-                            500: '#64748b',
-                            600: '#475569',
-                            700: '#334155',
-                            800: '#1e293b',
-                            900: '#0f172a',
-                        }
-                    },
-                    animation: {
-                        'fade-in': 'fadeIn 0.5s ease-in-out',
-                        'slide-up': 'slideUp 0.3s ease-out',
-                        'pulse-subtle': 'pulseSubtle 2s infinite',
-                    },
-                    keyframes: {
-                        fadeIn: {
-                            '0%': { opacity: '0' },
-                            '100%': { opacity: '1' },
-                        },
-                        slideUp: {
-                            '0%': { transform: 'translateY(10px)', opacity: '0' },
-                            '100%': { transform: 'translateY(0)', opacity: '1' },
-                        },
-                        pulseSubtle: {
-                            '0%, 100%': { opacity: '1' },
-                            '50%': { opacity: '0.8' },
-                        }
-                    }
-                }
-            }
-        }
-    </script>
-    <style>
-        .glass-morphism {
-            background: rgba(255, 255, 255, 0.7);
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
-        }
-        
-        .gradient-border {
-            position: relative;
-            border: double 2px transparent;
-            background-image: linear-gradient(white, white), 
-                              linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            background-origin: border-box;
-            background-clip: content-box, border-box;
-        }
-        
-        .evidence-card {
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            border-radius: 12px;
-            overflow: hidden;
-        }
-        
-        .evidence-card:hover {
-            transform: translateY(-4px);
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
-        }
-        
-        .status-badge {
-            padding: 6px 16px;
-            border-radius: 20px;
-            font-size: 12px;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-        }
-        
-        .status-pending { 
-            background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
-            color: #92400e;
-            border: 1px solid rgba(245, 158, 11, 0.2);
-        }
-        
-        .status-acknowledged { 
-            background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
-            color: #065f46;
-            border: 1px solid rgba(16, 185, 129, 0.2);
-        }
-        
-        .status-released { 
-            background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
-            color: #1e40af;
-            border: 1px solid rgba(59, 130, 246, 0.2);
-        }
-        
-        .type-tag {
-            display: inline-flex;
-            align-items: center;
-            padding: 4px 12px;
-            border-radius: 12px;
-            font-size: 11px;
-            font-weight: 600;
-            margin-right: 6px;
-            margin-bottom: 6px;
-            gap: 4px;
-        }
-        
-        .timeline {
-            position: relative;
-            padding-left: 30px;
-        }
-        
-        .timeline::before {
-            content: '';
-            position: absolute;
-            left: 11px;
-            top: 0;
-            bottom: 0;
-            width: 2px;
-            background: linear-gradient(to bottom, #3b82f6, #10b981, #8b5cf6);
-        }
-        
-        .timeline-item {
-            position: relative;
-            margin-bottom: 20px;
-            padding-bottom: 20px;
-            border-bottom: 1px solid #f1f5f9;
-        }
-        
-        .timeline-item:last-child {
-            border-bottom: none;
-        }
-        
-        .timeline-item::before {
-            content: '';
-            position: absolute;
-            left: -20px;
-            top: 5px;
-            width: 12px;
-            height: 12px;
-            border-radius: 50%;
-            background: #3b82f6;
-            border: 2px solid white;
-            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
-            z-index: 2;
-        }
-        
-        .timeline-item.completed::before {
-            background: #10b981;
-            box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2);
-        }
-        
-        .form-input {
-            transition: all 0.3s ease;
-            border: 2px solid #e2e8f0;
-            border-radius: 10px;
-            padding: 12px 16px;
-            width: 100%;
-        }
-        
-        .form-input:focus {
-            outline: none;
-            border-color: #3b82f6;
-            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-        }
-        
-        .form-select {
-            background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
-            background-position: right 0.5rem center;
-            background-repeat: no-repeat;
-            background-size: 1.5em 1.5em;
-            padding-right: 2.5rem;
-            -webkit-print-color-adjust: exact;
-            print-color-adjust: exact;
-        }
-        
-        .stat-card {
-            transition: all 0.3s ease;
-            border-radius: 12px;
-            padding: 20px;
-            position: relative;
-            overflow: hidden;
-        }
-        
-        .stat-card::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 4px;
-            background: linear-gradient(90deg, var(--tw-gradient-from), var(--tw-gradient-to));
-        }
-        
-        .custom-scrollbar {
-            scrollbar-width: thin;
-            scrollbar-color: #cbd5e1 #f1f5f9;
-        }
-        
-        .custom-scrollbar::-webkit-scrollbar {
-            width: 6px;
-            height: 6px;
-        }
-        
-        .custom-scrollbar::-webkit-scrollbar-track {
-            background: #f1f5f9;
-            border-radius: 3px;
-        }
-        
-        .custom-scrollbar::-webkit-scrollbar-thumb {
-            background: #cbd5e1;
-            border-radius: 3px;
-        }
-        
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-            background: #94a3b8;
-        }
-        
-        .animate-float {
-            animation: float 3s ease-in-out infinite;
-        }
-        
-        @keyframes float {
-            0%, 100% { transform: translateY(0px); }
-            50% { transform: translateY(-10px); }
-        }
-        
-        .print-only {
-            display: none;
-        }
-        
-        @media print {
-            .no-print {
-                display: none !important;
-            }
-            .print-only {
-                display: block !important;
-            }
-            body {
-                background: white !important;
-                color: black !important;
-            }
-            .evidence-card {
-                break-inside: avoid;
-                border: 1px solid #000 !important;
-                box-shadow: none !important;
-            }
-        }
-        
-        .pagination {
-            display: flex;
-            justify-content: center;
-            margin-top: 20px;
-        }
-        
-        .pagination a, .pagination span {
-            display: inline-block;
-            padding: 8px 16px;
-            margin: 0 4px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            text-decoration: none;
-            color: #333;
-        }
-        
-        .pagination a:hover {
-            background-color: #3b82f6;
-            color: white;
-            border-color: #3b82f6;
-        }
-        
-        .pagination .active {
-            background-color: #3b82f6;
-            color: white;
-            border-color: #3b82f6;
-        }
-        
-        .pagination .disabled {
-            color: #ccc;
-            pointer-events: none;
-        }
-    </style>
-</head>
-<body class="bg-gradient-to-br from-gray-50 to-primary-50 min-h-screen p-4 md:p-6">
-    <div class="max-w-7xl mx-auto">
-        <!-- Header -->
-        <div class="glass-morphism rounded-2xl p-6 mb-6 animate-fade-in">
-            <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                <div>
-                    <h1 class="text-2xl md:text-3xl font-bold text-gray-900 mb-2 flex items-center gap-3">
-                        <i class="fas fa-boxes-stacked text-primary-600"></i>
-                        Evidence Handover System
-                    </h1>
-                    <p class="text-gray-600">Securely document and track evidence transfers with complete chain of custody</p>
-                </div>
-                <div class="flex items-center gap-3">
-                    <div class="text-right">
-                        <p class="text-sm text-gray-600">Logged in as</p>
-                        <p class="font-semibold text-gray-900"><?php echo htmlspecialchars($tanod_name); ?></p>
-                        <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-primary-100 text-primary-700 text-xs font-medium">
-                            <i class="fas fa-shield-alt"></i>
-                            Tanod
-                        </span>
-                    </div>
-                    <div class="w-12 h-12 rounded-full bg-gradient-to-r from-primary-500 to-primary-700 flex items-center justify-center text-white font-bold">
-                        <?php echo strtoupper(substr($_SESSION['first_name'], 0, 1)); ?>
-                    </div>
-                </div>
-            </div>
-        </div>
 
-        <!-- Stats Overview -->
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-            <div class="stat-card bg-gradient-to-b from-white to-blue-50 border border-blue-100" style="--tw-gradient-from: #3b82f6; --tw-gradient-to: #60a5fa;">
-                <div class="flex items-center justify-between">
-                    <div>
-                        <p class="text-sm font-medium text-blue-600 mb-1">Total Handovers</p>
-                        <p class="text-3xl font-bold text-gray-900"><?php echo $stats['total']; ?></p>
-                    </div>
-                    <i class="fas fa-archive text-blue-400 text-2xl"></i>
-                </div>
+<!-- Case-Blotter Management Module -->
+<div class="space-y-8">
+    <?php if ($db_error): ?>
+    <div class="bg-red-50 border border-red-200 rounded-xl p-6">
+        <div class="flex items-center">
+            <div class="flex-shrink-0">
+                <i class="fas fa-exclamation-triangle text-red-400 text-2xl"></i>
             </div>
-            
-            <div class="stat-card bg-gradient-to-b from-white to-yellow-50 border border-yellow-100" style="--tw-gradient-from: #f59e0b; --tw-gradient-to: #fbbf24;">
-                <div class="flex items-center justify-between">
-                    <div>
-                        <p class="text-sm font-medium text-yellow-600 mb-1">Pending</p>
-                        <p class="text-3xl font-bold text-gray-900"><?php echo $stats['pending']; ?></p>
-                    </div>
-                    <i class="fas fa-clock text-yellow-400 text-2xl"></i>
-                </div>
-            </div>
-            
-            <div class="stat-card bg-gradient-to-b from-white to-green-50 border border-green-100" style="--tw-gradient-from: #10b981; --tw-gradient-to: #34d399;">
-                <div class="flex items-center justify-between">
-                    <div>
-                        <p class="text-sm font-medium text-green-600 mb-1">Acknowledged</p>
-                        <p class="text-3xl font-bold text-gray-900"><?php echo $stats['acknowledged']; ?></p>
-                    </div>
-                    <i class="fas fa-check-circle text-green-400 text-2xl"></i>
-                </div>
-            </div>
-            
-            <div class="stat-card bg-gradient-to-b from-white to-purple-50 border border-purple-100" style="--tw-gradient-from: #8b5cf6; --tw-gradient-to: #a78bfa;">
-                <div class="flex items-center justify-between">
-                    <div>
-                        <p class="text-sm font-medium text-purple-600 mb-1">Released</p>
-                        <p class="text-3xl font-bold text-gray-900"><?php echo $stats['released']; ?></p>
-                    </div>
-                    <i class="fas fa-box-open text-purple-400 text-2xl"></i>
-                </div>
-            </div>
-        </div>
-
-        <!-- Alerts -->
-        <?php if ($success_message): ?>
-        <div class="mb-6 animate-slide-up">
-            <div class="bg-gradient-to-r from-green-50 to-green-100 border-l-4 border-green-500 rounded-lg p-4 shadow-sm">
-                <div class="flex items-center">
-                    <div class="flex-shrink-0">
-                        <i class="fas fa-check-circle text-green-500 text-xl"></i>
-                    </div>
-                    <div class="ml-3 flex-1">
-                        <p class="text-sm font-medium text-green-800"><?php echo $success_message; ?></p>
-                        <p class="text-xs text-green-600 mt-1"><?php echo date('F j, Y - h:i A'); ?></p>
-                    </div>
-                    <button type="button" onclick="this.parentElement.parentElement.remove()" class="ml-auto -mx-1.5 -my-1.5 text-green-500 hover:text-green-600">
-                        <i class="fas fa-times"></i>
-                    </button>
-                </div>
-            </div>
-        </div>
-        <?php endif; ?>
-        
-        <?php if ($error_message): ?>
-        <div class="mb-6 animate-slide-up">
-            <div class="bg-gradient-to-r from-red-50 to-red-100 border-l-4 border-red-500 rounded-lg p-4 shadow-sm">
-                <div class="flex items-center">
-                    <div class="flex-shrink-0">
-                        <i class="fas fa-exclamation-circle text-red-500 text-xl"></i>
-                    </div>
-                    <div class="ml-3 flex-1">
-                        <p class="text-sm font-medium text-red-800"><?php echo $error_message; ?></p>
-                    </div>
-                    <button type="button" onclick="this.parentElement.parentElement.remove()" class="ml-auto -mx-1.5 -my-1.5 text-red-500 hover:text-red-600">
-                        <i class="fas fa-times"></i>
-                    </button>
-                </div>
-            </div>
-        </div>
-        <?php endif; ?>
-
-        <!-- Warning about missing cases table -->
-        <?php if (!$cases_table_exists): ?>
-        <div class="mb-6 bg-gradient-to-r from-yellow-50 to-yellow-100 border-l-4 border-yellow-500 rounded-lg p-4">
-            <div class="flex items-center">
-                <i class="fas fa-exclamation-triangle text-yellow-500 text-xl mr-3"></i>
-                <div>
-                    <p class="font-medium text-yellow-800">Cases table not found</p>
-                    <p class="text-sm text-yellow-600 mt-1">The 'cases' table is missing from the database. Case linking functionality will be limited.</p>
-                </div>
-            </div>
-        </div>
-        <?php endif; ?>
-
-        <!-- Main Content Grid -->
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <!-- Left Column: New Handover Form -->
-            <div class="lg:col-span-1">
-                <div class="glass-morphism rounded-2xl p-6 h-full">
-                    <div class="flex items-center justify-between mb-6">
-                        <h2 class="text-xl font-bold text-gray-900 flex items-center gap-2">
-                            <i class="fas fa-plus-circle text-primary-600"></i>
-                            Log New Evidence
-                        </h2>
-                        <span class="text-xs font-medium px-3 py-1 rounded-full bg-primary-100 text-primary-700">
-                            Step 1 of 3
-                        </span>
-                    </div>
-                    
-                    <form method="POST" action="" id="handoverForm" class="space-y-5">
-                        <!-- Case Reference -->
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
-                                <i class="fas fa-folder text-gray-500"></i>
-                                <span>Link to Case <?php if (!$cases_table_exists): ?><span class="text-yellow-600 text-xs">(Table Missing)</span><?php endif; ?></span>
-                            </label>
-                            <select name="case_id" 
-                                    class="form-input form-select">
-                                <option value="">Select Case (Optional)</option>
-                                <option value="0">No specific case</option>
-                                <?php if ($cases_table_exists && !empty($cases)): ?>
-                                    <?php foreach ($cases as $case): ?>
-                                        <option value="<?php echo $case['id']; ?>">
-                                            <?php echo htmlspecialchars($case['case_number']); ?> - 
-                                            <?php echo htmlspecialchars(substr($case['title'], 0, 50)); ?>
-                                        </option>
-                                    <?php endforeach; ?>
-                                <?php endif; ?>
-                            </select>
-                        </div>
-                        
-                        <!-- Evidence Type -->
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
-                                <i class="fas fa-tag text-primary-500"></i>
-                                <span>Evidence Type <span class="text-red-500">*</span></span>
-                            </label>
-                            <select name="item_type" required class="form-input form-select" id="itemType">
-                                <option value="">Select Type of Evidence</option>
-                                <option value="weapon">🔫 Weapon</option>
-                                <option value="document">📄 Document</option>
-                                <option value="electronic">💻 Electronic Device</option>
-                                <option value="clothing">👕 Clothing</option>
-                                <option value="vehicle">🚗 Vehicle Part</option>
-                                <option value="drugs">💊 Suspected Drugs</option>
-                                <option value="money">💰 Money/Currency</option>
-                                <option value="jewelry">💎 Jewelry</option>
-                                <option value="property">🏚️ Damaged Property</option>
-                                <option value="personal">🎒 Personal Effects</option>
-                                <option value="other">📦 Other Evidence</option>
-                            </select>
-                        </div>
-                        
-                        <!-- Evidence Description -->
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
-                                <i class="fas fa-align-left text-primary-500"></i>
-                                <span>Evidence Description <span class="text-red-500">*</span></span>
-                            </label>
-                            <textarea name="item_description" required rows="4" id="itemDescription"
-                                      placeholder="Provide detailed description including:
-• Brand, model, serial numbers
-• Color, size, unique markings
-• Condition (damaged, intact, etc.)
-• Where and how it was found
-• Any other identifying features"
-                                      class="form-input"></textarea>
-                            <div class="flex justify-between items-center mt-2">
-                                <div id="descriptionError" class="text-xs text-red-600 hidden">Minimum 20 characters required</div>
-                                <div id="charCount" class="text-xs text-gray-500">0 characters</div>
-                            </div>
-                        </div>
-                        
-                        <!-- Evidence Location -->
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
-                                <i class="fas fa-map-marker-alt text-primary-500"></i>
-                                <span>Location Found</span>
-                            </label>
-                            <input type="text" name="evidence_location" id="evidenceLocation"
-                                   placeholder="Where was this evidence found?"
-                                   class="form-input">
-                        </div>
-                        
-                        <!-- Handover To -->
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
-                                <i class="fas fa-user-check text-primary-500"></i>
-                                <span>Handover To (Recipient) <span class="text-red-500">*</span></span>
-                            </label>
-                            <select name="handover_to" required id="handoverTo" class="form-input form-select">
-                                <option value="">Select Secretary, Admin, or Captain</option>
-                                <?php if (!empty($recipients)): ?>
-                                    <?php foreach ($recipients as $recipient): ?>
-                                        <option value="<?php echo $recipient['id']; ?>">
-                                            <?php echo htmlspecialchars($recipient['full_name']); ?> 
-                                            <span class="text-gray-500">
-                                                (<?php echo ucfirst($recipient['role']); ?>)
-                                            </span>
-                                        </option>
-                                    <?php endforeach; ?>
-                                <?php else: ?>
-                                    <option value="" disabled>No recipients available</option>
-                                <?php endif; ?>
-                            </select>
-                        </div>
-                        
-                        <!-- Chain of Custody -->
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
-                                <i class="fas fa-link text-primary-500"></i>
-                                <span>Chain of Custody Notes</span>
-                            </label>
-                            <textarea name="chain_of_custody" rows="3"
-                                      placeholder="Document chain of custody information..."
-                                      class="form-input"></textarea>
-                        </div>
-                        
-                        <!-- Witnesses -->
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
-                                <i class="fas fa-users text-primary-500"></i>
-                                <span>Witnesses (Optional)</span>
-                            </label>
-                            <textarea name="witnesses" rows="2"
-                                      placeholder="Names of witnesses present..."
-                                      class="form-input"></textarea>
-                        </div>
-                        
-                        <!-- Form Buttons -->
-                        <div class="pt-4 border-t border-gray-200">
-                            <div class="flex gap-3">
-                                <button type="submit" name="submit_handover" id="submitBtn"
-                                        class="flex-1 bg-gradient-to-r from-primary-600 to-primary-700 text-white font-semibold py-3 px-6 rounded-lg hover:from-primary-700 hover:to-primary-800 transition-all duration-300 flex items-center justify-center gap-2 shadow-md hover:shadow-lg">
-                                    <i class="fas fa-save"></i>
-                                    Submit Handover
-                                </button>
-                                <button type="reset" id="resetBtn"
-                                        class="px-6 py-3 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition">
-                                    Clear
-                                </button>
-                            </div>
-                        </div>
-                    </form>
-                    
-                    <!-- Guidelines -->
-                    <div class="mt-8 pt-6 border-t border-gray-200">
-                        <h4 class="font-bold text-gray-900 mb-4 flex items-center gap-2">
-                            <i class="fas fa-graduation-cap text-primary-600"></i>
-                            Evidence Handling Guidelines
-                        </h4>
-                        <div class="space-y-3">
-                            <div class="flex items-start gap-3">
-                                <div class="flex-shrink-0 w-6 h-6 rounded-full bg-green-100 flex items-center justify-center">
-                                    <i class="fas fa-check text-green-600 text-xs"></i>
-                                </div>
-                                <p class="text-sm text-gray-600">Use gloves when handling evidence</p>
-                            </div>
-                            <div class="flex items-start gap-3">
-                                <div class="flex-shrink-0 w-6 h-6 rounded-full bg-green-100 flex items-center justify-center">
-                                    <i class="fas fa-check text-green-600 text-xs"></i>
-                                </div>
-                                <p class="text-sm text-gray-600">Photograph evidence before moving</p>
-                            </div>
-                            <div class="flex items-start gap-3">
-                                <div class="flex-shrink-0 w-6 h-6 rounded-full bg-green-100 flex items-center justify-center">
-                                    <i class="fas fa-check text-green-600 text-xs"></i>
-                                </div>
-                                <p class="text-sm text-gray-600">Document all transfers immediately</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Right Column: Evidence Records -->
-            <div class="lg:col-span-2">
-                <div class="glass-morphism rounded-2xl p-6">
-                    <!-- Header -->
-                    <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
-                        <div>
-                            <h2 class="text-xl font-bold text-gray-900 mb-2 flex items-center gap-2">
-                                <i class="fas fa-history text-primary-600"></i>
-                                My Evidence Handovers
-                            </h2>
-                            <div class="flex flex-wrap items-center gap-3">
-                                <p class="text-gray-600">
-                                    Showing <?php echo count($handovers); ?> of <?php echo $total_records; ?> record<?php echo $total_records != 1 ? 's' : ''; ?>
-                                    (Page <?php echo $page; ?> of <?php echo $total_pages; ?>)
-                                </p>
-                                <?php if ($stats['pending'] > 0): ?>
-                                    <span class="px-3 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs font-medium flex items-center gap-1">
-                                        <i class="fas fa-clock"></i>
-                                        <?php echo $stats['pending']; ?> pending
-                                    </span>
-                                <?php endif; ?>
-                            </div>
-                        </div>
-                        
-                        <div class="flex flex-wrap gap-3">
-                            <div class="relative">
-                                <input type="text" placeholder="Search evidence..." 
-                                       class="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 w-full md:w-64"
-                                       onkeyup="filterEvidence(this.value)" id="searchInput">
-                                <i class="fas fa-search absolute left-3 top-3 text-gray-400"></i>
-                            </div>
-                            <div class="flex gap-2">
-                                <button onclick="window.print()" 
-                                        class="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition flex items-center gap-2 no-print">
-                                    <i class="fas fa-print"></i>
-                                    Print
-                                </button>
-                                <button onclick="exportToCSV()"
-                                        class="px-4 py-2 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-lg hover:from-green-700 hover:to-green-800 transition flex items-center gap-2 no-print">
-                                    <i class="fas fa-download"></i>
-                                    Export
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Quick Filters -->
-                    <div class="flex flex-wrap gap-2 mb-6">
-                        <button onclick="filterByStatus('all')" 
-                                class="px-4 py-2 bg-gradient-to-r from-primary-600 to-primary-700 text-white rounded-lg hover:from-primary-700 hover:to-primary-800 transition font-medium">
-                            All (<?php echo $stats['total']; ?>)
-                        </button>
-                        <button onclick="filterByStatus('pending_acknowledgement')" 
-                                class="px-4 py-2 bg-gradient-to-r from-yellow-100 to-yellow-200 text-yellow-800 rounded-lg hover:from-yellow-200 hover:to-yellow-300 transition font-medium">
-                            Pending (<?php echo $stats['pending']; ?>)
-                        </button>
-                        <button onclick="filterByStatus('acknowledged')" 
-                                class="px-4 py-2 bg-gradient-to-r from-green-100 to-green-200 text-green-800 rounded-lg hover:from-green-200 hover:to-green-300 transition font-medium">
-                            Acknowledged (<?php echo $stats['acknowledged']; ?>)
-                        </button>
-                    </div>
-                    
-                    <?php if (empty($handovers)): ?>
-                        <!-- Empty State -->
-                        <div class="text-center py-16">
-                            <div class="inline-block p-6 bg-gradient-to-br from-primary-50 to-primary-100 rounded-full mb-6">
-                                <i class="fas fa-box-open text-primary-500 text-5xl"></i>
-                            </div>
-                            <h3 class="text-2xl font-bold text-gray-800 mb-4">No Evidence Handovers Found</h3>
-                            <p class="text-gray-600 max-w-md mx-auto mb-8">
-                                Start by submitting your first evidence handover. Ensure proper documentation and chain of custody for all evidence transfers.
-                            </p>
-                            <button onclick="document.getElementById('handoverForm').scrollIntoView({behavior: 'smooth'})"
-                                    class="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-primary-600 to-primary-700 text-white font-semibold rounded-lg hover:from-primary-700 hover:to-primary-800 transition shadow-md hover:shadow-lg">
-                                <i class="fas fa-plus"></i>
-                                Log First Evidence
-                            </button>
-                        </div>
-                    <?php else: ?>
-                        <!-- Evidence Cards -->
-                        <div class="grid grid-cols-1 gap-6" id="evidenceGrid">
-                            <?php foreach ($handovers as $handover): 
-                                $status_class = '';
-                                $status_text = '';
-                                $status_icon = '';
-                                switch($handover['status']) {
-                                    case 'released':
-                                        $status_class = 'status-released';
-                                        $status_text = 'RELEASED';
-                                        $status_icon = 'fa-box-open';
-                                        break;
-                                    case 'acknowledged':
-                                        $status_class = 'status-acknowledged';
-                                        $status_text = 'ACKNOWLEDGED';
-                                        $status_icon = 'fa-check-circle';
-                                        break;
-                                    case 'pending_acknowledgement':
-                                    default:
-                                        $status_class = 'status-pending';
-                                        $status_text = 'PENDING';
-                                        $status_icon = 'fa-clock';
-                                }
-                                
-                                $evidence_code = 'EVID-' . str_pad($handover['id'], 5, '0', STR_PAD_LEFT);
-                            ?>
-                            <div class="evidence-card bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-all duration-300"
-                                 data-status="<?php echo $handover['status']; ?>"
-                                 data-search="<?php echo htmlspecialchars(strtolower(
-                                     $handover['item_description'] . ' ' . 
-                                     $handover['item_type'] . ' ' . 
-                                     $handover['recipient_first'] . ' ' . 
-                                     $handover['recipient_last'] . ' ' .
-                                     ($handover['case_number'] ?? '') . ' ' .
-                                     $evidence_code
-                                 )); ?>">
-                                
-                                <!-- Card Header -->
-                                <div class="p-5 border-b border-gray-100">
-                                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                                        <div class="flex-1">
-                                            <div class="flex items-center gap-3 mb-2">
-                                                <h3 class="font-bold text-gray-900 text-lg"><?php echo $evidence_code; ?></h3>
-                                                <span class="status-badge <?php echo $status_class; ?>">
-                                                    <i class="fas <?php echo $status_icon; ?>"></i>
-                                                    <?php echo $status_text; ?>
-                                                </span>
-                                            </div>
-                                            <div class="flex flex-wrap items-center gap-3">
-                                                <span class="inline-flex items-center gap-1 px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-medium">
-                                                    <i class="fas fa-tag"></i>
-                                                    <?php echo ucfirst(str_replace('_', ' ', $handover['item_type'])); ?>
-                                                </span>
-                                                <span class="text-gray-500 text-sm">
-                                                    <i class="far fa-calendar"></i>
-                                                    <?php echo date('M d, Y', strtotime($handover['handover_date'])); ?>
-                                                </span>
-                                                <?php if (!empty($handover['case_number'])): ?>
-                                                    <span class="inline-flex items-center gap-1 px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-xs">
-                                                        <i class="fas fa-folder"></i>
-                                                        <?php echo htmlspecialchars($handover['case_number']); ?>
-                                                    </span>
-                                                <?php endif; ?>
-                                            </div>
-                                        </div>
-                                        <div class="text-right">
-                                            <div class="text-sm text-gray-500">
-                                                <?php echo date('h:i A', strtotime($handover['handover_date'])); ?>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                                
-                                <!-- Card Body -->
-                                <div class="p-5">
-                                    <!-- Description -->
-                                    <p class="text-gray-700 mb-5 line-clamp-2">
-                                        <?php echo htmlspecialchars(substr($handover['item_description'], 0, 150)); ?>
-                                        <?php if (strlen($handover['item_description']) > 150): ?>...<?php endif; ?>
-                                    </p>
-                                    
-                                    <!-- People Involved -->
-                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-5">
-                                        <!-- From Tanod -->
-                                        <div class="bg-gray-50 rounded-lg p-3">
-                                            <p class="text-xs text-gray-500 mb-2">From (Tanod)</p>
-                                            <div class="flex items-center gap-3">
-                                                <div class="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-700 rounded-full flex items-center justify-center text-white font-bold">
-                                                    <?php echo strtoupper(substr($handover['tanod_first'], 0, 1)); ?>
-                                                </div>
-                                                <div>
-                                                    <p class="font-medium text-gray-900"><?php echo htmlspecialchars($handover['tanod_first'] . ' ' . $handover['tanod_last']); ?></p>
-                                                    <span class="text-xs text-blue-600 font-medium">Tanod</span>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        
-                                        <!-- To Recipient -->
-                                        <div class="bg-gray-50 rounded-lg p-3">
-                                            <p class="text-xs text-gray-500 mb-2">To (Recipient)</p>
-                                            <div class="flex items-center gap-3">
-                                                <div class="w-10 h-10 bg-gradient-to-br from-green-500 to-green-700 rounded-full flex items-center justify-center text-white font-bold">
-                                                    <?php echo strtoupper(substr($handover['recipient_first'], 0, 1)); ?>
-                                                </div>
-                                                <div>
-                                                    <p class="font-medium text-gray-900"><?php echo htmlspecialchars($handover['recipient_first'] . ' ' . $handover['recipient_last']); ?></p>
-                                                    <span class="text-xs text-green-600 font-medium"><?php echo ucfirst($handover['recipient_role']); ?></span>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    
-                                    <!-- Timeline -->
-                                    <div class="timeline mb-5">
-                                        <div class="timeline-item <?php echo $handover['acknowledged_at'] ? 'completed' : ''; ?>">
-                                            <div class="text-sm font-medium text-gray-900">Handover Submitted</div>
-                                            <div class="text-xs text-gray-500 mt-1">
-                                                <?php echo date('M d, h:i A', strtotime($handover['handover_date'])); ?>
-                                            </div>
-                                        </div>
-                                        <div class="timeline-item <?php echo $handover['acknowledged_at'] ? 'completed' : ''; ?>">
-                                            <div class="text-sm font-medium text-gray-900">Recipient Acknowledgement</div>
-                                            <?php if ($handover['acknowledged_at']): ?>
-                                                <div class="text-xs text-gray-500 mt-1">
-                                                    <?php echo date('M d, h:i A', strtotime($handover['acknowledged_at'])); ?>
-                                                </div>
-                                                <div class="text-xs text-gray-600 mt-1">
-                                                    <i class="fas fa-user-check"></i>
-                                                    <?php echo htmlspecialchars($handover['acknowledged_first'] . ' ' . $handover['acknowledged_last']); ?>
-                                                </div>
-                                            <?php else: ?>
-                                                <div class="text-sm text-yellow-600 mt-1">
-                                                    <i class="fas fa-clock"></i> Waiting for acknowledgement
-                                                </div>
-                                            <?php endif; ?>
-                                        </div>
-                                    </div>
-                                    
-                                    <!-- Action Buttons -->
-                                    <div class="flex justify-between items-center pt-4 border-t border-gray-100">
-                                        <button onclick="showDetails(<?php echo $handover['id']; ?>)"
-                                                class="px-4 py-2 bg-gradient-to-r from-blue-50 to-blue-100 text-blue-700 rounded-lg hover:from-blue-100 hover:to-blue-200 transition font-medium text-sm flex items-center gap-2">
-                                            <i class="fas fa-eye"></i>
-                                            View Details
-                                        </button>
-                                        <div class="text-xs text-gray-500">
-                                            Updated: <?php echo date('M d, Y', strtotime($handover['updated_at'])); ?>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            <?php endforeach; ?>
-                        </div>
-                        
-                        <!-- Pagination -->
-                        <?php if ($total_pages > 1): ?>
-                        <div class="mt-8">
-                            <div class="flex flex-col md:flex-row justify-between items-center">
-                                <div class="text-gray-600 text-sm mb-4 md:mb-0">
-                                    Showing <?php echo (($page - 1) * $per_page) + 1; ?> to <?php echo min($page * $per_page, $total_records); ?> of <?php echo $total_records; ?> entries
-                                </div>
-                                <div class="pagination">
-                                    <?php if ($page > 1): ?>
-                                        <a href="<?php echo generatePageUrl($page - 1); ?>" class="px-3 py-1 bg-white border border-gray-300 rounded-l-md hover:bg-gray-50">
-                                            <i class="fas fa-chevron-left"></i>
-                                        </a>
-                                    <?php else: ?>
-                                        <span class="px-3 py-1 bg-gray-100 border border-gray-300 rounded-l-md text-gray-400">
-                                            <i class="fas fa-chevron-left"></i>
-                                        </span>
-                                    <?php endif; ?>
-                                    
-                                    <?php
-                                    $start = max(1, $page - 2);
-                                    $end = min($total_pages, $page + 2);
-                                    
-                                    for ($i = $start; $i <= $end; $i++):
-                                    ?>
-                                        <a href="<?php echo generatePageUrl($i); ?>" class="px-3 py-1 <?php echo $i == $page ? 'bg-primary-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'; ?> border border-gray-300">
-                                            <?php echo $i; ?>
-                                        </a>
-                                    <?php endfor; ?>
-                                    
-                                    <?php if ($page < $total_pages): ?>
-                                        <a href="<?php echo generatePageUrl($page + 1); ?>" class="px-3 py-1 bg-white border border-gray-300 rounded-r-md hover:bg-gray-50">
-                                            <i class="fas fa-chevron-right"></i>
-                                        </a>
-                                    <?php else: ?>
-                                        <span class="px-3 py-1 bg-gray-100 border border-gray-300 rounded-r-md text-gray-400">
-                                            <i class="fas fa-chevron-right"></i>
-                                        </span>
-                                    <?php endif; ?>
-                                </div>
-                            </div>
-                        </div>
-                        <?php endif; ?>
+            <div class="ml-4">
+                <h3 class="text-lg font-medium text-red-800">Database Connection Issue</h3>
+                <div class="mt-2 text-sm text-red-700">
+                    <p>Unable to connect to the database. Please check:</p>
+                    <ul class="list-disc ml-5 mt-2 space-y-1">
+                        <li>Database credentials are correct</li>
+                        <li>Remote MySQL is enabled on your hosting</li>
+                        <li>IP address <code class="bg-red-100 px-1">153.92.15.81</code> allows connections</li>
+                        <li>Database <code class="bg-red-100 px-1">u514031374_leir</code> exists</li>
+                    </ul>
+                    <p class="mt-3 text-red-600 font-medium">Error: <?php echo htmlspecialchars($db_error); ?></p>
+                    <?php if (!$config_found && $db_config_path): ?>
+                    <p class="mt-2 text-red-600">Config path tried: <?php echo htmlspecialchars($db_config_path); ?></p>
                     <?php endif; ?>
-                    
-                    <!-- Footer -->
-                    <div class="mt-8 pt-6 border-t border-gray-200">
-                        <div class="text-center text-gray-500 text-sm">
-                            <p>Barangay LEIR Evidence Handover System v2.0 &copy; <?php echo date('Y'); ?></p>
-                            <p class="mt-1">All evidence transfers are logged for chain of custody documentation.</p>
-                        </div>
+                </div>
+                <div class="mt-4">
+                    <button onclick="retryConnection()" 
+                            class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-red-700 bg-red-100 hover:bg-red-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500">
+                        <i class="fas fa-redo mr-2"></i> Retry Connection
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <?php endif; ?>
+    
+    <!-- Header Section -->
+    <div class="glass-card rounded-xl p-6">
+        <div class="flex justify-between items-center mb-6">
+            <h2 class="text-2xl font-bold text-gray-800">Case & Blotter Management</h2>
+            <div class="text-sm text-gray-600">
+                <i class="fas fa-calendar-alt mr-1"></i>
+                <?php echo date('F d, Y'); ?>
+            </div>
+        </div>
+        
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <div class="bg-blue-50 p-4 rounded-lg">
+                <div class="flex items-center">
+                    <div class="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mr-4">
+                        <i class="fas fa-hashtag text-blue-600 text-xl"></i>
+                    </div>
+                    <div>
+                        <p class="text-sm text-gray-600">Active Cases</p>
+                        <p class="text-xl font-bold text-gray-800">
+                            <?php
+                            if (!$db_error && $conn) {
+                                try {
+                                    // FIXED: Include all non-closed cases including pending, assigned, in_progress, resolved
+                                    $query = "SELECT COUNT(*) as count FROM reports WHERE status NOT IN ('closed', 'referred')";
+                                    $stmt = $conn->prepare($query);
+                                    $stmt->execute();
+                                    $result = $stmt->fetch(PDO::FETCH_ASSOC);
+                                    echo ($result['count'] ?? 0) . ' Cases';
+                                } catch (Exception $e) {
+                                    echo 'Error';
+                                }
+                            } else {
+                                echo 'N/A';
+                            }
+                            ?>
+                        </p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="bg-green-50 p-4 rounded-lg">
+                <div class="flex items-center">
+                    <div class="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center mr-4">
+                        <i class="fas fa-users text-green-600 text-xl"></i>
+                    </div>
+                    <div>
+                        <p class="text-sm text-gray-600">Pending Cases</p>
+                        <p class="text-xl font-bold text-gray-800">
+                            <?php
+                            if (!$db_error && $conn) {
+                                try {
+                                    // FIXED: Include all pending statuses
+                                    $query = "SELECT COUNT(*) as count FROM reports WHERE status IN ('pending', 'pending_field_verification')";
+                                    $stmt = $conn->prepare($query);
+                                    $stmt->execute();
+                                    $result = $stmt->fetch(PDO::FETCH_ASSOC);
+                                    echo ($result['count'] ?? 0) . ' Pending';
+                                } catch (Exception $e) {
+                                    echo 'Error';
+                                }
+                            } else {
+                                echo 'N/A';
+                            }
+                            ?>
+                        </p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="bg-purple-50 p-4 rounded-lg">
+                <div class="flex items-center">
+                    <div class="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center mr-4">
+                        <i class="fas fa-sticky-note text-purple-600 text-xl"></i>
+                    </div>
+                    <div>
+                        <p class="text-sm text-gray-600">Assigned Cases</p>
+                        <p class="text-xl font-bold text-gray-800">
+                            <?php
+                            if (!$db_error && $conn) {
+                                try {
+                                    $query = "SELECT COUNT(*) as count FROM reports WHERE status = 'assigned'";
+                                    $stmt = $conn->prepare($query);
+                                    $stmt->execute();
+                                    $result = $stmt->fetch(PDO::FETCH_ASSOC);
+                                    echo ($result['count'] ?? 0) . ' Assigned';
+                                } catch (Exception $e) {
+                                    echo 'Error';
+                                }
+                            } else {
+                                echo 'N/A';
+                            }
+                            ?>
+                        </p>
                     </div>
                 </div>
             </div>
         </div>
     </div>
     
-    <!-- JavaScript -->
-    <script>
-    // Character counter for description
-    document.getElementById('itemDescription').addEventListener('input', function() {
-        const charCount = this.value.length;
-        document.getElementById('charCount').textContent = charCount + ' characters';
+    <!-- Enhanced Filter Section -->
+    <div class="glass-card rounded-xl p-6">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="text-xl font-bold text-gray-800">Filter Reports</h3>
+            <div class="text-sm text-gray-600">
+                <i class="fas fa-info-circle mr-1"></i>
+                Filter to find specific cases
+            </div>
+        </div>
         
-        if (charCount < 20 && charCount > 0) {
-            document.getElementById('descriptionError').classList.remove('hidden');
-            this.classList.add('border-red-500');
-        } else {
-            document.getElementById('descriptionError').classList.add('hidden');
-            this.classList.remove('border-red-500');
-        }
-    });
-    
-    // Form validation
-    document.getElementById('handoverForm').addEventListener('submit', function(e) {
-        let isValid = true;
-        
-        // Validate evidence type
-        const itemType = document.getElementById('itemType');
-        if (!itemType.value) {
-            itemType.classList.add('border-red-500');
-            isValid = false;
-        } else {
-            itemType.classList.remove('border-red-500');
-        }
-        
-        // Validate description
-        const description = document.getElementById('itemDescription');
-        if (description.value.length < 20) {
-            document.getElementById('descriptionError').classList.remove('hidden');
-            description.classList.add('border-red-500');
-            isValid = false;
-        } else {
-            document.getElementById('descriptionError').classList.add('hidden');
-            description.classList.remove('border-red-500');
-        }
-        
-        // Validate recipient
-        const recipient = document.getElementById('handoverTo');
-        if (!recipient.value) {
-            recipient.classList.add('border-red-500');
-            isValid = false;
-        } else {
-            recipient.classList.remove('border-red-500');
-        }
-        
-        if (!isValid) {
-            e.preventDefault();
-            showToast('Please fix the errors in the form before submitting.', 'error');
-        } else {
-            // Show loading state
-            const submitBtn = document.getElementById('submitBtn');
-            const originalText = submitBtn.innerHTML;
-            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Processing...';
-            submitBtn.disabled = true;
-        }
-    });
-    
-    // Reset form
-    document.getElementById('resetBtn').addEventListener('click', function() {
-        document.querySelectorAll('.border-red-500').forEach(el => el.classList.remove('border-red-500'));
-        document.getElementById('descriptionError').classList.add('hidden');
-        document.getElementById('charCount').textContent = '0 characters';
-    });
-    
-    // Filter Functions
-    function filterByStatus(status) {
-        const cards = document.querySelectorAll('.evidence-card');
-        cards.forEach(card => {
-            if (status === 'all' || card.dataset.status === status) {
-                card.style.display = 'block';
-            } else {
-                card.style.display = 'none';
-            }
-        });
-    }
-    
-    function filterEvidence(searchTerm) {
-        const cards = document.querySelectorAll('.evidence-card');
-        const term = searchTerm.toLowerCase();
-        
-        cards.forEach(card => {
-            const searchable = card.dataset.search;
-            if (searchable.includes(term)) {
-                card.style.display = 'block';
-            } else {
-                card.style.display = 'none';
-            }
-        });
-    }
-    
-    // Export Functions
-    function exportToCSV() {
-        showToast('Exporting evidence records to CSV...', 'info');
-        
-        setTimeout(() => {
-            showToast('Evidence records exported successfully!', 'success');
-        }, 1500);
-    }
-    
-    // Toast notification
-    function showToast(message, type = 'info') {
-        const toast = document.createElement('div');
-        const toastId = 'toast-' + Date.now();
-        
-        let bgColor, icon;
-        switch(type) {
-            case 'success':
-                bgColor = 'bg-gradient-to-r from-green-500 to-green-600';
-                icon = 'fa-check-circle';
-                break;
-            case 'error':
-                bgColor = 'bg-gradient-to-r from-red-500 to-red-600';
-                icon = 'fa-exclamation-circle';
-                break;
-            default:
-                bgColor = 'bg-gradient-to-r from-blue-500 to-blue-600';
-                icon = 'fa-info-circle';
-        }
-        
-        toast.id = toastId;
-        toast.className = `fixed top-4 right-4 ${bgColor} text-white px-6 py-4 rounded-lg shadow-xl z-50 transform translate-x-full transition-transform duration-300 flex items-center gap-3`;
-        toast.innerHTML = `
-            <i class="fas ${icon}"></i>
-            <span class="font-medium">${message}</span>
-            <button onclick="document.getElementById('${toastId}').remove()" class="ml-4">
-                <i class="fas fa-times"></i>
-            </button>
-        `;
-        
-        document.body.appendChild(toast);
-        
-        setTimeout(() => {
-            toast.classList.remove('translate-x-full');
-            toast.classList.add('translate-x-0');
-        }, 10);
-        
-        setTimeout(() => {
-            toast.classList.remove('translate-x-0');
-            toast.classList.add('translate-x-full');
-            setTimeout(() => toast.remove(), 300);
-        }, 5000);
-    }
-    
-    // Initialize
-    document.addEventListener('DOMContentLoaded', function() {
-        filterByStatus('all');
-        
-        // Auto-expand textareas
-        document.querySelectorAll('textarea').forEach(textarea => {
-            textarea.style.height = 'auto';
-            textarea.style.height = (textarea.scrollHeight) + 'px';
+        <form id="filterForm" method="GET" class="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
+            <input type="hidden" name="module" value="case">
             
-            textarea.addEventListener('input', function() {
-                this.style.height = 'auto';
-                this.style.height = (this.scrollHeight) + 'px';
-            });
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                <select name="status" class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    <option value="">All Status</option>
+                    <option value="pending" <?php echo ($currentFilter['status'] ?? '') === 'pending' ? 'selected' : ''; ?>>Pending</option>
+                    <option value="pending_field_verification" <?php echo ($currentFilter['status'] ?? '') === 'pending_field_verification' ? 'selected' : ''; ?>>Pending Verification</option>
+                    <option value="assigned" <?php echo ($currentFilter['status'] ?? '') === 'assigned' ? 'selected' : ''; ?>>Assigned</option>
+                    <option value="investigating" <?php echo ($currentFilter['status'] ?? '') === 'investigating' ? 'selected' : ''; ?>>Investigating</option>
+                    <option value="resolved" <?php echo ($currentFilter['status'] ?? '') === 'resolved' ? 'selected' : ''; ?>>Resolved</option>
+                    <option value="referred" <?php echo ($currentFilter['status'] ?? '') === 'referred' ? 'selected' : ''; ?>>Referred</option>
+                    <option value="closed" <?php echo ($currentFilter['status'] ?? '') === 'closed' ? 'selected' : ''; ?>>Closed</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Classification</label>
+                <select name="category" class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    <option value="">All Types</option>
+                    <option value="Barangay Matter" <?php echo ($currentFilter['category'] ?? '') === 'Barangay Matter' ? 'selected' : ''; ?>>Barangay Matter</option>
+                    <option value="Police Matter" <?php echo ($currentFilter['category'] ?? '') === 'Police Matter' ? 'selected' : ''; ?>>Police Matter</option>
+                    <option value="Criminal" <?php echo ($currentFilter['category'] ?? '') === 'Criminal' ? 'selected' : ''; ?>>Criminal</option>
+                    <option value="Civil" <?php echo ($currentFilter['category'] ?? '') === 'Civil' ? 'selected' : ''; ?>>Civil</option>
+                    <option value="VAWC" <?php echo ($currentFilter['category'] ?? '') === 'VAWC' ? 'selected' : ''; ?>>VAWC</option>
+                    <option value="Minor" <?php echo ($currentFilter['category'] ?? '') === 'Minor' ? 'selected' : ''; ?>>Minor</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">From Date</label>
+                <input type="date" name="from_date" value="<?php echo $currentFilter['from_date'] ?? ''; ?>"
+                       class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">To Date</label>
+                <input type="date" name="to_date" value="<?php echo $currentFilter['to_date'] ?? ''; ?>"
+                       class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+            </div>
+            <div class="flex items-end space-x-2">
+                <button type="button" onclick="resetFilters()" 
+                        class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors flex items-center">
+                    <i class="fas fa-times mr-2"></i> Clear
+                </button>
+                <button type="button" onclick="applyFilters()" 
+                        class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center">
+                    <i class="fas fa-filter mr-2"></i> Filter
+                </button>
+            </div>
+        </form>
+    </div>
+    
+    <!-- Cases Table -->
+    <div class="glass-card rounded-xl p-6">
+        <div class="flex justify-between items-center mb-6">
+            <h3 class="text-xl font-bold text-gray-800">Case Reports</h3>
+            <div class="text-sm text-gray-600">
+                Showing 
+                <span id="currentPage"><?php echo $page; ?></span> 
+                of 
+                <span id="totalPages"><?php echo $total_pages; ?></span> 
+                pages
+            </div>
+        </div>
+        
+        <div class="overflow-x-auto">
+            <table class="w-full case-table">
+                <thead>
+                    <tr class="bg-gray-50">
+                        <th class="py-3 px-4 text-left text-gray-600 font-semibold">Case ID</th>
+                        <th class="py-3 px-4 text-left text-gray-600 font-semibold">Date Filed</th>
+                        <th class="py-3 px-4 text-left text-gray-600 font-semibold">Complainant</th>
+                        <th class="py-3 px-4 text-left text-gray-600 font-semibold">Category</th>
+                        <th class="py-3 px-4 text-left text-gray-600 font-semibold">Attachments</th>
+                        <th class="py-3 px-4 text-left text-gray-600 font-semibold">Status</th>
+                        <th class="py-3 px-4 text-left text-gray-600 font-semibold">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="casesTableBody">
+                    <?php if (!$db_error && $conn): ?>
+                    <!-- Show real data from PHP if connection is available -->
+                    <?php
+                    try {
+                        // Get filter parameters from URL
+                        $page = isset($_GET['page']) ? max(1, intval($_GET['page'])) : 1;
+                        
+                        $status = $_GET['status'] ?? '';
+                        $category = $_GET['category'] ?? '';
+                        $from_date = $_GET['from_date'] ?? '';
+                        $to_date = $_GET['to_date'] ?? '';
+                        
+                        $records_per_page = 10;
+                        $offset = ($page - 1) * $records_per_page;
+                        
+                        // Build the query with filters
+                        $where_clauses = [];
+                        $params = [];
+                        
+                        if (!empty($status)) {
+                            $where_clauses[] = "r.status = :status";
+                            $params[':status'] = $status;
+                        }
+                        
+                        if (!empty($category)) {
+                            $where_clauses[] = "r.category = :category";
+                            $params[':category'] = $category;
+                        }
+                        
+                        if (!empty($from_date)) {
+                            $where_clauses[] = "DATE(r.created_at) >= :from_date";
+                            $params[':from_date'] = $from_date;
+                        }
+                        
+                        if (!empty($to_date)) {
+                            $where_clauses[] = "DATE(r.created_at) <= :to_date";
+                            $params[':to_date'] = $to_date;
+                        }
+                        
+                        // REMOVED: Default filter showing only pending cases
+                        // This was causing pending cases to "disappear"
+                        // Now shows all cases when no filters are applied
+                        
+                        $where_sql = !empty($where_clauses) ? "WHERE " . implode(" AND ", $where_clauses) : "";
+                        
+                        // Get total count
+                        $count_sql = "SELECT COUNT(*) as total FROM reports r $where_sql";
+                        $count_stmt = $conn->prepare($count_sql);
+                        foreach ($params as $key => $value) {
+                            $count_stmt->bindValue($key, $value);
+                        }
+                        $count_stmt->execute();
+                        $total_records = $count_stmt->fetch(PDO::FETCH_ASSOC)['total'];
+                        $total_pages = ceil($total_records / $records_per_page);
+                        
+                        // Get cases with pagination
+                        $cases_sql = "SELECT r.*, 
+                                     CONCAT(u.first_name, ' ', u.last_name) as complainant_name,
+                                     (SELECT COUNT(*) FROM report_attachments ra WHERE ra.report_id = r.id) as attachment_count
+                                     FROM reports r 
+                                     LEFT JOIN users u ON r.user_id = u.id 
+                                     $where_sql
+                                     ORDER BY r.created_at DESC 
+                                     LIMIT :limit OFFSET :offset";
+                        
+                        $cases_stmt = $conn->prepare($cases_sql);
+                        
+                        // Bind all parameters
+                        foreach ($params as $key => $value) {
+                            $cases_stmt->bindValue($key, $value);
+                        }
+                        $cases_stmt->bindValue(':limit', $records_per_page, PDO::PARAM_INT);
+                        $cases_stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+                        $cases_stmt->execute();
+                        $cases = $cases_stmt->fetchAll(PDO::FETCH_ASSOC);
+                        
+                        if (count($cases) > 0) {
+                            foreach ($cases as $case) {
+                                $status_class = getStatusClass($case['status']);
+                                $status_text = getStatusText($case['status']);
+                                $category_class = getCategoryClass($case['category'] ?? '');
+                                
+                                echo '<tr class="hover:bg-gray-50 transition-colors">';
+                                echo '<td class="py-3 px-4">';
+                                echo '<span class="font-medium text-blue-600">#' . $case['id'] . '</span>';
+                                if (!empty($case['blotter_number'])) {
+                                    echo '<p class="text-xs text-green-600 mt-1">' . htmlspecialchars($case['blotter_number']) . '</p>';
+                                }
+                                echo '</td>';
+                                echo '<td class="py-3 px-4">' . date('M d, Y', strtotime($case['created_at'])) . '</td>';
+                                echo '<td class="py-3 px-4">' . htmlspecialchars($case['complainant_name'] ?? 'Unknown') . '</td>';
+                                echo '<td class="py-3 px-4">';
+                                echo '<span class="category-badge ' . $category_class . '">';
+                                echo htmlspecialchars($case['category'] ?? 'Uncategorized');
+                                echo '</span>';
+                                echo '</td>';
+                                echo '<td class="py-3 px-4">';
+                                if ($case['attachment_count'] > 0) {
+                                    echo '<div class="flex items-center">';
+                                    echo '<span class="mr-2 text-sm text-gray-600">' . $case['attachment_count'] . ' file(s)</span>';
+                                    echo '<button onclick="viewAttachments(' . $case['id'] . ')" class="text-blue-600 hover:text-blue-800 transition-colors" title="View attachments">';
+                                    echo '<i class="fas fa-paperclip"></i>';
+                                    echo '</button>';
+                                    echo '</div>';
+                                } else {
+                                    echo '<span class="text-gray-400 text-sm">No attachments</span>';
+                                }
+                                echo '</td>';
+                                echo '<td class="py-3 px-4">';
+                                echo '<span class="status-badge ' . $status_class . '">' . $status_text . '</span>';
+                                echo '</td>';
+                                echo '<td class="py-3 px-4">';
+                                echo '<div class="flex space-x-2">';
+                                echo '<button onclick="viewCaseDetails(' . $case['id'] . ')" class="px-3 py-1 bg-blue-100 text-blue-700 rounded-lg text-sm hover:bg-blue-200 transition-colors" title="View full report">';
+                                echo '<i class="fas fa-eye mr-1"></i> View';
+                                echo '</button>';
+                                if ($case['status'] === 'pending' || $case['status'] === 'pending_field_verification') {
+                                    echo '<button onclick="openAssignmentModal(' . $case['id'] . ')" class="px-3 py-1 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700 transition-colors" title="Assign to officer">';
+                                    echo '<i class="fas fa-user-check mr-1"></i> Assign';
+                                    echo '</button>';
+                                } else {
+                                    echo '<button class="px-3 py-1 bg-gray-300 text-gray-600 rounded-lg text-sm cursor-not-allowed" title="Already assigned">';
+                                    echo '<i class="fas fa-user-check mr-1"></i> Assigned';
+                                    echo '</button>';
+                                }
+                                echo '</div>';
+                                echo '</td>';
+                                echo '</tr>';
+                            }
+                        } else {
+                            echo '<tr><td colspan="7" class="py-8 text-center text-gray-500">No cases found matching your criteria.</td></tr>';
+                        }
+                        
+                    } catch (Exception $e) {
+                        echo '<tr><td colspan="7" class="py-8 text-center text-red-500">Error loading cases: ' . htmlspecialchars($e->getMessage()) . '</td></tr>';
+                    }
+                    ?>
+                    <?php else: ?>
+                    <!-- Show loading message if no connection -->
+                    <tr>
+                        <td colspan="7" class="py-8 text-center text-gray-500">
+                            <?php if ($db_error): ?>
+                            <i class="fas fa-exclamation-triangle text-red-500 text-4xl mb-4"></i>
+                            <p class="text-red-600">Database Connection Error</p>
+                            <p class="text-sm text-gray-500 mt-2"><?php echo htmlspecialchars($db_error); ?></p>
+                            <?php else: ?>
+                            <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mb-4"></div>
+                            <p>Connecting to database...</p>
+                            <?php endif; ?>
+                        </td>
+                    </tr>
+                    <?php endif; ?>
+                </tbody>
+            </table>
+        </div>
+        
+        <!-- Pagination -->
+        <div class="flex justify-center items-center mt-6 space-x-2" id="paginationContainer">
+            <?php if (!$db_error && $conn && isset($total_pages) && $total_pages > 1): ?>
+            <div class="flex items-center space-x-2">
+                <button onclick="changePage(<?php echo max(1, $page - 1); ?>)" 
+                        class="pagination-btn <?php echo $page <= 1 ? 'opacity-50 cursor-not-allowed' : ''; ?>">
+                    <i class="fas fa-chevron-left"></i>
+                </button>
+                
+                <?php 
+                $maxVisiblePages = 5;
+                $startPage = max(1, $page - floor($maxVisiblePages / 2));
+                $endPage = min($total_pages, $startPage + $maxVisiblePages - 1);
+                
+                if ($endPage - $startPage + 1 < $maxVisiblePages) {
+                    $startPage = max(1, $endPage - $maxVisiblePages + 1);
+                }
+                
+                for ($i = $startPage; $i <= $endPage; $i++): 
+                ?>
+                <button onclick="changePage(<?php echo $i; ?>)" 
+                        class="pagination-btn <?php echo $i == $page ? 'active' : ''; ?>">
+                    <?php echo $i; ?>
+                </button>
+                <?php endfor; ?>
+                
+                <button onclick="changePage(<?php echo min($total_pages, $page + 1); ?>)" 
+                        class="pagination-btn <?php echo $page >= $total_pages ? 'opacity-50 cursor-not-allowed' : ''; ?>">
+                    <i class="fas fa-chevron-right"></i>
+                </button>
+            </div>
+            <div class="text-gray-600 ml-4">
+                Page <?php echo $page; ?> of <?php echo $total_pages; ?> • <?php echo $total_records; ?> records
+            </div>
+            <?php elseif (!$db_error && $conn && isset($total_records)): ?>
+            <div class="text-gray-600">
+                Showing <?php echo $total_records; ?> records
+            </div>
+            <?php endif; ?>
+        </div>
+    </div>
+</div>
+
+<!-- Case Details Modal -->
+<div id="caseDetailsModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+        <div class="flex justify-between items-center p-6 border-b">
+            <h3 class="text-xl font-bold text-gray-800">Case Details</h3>
+            <button onclick="closeCaseDetailsModal()" class="text-gray-400 hover:text-gray-600">
+                <i class="fas fa-times text-2xl"></i>
+            </button>
+        </div>
+        
+        <div class="p-6 overflow-y-auto" id="caseDetailsContent">
+            <!-- Content will be loaded via AJAX -->
+        </div>
+        
+        <div class="p-6 border-t bg-gray-50 flex justify-end space-x-3 mt-auto">
+            <button onclick="closeCaseDetailsModal()" 
+                    class="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors">
+                Close
+            </button>
+            <button onclick="printCaseDetails()" 
+                    class="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+                <i class="fas fa-print mr-2"></i> Print
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Assignment Modal -->
+<div id="assignmentModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+        <div class="flex justify-between items-center p-6 border-b">
+            <h3 class="text-xl font-bold text-gray-800">Assign Case to Officer</h3>
+            <button onclick="closeAssignmentModal()" class="text-gray-400 hover:text-gray-600">
+                <i class="fas fa-times text-2xl"></i>
+            </button>
+        </div>
+        
+        <div class="p-6 overflow-y-auto" id="assignmentModalContent">
+            <!-- Content will be loaded directly from PHP -->
+            <div id="assignmentContent">
+                <?php if (!$db_error && $conn): ?>
+                <div class="mb-6">
+                    <h4 class="font-medium text-gray-800 mb-3">Select Officer Type</h4>
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-3 mb-6" id="officerTypeSelection">
+                        <div class="assignment-option active" data-type="all" onclick="updateOfficerTypeSelection(this, 'all')">
+                            <div class="flex items-center">
+                                <div class="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center mr-3">
+                                    <i class="fas fa-users text-gray-600"></i>
+                                </div>
+                                <div>
+                                    <h5 class="font-medium">All Officers</h5>
+                                    <p class="text-sm text-gray-600">Show everyone</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="assignment-option" data-type="lupon" onclick="updateOfficerTypeSelection(this, 'lupon')">
+                            <div class="flex items-center">
+                                <div class="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center mr-3">
+                                    <i class="fas fa-user-tie text-green-600"></i>
+                                </div>
+                                <div>
+                                    <h5 class="font-medium">Lupon Members</h5>
+                                    <p class="text-sm text-gray-600">Assign to barangay lupon</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="assignment-option" data-type="barangay_captain" onclick="updateOfficerTypeSelection(this, 'barangay_captain')">
+                            <div class="flex items-center">
+                                <div class="w-10 h-10 bg-yellow-100 rounded-lg flex items-center justify-center mr-3">
+                                    <i class="fas fa-user-tie text-yellow-600"></i>
+                                </div>
+                                <div>
+                                    <h5 class="font-medium">Barangay Captain</h5>
+                                    <p class="text-sm text-gray-600">Assign to Captain</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="assignment-option" data-type="tanod" onclick="updateOfficerTypeSelection(this, 'tanod')">
+                            <div class="flex items-center">
+                                <div class="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center mr-3">
+                                    <i class="fas fa-shield-alt text-blue-600"></i>
+                                </div>
+                                <div>
+                                    <h5 class="font-medium">Tanod</h5>
+                                    <p class="text-sm text-gray-600">Assign to barangay tanod</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="mb-6">
+                    <h4 class="font-medium text-gray-800 mb-3">Available Officers</h4>
+                    <div id="officerList" class="space-y-3">
+                        <?php 
+                        if (count($availableOfficers) > 0): 
+                            // Display officers
+                            $firstOfficer = true;
+                            foreach ($availableOfficers as $officer): 
+                                $officerName = htmlspecialchars($officer['first_name'] . ' ' . $officer['last_name']);
+                                $role = htmlspecialchars($officer['role']);
+                                $roleClass = 'role-badge ';
+                                $roleDisplay = '';
+                                
+                                switch($role) {
+                                    case 'lupon':
+                                    case 'lupon_member':
+                                        $roleClass .= 'lupon';
+                                        $roleDisplay = 'Lupon Member';
+                                        $officerType = 'lupon';
+                                        break;
+                                    case 'lupon_chairman':
+                                        $roleClass .= 'lupon';
+                                        $roleDisplay = 'Barangay Captain'; // Fallback mapping
+                                        $officerType = 'barangay_captain';
+                                        break;
+                                    case 'tanod':
+                                    case 'barangay_tanod':
+                                        $roleClass .= 'tanod';
+                                        $roleDisplay = 'Tanod';
+                                        $officerType = 'tanod';
+                                        break;
+                                    case 'barangay_captain':
+                                        $roleClass .= 'lupon';
+                                        $roleDisplay = 'Barangay Captain';
+                                        $officerType = 'barangay_captain';
+                                        break;
+                                    default:
+                                        $roleClass .= 'lupon';
+                                        $roleDisplay = $role;
+                                        $officerType = 'lupon';
+                                }
+                                
+                                // Get assigned case count for this officer
+                                $assignedCount = 0;
+                                try {
+                                    $countColumn = ($officerType == 'tanod') ? 'assigned_tanod' : 'assigned_lupon';
+                                    // Also check assigned_lupon_chairman if applicable
+                                    if ($role == 'lupon_chairman' || $role == 'barangay_captain') {
+                                        $countColumn = 'assigned_lupon_chairman';
+                                    }
+                                    
+                                    // Check if column exists or handle generic assignment
+                                    $countQuery = "SELECT COUNT(*) as count FROM reports WHERE $countColumn = :officer_id AND status NOT IN ('closed', 'resolved')";
+                                    $countStmt = $conn->prepare($countQuery);
+                                    $countStmt->bindValue(':officer_id', $officer['id']);
+                                    $countStmt->execute();
+                                    $result = $countStmt->fetch(PDO::FETCH_ASSOC);
+                                    $assignedCount = $result['count'] ?? 0;
+                                } catch (Exception $e) {
+                                    // Silently continue
+                                }
+                                
+                                $isOnline = !empty($officer['is_online']);
+                        ?>
+                        <div class="officer-item <?php echo $firstOfficer ? 'active' : ''; ?>" 
+                             data-officer-id="<?php echo $officer['id']; ?>" 
+                             data-officer-type="<?php echo $officerType; ?>"
+                             data-officer-role="<?php echo $role; ?>"
+                             onclick="selectOfficer(this)">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <h5 class="font-medium officer-name flex items-center">
+                                        <span class="online-indicator <?php echo $isOnline ? 'online-active' : 'online-offline'; ?>" 
+                                              title="<?php echo $isOnline ? 'Online' : 'Offline'; ?>"></span>
+                                        <?php echo $officerName; ?>
+                                    </h5>
+                                    <div class="flex items-center mt-1">
+                                        <span class="<?php echo $roleClass; ?> mr-2"><?php echo $roleDisplay; ?></span>
+                                        <span class="text-sm text-gray-600"><?php echo $assignedCount; ?> case(s) assigned</span>
+                                    </div>
+                                </div>
+                                <div class="text-right">
+                                    <span class="text-sm text-gray-500">Contact</span>
+                                    <div class="text-blue-600 font-medium text-sm">
+                                        <?php 
+                                        $contact = $officer['phone'] ?? $officer['email'] ?? 'N/A';
+                                        echo htmlspecialchars($contact);
+                                        ?>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <?php 
+                                $firstOfficer = false;
+                            endforeach; 
+                        else: 
+                        ?>
+                        <div class="text-center py-4">
+                            <i class="fas fa-users text-gray-400 text-3xl mb-2"></i>
+                            <p class="text-gray-600">No officers available</p>
+                            <p class="text-sm text-gray-500 mt-1">Please add officers in the system first.</p>
+                        </div>
+                        <?php endif; ?>
+                    </div>
+                </div>
+                
+                <div id="selectionInfo">
+                    <?php if (count($availableOfficers) > 0): 
+                        // Find first lupon officer for default selection
+                        $defaultOfficer = null;
+                        foreach ($availableOfficers as $officer) {
+                            $role = $officer['role'];
+                            if ($role == 'lupon' || $role == 'lupon_member' || $role == 'lupon_chairman' || $role == 'barangay_captain') {
+                                $defaultOfficer = $officer;
+                                break;
+                            }
+                        }
+                        if (!$defaultOfficer && count($availableOfficers) > 0) {
+                            $defaultOfficer = $availableOfficers[0];
+                        }
+                        if ($defaultOfficer):
+                    ?>
+                    <div class="bg-green-50 p-4 rounded-lg mb-4">
+                        <div class="flex items-center">
+                            <i class="fas fa-check-circle text-green-600 mr-2"></i>
+                            <span class="font-medium">Selected:</span>
+                            <span class="ml-2" id="selectedOfficerName">
+                                <?php echo htmlspecialchars($defaultOfficer['first_name'] . ' ' . $defaultOfficer['last_name']); ?>
+                            </span>
+                            <span class="ml-2 px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800" id="selectedOfficerRole">
+                                <?php 
+                                $role = $defaultOfficer['role'];
+                                if ($role === 'lupon_chairman') echo 'Barangay Captain';
+                                elseif ($role === 'barangay_captain') echo 'Barangay Captain';
+                                elseif ($role === 'tanod' || $role === 'barangay_tanod') echo 'Tanod';
+                                else echo 'Lupon Member';
+                                ?>
+                            </span>
+                        </div>
+                    </div>
+                    <?php endif; ?>
+                    <?php endif; ?>
+                </div>
+                <?php else: ?>
+                <div class="text-center py-8">
+                    <i class="fas fa-exclamation-triangle text-red-500 text-4xl mb-4"></i>
+                    <p class="text-red-600">Database Connection Error</p>
+                    <p class="text-sm text-gray-500 mt-2">Cannot load officers without database connection.</p>
+                </div>
+                <?php endif; ?>
+            </div>
+        </div>
+        
+        <div class="p-6 border-t bg-gray-50 flex justify-end space-x-3 mt-auto">
+            <button onclick="closeAssignmentModal()" 
+                    class="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors">
+                Cancel
+            </button>
+            <button onclick="submitAssignment()" 
+                    class="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+                <i class="fas fa-check mr-2"></i> Assign Case
+            </button>
+        </div>
+    </div>
+</div>
+
+<style>
+    /* Status Badges - Pill Style */
+    .status-badge {
+        padding: 0.25rem 0.75rem;
+        border-radius: 9999px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        white-space: nowrap;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid transparent;
+    }
+
+    .status-badge::before {
+        display: none;
+    }
+    
+    .status-pending {
+        background-color: #fff7ed;
+        color: #c2410c;
+        border-color: #fdba74;
+        font-size: 0.65rem; /* Smaller font for pending */
+    }
+    
+    .status-pending_field_verification {
+        background-color: #fff7ed;
+        color: #ea580c;
+        border-color: #fdba74;
+        white-space: normal;
+        text-align: center;
+        max-width: 140px;
+        line-height: 1.1;
+        font-size: 0.65rem; /* Smaller font */
+    }
+    
+    .status-assigned { 
+        background-color: #eff6ff;
+        color: #1d4ed8; 
+        border-color: #93c5fd;
+    }
+    
+    .status-investigating { 
+        background-color: #eef2ff;
+        color: #4338ca; 
+        border-color: #a5b4fc;
+    }
+    
+    .status-resolved { 
+        background-color: #f0fdf4;
+        color: #15803d; 
+        border-color: #86efac;
+    }
+    
+    .status-referred { 
+        background-color: #faf5ff;
+        color: #7e22ce; 
+        border-color: #d8b4fe;
+    }
+    
+    .status-closed { 
+        background-color: #f3f4f6;
+        color: #374151; 
+        border-color: #d1d5db;
+    }
+    
+    /* Category Badges - Pill Style */
+    .category-badge {
+        padding: 0.25rem 0.75rem;
+        border-radius: 9999px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: capitalize;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid transparent;
+    }
+
+    .category-badge::before {
+        display: none;
+    }
+    
+    /* User requested colors: incident (red), complain (blue), blotter (green) */
+    .category-incident, .category-police, .category-criminal, .category-vawc { 
+        background-color: #fee2e2;
+        color: #991b1b;
+        border-color: #ef4444;
+    }
+    
+    .category-complain, .category-barangay, .category-civil { 
+        background-color: #dbeafe;
+        color: #1e40af;
+        border-color: #3b82f6;
+    }
+    
+    .category-blotter, .category-minor { 
+        background-color: #dcfce7;
+        color: #166534;
+        border-color: #22c55e;
+    }
+    
+    .category-other { 
+        background-color: #f3f4f6;
+        color: #4b5563;
+        border-color: #d1d5db;
+    }
+
+    /* Online Indicators */
+    .online-indicator {
+        display: inline-block;
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        margin-right: 8px;
+        border: 2px solid #fff;
+        box-shadow: 0 0 0 1px #e5e7eb;
+    }
+    .online-active {
+        background-color: #22c55e; /* Green */
+        box-shadow: 0 0 0 1px #22c55e;
+    }
+    .online-offline {
+        background-color: #9ca3af; /* Gray */
+    }
+
+    /* Officer Selection Styles */
+    .assignment-option {
+        border: 1px solid #e5e7eb;
+        border: 1px solid #f472b6;
+    }
+    
+    .category-minor {
+        background-color: #fffbeb;
+        color: #b45309;
+        border: 1px solid #fbbf24;
+    }
+
+    /* Incident - Red */
+    .category-incident {
+        background-color: #fee2e2;
+        color: #991b1b;
+        border: 1px solid #ef4444;
+    }
+    
+    /* Blotter - Green */
+    .category-blotter {
+        background-color: #dcfce7;
+        color: #15803d;
+        border: 1px solid #4ade80;
+    }
+    
+    /* Complain - Blue */
+    .category-complain {
+        background-color: #dbeafe;
+        color: #1d4ed8;
+        border: 1px solid #60a5fa;
+    }
+    
+    .category-other {
+        background-color: #f3f4f6;
+        color: #374151;
+        border: 1px solid #d1d5db;
+    }
+    
+    /* Online Status Indicator */
+    .online-indicator {
+        height: 8px;
+        width: 8px;
+        border-radius: 50%;
+        display: inline-block;
+        margin-right: 6px;
+    }
+    .online-active { background-color: #10b981; } /* Green */
+    .online-offline { background-color: #9ca3af; } /* Gray */
+    
+    /* Pagination Styles */
+    .pagination-btn {
+        width: 2.5rem;
+        height: 2.5rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 0.5rem;
+        border: 1px solid #d1d5db;
+        background-color: white;
+        color: #374151;
+        transition: all 0.2s;
+        box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+        cursor: pointer;
+    }
+    
+    .pagination-btn:hover {
+        background-color: #f9fafb;
+    }
+    
+    .pagination-btn.active {
+        background-color: #2563eb;
+        color: white;
+        border-color: #2563eb;
+        font-weight: bold;
+    }
+    
+    .pagination-btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+    
+    /* Assignment Modal Styles */
+    .assignment-option {
+        border: 2px solid #e5e7eb;
+        border-radius: 0.75rem;
+        padding: 1rem;
+        cursor: pointer;
+        transition: all 0.3s;
+    }
+    
+    .assignment-option:hover {
+        border-color: #93c5fd;
+        background-color: #f0f9ff;
+    }
+    
+    .assignment-option.active {
+        border-color: #3b82f6;
+        background-color: #eff6ff;
+    }
+    
+    .officer-item {
+        border: 1px solid #e5e7eb;
+        border-radius: 0.75rem;
+        padding: 1rem;
+        cursor: pointer;
+        transition: all 0.3s;
+        display: none;
+    }
+    
+    .officer-item:hover {
+        border-color: #93c5fd;
+        background-color: #f0f9ff;
+    }
+    
+    .officer-item.active {
+        border-color: #3b82f6;
+        background-color: #eff6ff;
+        display: block !important;
+    }
+    
+    .officer-item[style*="display: block"] {
+        display: block !important;
+    }
+    
+    .role-badge {
+        padding: 0.25rem 0.5rem;
+        border-radius: 9999px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        display: inline-block;
+    }
+    
+    .role-badge.lupon {
+        background-color: #d1fae5;
+        color: #065f46;
+        border: 1px solid #34d399;
+    }
+    
+    .role-badge.tanod {
+        background-color: #dbeafe;
+        color: #1e40af;
+        border: 1px solid #60a5fa;
+    }
+    
+    /* Glass Card Effect */
+    .glass-card {
+        background-color: rgba(255, 255, 255, 0.8);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+    
+    /* Table Styles */
+    .case-table {
+        min-width: 100%;
+        border-collapse: separate;
+        border-spacing: 0;
+    }
+    
+    .case-table thead tr th {
+        text-align: left;
+        font-size: 0.75rem;
+        font-weight: 500;
+        color: #6b7280;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        padding: 0.75rem 1rem;
+    }
+    
+    .case-table tbody tr {
+        border-bottom: 1px solid #e5e7eb;
+    }
+    
+    .case-table tbody tr:hover {
+        background-color: #f9fafb;
+    }
+    
+    .case-table tbody tr td {
+        padding: 1rem;
+        white-space: nowrap;
+        font-size: 0.875rem;
+        color: #1f2937;
+        vertical-align: middle;
+    }
+</style>
+
+<!-- Blotter Number Modal -->
+<div id="blotterModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-2xl max-w-md w-full">
+        <div class="flex justify-between items-center p-6 border-b">
+            <h3 class="text-xl font-bold text-gray-800">Set Blotter Number</h3>
+            <button onclick="closeBlotterModal()" class="text-gray-400 hover:text-gray-600">
+                <i class="fas fa-times text-2xl"></i>
+            </button>
+        </div>
+        <div class="p-6">
+            <input type="hidden" id="blotterCaseId">
+            <div class="mb-4">
+                <label class="block text-gray-700 text-sm font-bold mb-2">Blotter Number</label>
+                <input type="text" id="blotterNumberInput" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Enter blotter number">
+                <p class="text-xs text-gray-500 mt-1">Format: YYYY-MM-XXXX</p>
+            </div>
+            <div class="flex justify-end space-x-3">
+                <button onclick="closeBlotterModal()" class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200">Cancel</button>
+                <button onclick="saveBlotterNumber()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Save</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+console.log('case.php script loaded at ' + new Date().toLocaleTimeString());
+
+// Blotter Number Functions
+function openBlotterModal(caseId, currentNumber = '') {
+    document.getElementById('blotterCaseId').value = caseId;
+    document.getElementById('blotterNumberInput').value = currentNumber;
+    const modal = document.getElementById('blotterModal');
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+}
+
+function closeBlotterModal() {
+    const modal = document.getElementById('blotterModal');
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+}
+
+function saveBlotterNumber() {
+    const caseId = document.getElementById('blotterCaseId').value;
+    const number = document.getElementById('blotterNumberInput').value;
+    
+    if (!number) {
+        alert('Please enter a blotter number');
+        return;
+    }
+    
+    const formData = new FormData();
+    formData.append('case_id', caseId);
+    formData.append('blotter_number', number);
+    
+    fetch('../../sec/modules/update_blotter.php', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('Blotter number updated successfully');
+            location.reload();
+        } else {
+            alert('Error: ' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('An error occurred');
+    });
+}
+// Page state variables, initialized by PHP
+let currentPage = <?php echo isset($page) ? $page : 1; ?>;
+let totalPages = <?php echo isset($total_pages) ? $total_pages : 1; ?>;
+
+// Assignment-related variables
+let selectedCaseId = null;
+let selectedOfficerId = null;
+let selectedOfficerType = 'lupon'; // Default to lupon
+let selectedOfficerRole = null;
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('DOM Content Loaded');
+    
+    // Update pagination display
+    document.getElementById('currentPage').textContent = currentPage;
+    document.getElementById('totalPages').textContent = totalPages;
+    
+    // Initialize officer selection
+    initializeOfficerSelection();
+});
+
+// Initialize officer selection
+function initializeOfficerSelection() {
+    console.log('Initializing officer selection');
+    
+    // Set default selection to all
+    const allOption = document.querySelector('.assignment-option[data-type="all"]');
+    if (allOption) {
+        updateOfficerTypeSelection(allOption, 'all');
+    }
+    
+    // Set up click handlers for officer items
+    document.querySelectorAll('.officer-item').forEach(item => {
+        item.addEventListener('click', function() {
+            selectOfficer(this);
         });
     });
+}
+
+// --- Major Page Navigation and Filtering ---
+
+function applyFilters() {
+    console.log('applyFilters called');
+    const form = document.getElementById('filterForm');
+    const formData = new FormData(form);
     
-    // Prevent form resubmission on refresh
-    if (window.history.replaceState) {
-        window.history.replaceState(null, null, window.location.href);
+    // Build query string
+    const params = new URLSearchParams();
+    
+    // Add module parameter
+    params.set('module', 'case');
+    
+    // Add all form values
+    if (formData.get('status')) params.set('status', formData.get('status'));
+    if (formData.get('category')) params.set('category', formData.get('category'));
+    if (formData.get('from_date')) params.set('from_date', formData.get('from_date'));
+    if (formData.get('to_date')) params.set('to_date', formData.get('to_date'));
+    
+    // Always reset to page 1 when applying a new filter
+    params.set('page', '1');
+    
+    console.log('Applying filters:', params.toString());
+    
+    // Reload the page with the new query string
+    window.location.href = window.location.pathname + '?' + params.toString();
+}
+
+function resetFilters() {
+    console.log('resetFilters called');
+    // Just reload the page with only module parameter
+    window.location.href = window.location.pathname + '?module=case';
+}
+
+function changePage(page) {
+    if (page < 1 || page > totalPages) return;
+    
+    const params = new URLSearchParams(window.location.search);
+    params.set('page', page);
+    params.set('module', 'case');
+    
+    window.location.href = window.location.pathname + '?' + params.toString();
+}
+
+function retryConnection() {
+    location.reload();
+}
+
+// --- Modals and Details ---
+
+function viewCaseDetails(caseId) {
+    const modal = document.getElementById('caseDetailsModal');
+    const content = document.getElementById('caseDetailsContent');
+    
+    content.innerHTML = '<div class="text-center py-8"><div class="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div><p class="mt-4">Loading case details...</p></div>';
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+    
+    // Fetch details from the corrected handler
+    fetch(`../../handlers/get_case_details.php?id=${caseId}`)
+        .then(response => response.text())
+        .then(data => {
+            content.innerHTML = data;
+        })
+        .catch(error => {
+            console.error('Error loading case details:', error);
+            content.innerHTML = `<div class="text-center py-8 text-red-600"><i class="fas fa-exclamation-triangle text-4xl mb-4"></i><p>Error loading details.</p><p class="text-sm">${error.message}</p></div>`;
+        });
+}
+
+function closeCaseDetailsModal() {
+    document.getElementById('caseDetailsModal').classList.add('hidden');
+}
+
+// --- Case Assignment Logic ---
+
+function openAssignmentModal(caseId) {
+    console.log('Opening assignment modal for case:', caseId);
+    selectedCaseId = caseId;
+    
+    // Set default selection to 'lupon' and update the list
+    const luponOption = document.querySelector('.assignment-option[data-type="lupon"]');
+    if (luponOption) {
+        updateOfficerTypeSelection(luponOption, 'lupon');
     }
-    </script>
-</body>
-</html>
+    
+    const modal = document.getElementById('assignmentModal');
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+}
+
+function closeAssignmentModal() {
+    document.getElementById('assignmentModal').classList.add('hidden');
+    selectedCaseId = null;
+    selectedOfficerId = null;
+    selectedOfficerType = 'lupon';
+}
+
+function updateOfficerTypeSelection(element, type) {
+    console.log('updateOfficerTypeSelection called with type:', type);
+    
+    // Update active style on type selector
+    document.querySelectorAll('.assignment-option').forEach(opt => {
+        opt.classList.remove('active');
+    });
+    element.classList.add('active');
+    
+    selectedOfficerType = type;
+    
+    // Show/hide officers based on type
+    const officerItems = document.querySelectorAll('.officer-item');
+    let hasVisibleOfficers = false;
+    
+    officerItems.forEach(item => {
+        const itemType = item.getAttribute('data-officer-type');
+        if (type === 'all' || itemType === type) {
+            item.style.display = 'block';
+            hasVisibleOfficers = true;
+        } else {
+            item.style.display = 'none';
+        }
+    });
+    
+    // Auto-select the first visible officer
+    if (hasVisibleOfficers) {
+        const firstVisible = document.querySelector('.officer-item[style*="display: block"]');
+        if (firstVisible) {
+            selectOfficer(firstVisible);
+        }
+    } else {
+        // Clear selection if no officers of this type
+        selectedOfficerId = null;
+        updateSelectionInfo();
+    }
+}
+
+function selectOfficer(element) {
+    console.log('selectOfficer called');
+    
+    // Update active style for all officers
+    document.querySelectorAll('.officer-item').forEach(item => {
+        item.classList.remove('active');
+    });
+    
+    // Set active for selected officer
+    element.classList.add('active');
+    
+    // Store selected officer data
+    selectedOfficerId = element.getAttribute('data-officer-id');
+    selectedOfficerRole = element.getAttribute('data-officer-role');
+    
+    console.log('Selected officer:', selectedOfficerId, selectedOfficerRole);
+    updateSelectionInfo();
+}
+
+function updateSelectionInfo() {
+    const infoDiv = document.getElementById('selectionInfo');
+    const selectedOfficerElement = document.querySelector('.officer-item.active');
+    
+    if (selectedOfficerElement && selectedOfficerId) {
+        const officerName = selectedOfficerElement.querySelector('.officer-name').textContent;
+        const roleDisplay = selectedOfficerElement.querySelector('.role-badge').textContent;
+        const roleClass = selectedOfficerElement.querySelector('.role-badge').className;
+        
+        infoDiv.innerHTML = `
+            <div class="bg-green-50 p-4 rounded-lg">
+                <div class="flex items-center flex-wrap">
+                    <i class="fas fa-check-circle text-green-600 mr-2"></i>
+                    <span class="font-medium">Selected:</span>
+                    <span class="ml-2 font-semibold">${officerName}</span>
+                    <span class="ml-2 px-2 py-1 rounded-full text-xs font-medium ${roleClass}">
+                        ${roleDisplay}
+                    </span>
+                </div>
+            </div>`;
+    } else {
+        infoDiv.innerHTML = `
+            <div class="bg-yellow-50 p-4 rounded-lg text-center">
+                <i class="fas fa-exclamation-circle text-yellow-600 mr-2"></i>
+                <span class="text-yellow-800">Please select an officer from the list.</span>
+            </div>`;
+    }
+}
+
+function submitAssignment() {
+    if (!selectedCaseId || !selectedOfficerId) {
+        alert('Please select a case and an officer before assigning.');
+        return;
+    }
+
+    if (!confirm(`Assign Case #${selectedCaseId} to the selected officer?`)) return;
+
+    const formData = new FormData();
+    formData.append('case_id', selectedCaseId);
+    formData.append('officer_id', selectedOfficerId);
+    formData.append('officer_type', selectedOfficerType);
+
+    fetch('../../handlers/assign_case.php', { 
+        method: 'POST', 
+        body: formData 
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error('Network response was not ok');
+        }
+        return response.json();
+    })
+    .then(data => {
+        if (data.success) {
+            alert('Case assigned successfully!');
+            location.reload();
+        } else {
+            alert('Assignment failed: ' + (data.message || 'Unknown error.'));
+        }
+    })
+    .catch(error => {
+        console.error('Assignment error:', error);
+        alert('An error occurred during assignment. See console for details.');
+    });
+}
+
+// --- Utility and Event Handlers ---
+
+function printCaseDetails() {
+    const content = document.getElementById('caseDetailsContent').innerHTML;
+    const printWindow = window.open('', '_blank');
+    printWindow.document.write('<html><head><title>Print Case</title><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"></head><body>' + content + '</body></html>');
+    printWindow.document.close();
+    setTimeout(() => printWindow.print(), 500);
+}
+
+function viewAttachments(reportId) {
+    alert('Attachment viewing for report #' + reportId + ' needs to be implemented.');
+}
+
+// Global event listeners for closing modals
+document.addEventListener('click', function(event) {
+    if (event.target == document.getElementById('caseDetailsModal')) {
+        closeCaseDetailsModal();
+    }
+    if (event.target == document.getElementById('assignmentModal')) {
+        closeAssignmentModal();
+    }
+});
+
+document.addEventListener('keydown', function(event) {
+    if (event.key === "Escape") {
+        closeCaseDetailsModal();
+        closeAssignmentModal();
+    }
+});
+</script>
+
+<?php
+// Helper functions for styling badges
+function getStatusClass($status) {
+    $classes = [
+        'pending' => 'status-pending',
+        'pending_field_verification' => 'status-pending_field_verification',
+        'assigned' => 'status-assigned',
+        'investigating' => 'status-investigating',
+        'resolved' => 'status-resolved',
+        'referred' => 'status-referred',
+        'closed' => 'status-closed',
+    ];
+    return $classes[$status] ?? 'status-pending';
+}
+
+function getStatusText($status) {
+    $texts = [
+        'pending' => 'Pending',
+        'pending_field_verification' => 'Pending Field Verification',
+        'assigned' => 'Assigned',
+        'investigating' => 'Investigating',
+        'resolved' => 'Resolved',
+        'referred' => 'Referred',
+        'closed' => 'Closed',
+    ];
+    return $texts[$status] ?? ucwords(str_replace('_', ' ', $status));
+}
+
+function getCategoryClass($category) {
+    $classes = [
+        'Barangay Matter' => 'category-barangay',
+        'Police Matter' => 'category-police',
+        'Criminal' => 'category-criminal',
+        'Civil' => 'category-civil',
+        'VAWC' => 'category-vawc',
+        'Minor' => 'category-minor',
+        'Incident' => 'category-incident',
+        'Blotter' => 'category-blotter',
+        'Complain' => 'category-complain',
+        'barangay matter' => 'category-barangay',
+        'police matter' => 'category-police',
+        'criminal' => 'category-criminal',
+        'civil' => 'category-civil',
+        'vawc' => 'category-vawc',
+        'minor' => 'category-minor',
+        'incident' => 'category-incident',
+        'blotter' => 'category-blotter',
+        'complain' => 'category-complain',
+    ];
+    return $classes[$category] ?? 'category-other';
+}
+?>
