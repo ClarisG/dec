@@ -2,13 +2,14 @@
 // Fixed path: from modules folder to config folder
 require_once __DIR__ . '/../../config/database.php';
 
-// Only start session if not already started
-if (session_status() === PHP_SESSION_NONE) {
+// Only start session if not already started and not being included
+if (!isset($_SESSION) && session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-// Check if user is logged in - allow multiple roles (tanod AND secretary)
-if (!isset($_SESSION['user_id']) || !in_array($_SESSION['role'], ['tanod', 'secretary', 'admin', 'super_admin', 'captain'])) {
+// Check if user is logged in and is a tanod
+// But only redirect if not being included in another dashboard
+if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'tanod') {
     // Check if we're being included as a module
     $is_included = (strpos($_SERVER['PHP_SELF'], 'secretary_dashboard.php') !== false) 
                    || (strpos($_SERVER['PHP_SELF'], 'modules/case.php') !== false);
@@ -17,20 +18,15 @@ if (!isset($_SESSION['user_id']) || !in_array($_SESSION['role'], ['tanod', 'secr
         header('Location: ../../index.php');
         exit();
     } else {
-        // If included but not authorized, just show access denied
-        echo "<div class='bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4'>
-                <strong>Access Denied:</strong> You need Tanod or Secretary privileges to access this module.
-              </div>";
+        // If included but not a tanod, just show access denied
+        echo "<div class='alert alert-danger'>Access Denied: Tanod privileges required.</div>";
         exit();
     }
 }
 
-$user_id = $_SESSION['user_id'];
-$user_name = $_SESSION['first_name'] . ' ' . $_SESSION['last_name'];
+$tanod_id = $_SESSION['user_id'];
+$tanod_name = $_SESSION['first_name'] . ' ' . $_SESSION['last_name'];
 $user_role = $_SESSION['role'];
-
-// Check if user is Tanod (for form submission)
-$is_tanod = ($user_role === 'tanod');
 
 // Get database connection
 try {
@@ -63,8 +59,8 @@ try {
 
 // Handle form submission for new evidence handover (Tanod only)
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_handover'])) {
-    if (!$is_tanod) {
-        $error_message = "❌ Only Tanods can submit evidence handovers.";
+    if ($user_role !== 'tanod') {
+        $error_message = "Only Tanods can submit evidence handovers.";
     } else {
         $item_description = trim($_POST['item_description']);
         $item_type = trim($_POST['item_type']);
@@ -93,7 +89,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_handover'])) {
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending_acknowledgement', NOW())
                 ");
                 $stmt->execute([
-                    $user_id, 
+                    $tanod_id, 
                     $item_description, 
                     $item_type, 
                     $handover_to, 
@@ -128,7 +124,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_handover'])) {
                 $notif_stmt->execute([
                     $handover_to,
                     '📦 New Evidence Handover',
-                    "Tanod $user_name has submitted evidence for your acknowledgement ($evidence_code)",
+                    "Tanod $tanod_name has submitted evidence for your acknowledgement ($evidence_code)",
                     $handover_id
                 ]);
                 
@@ -144,13 +140,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_handover'])) {
                     $notif_stmt->execute([
                         $admin['id'],
                         '📦 Evidence Handover Submitted',
-                        "Tanod $user_name submitted evidence to $recipient_name ($evidence_code)",
+                        "Tanod $tanod_name submitted evidence to $recipient_name ($evidence_code)",
                         $handover_id
                     ]);
                 }
                 
                 // Log activity
-                addActivityLog($pdo, $user_id, 'evidence_handover', 
+                addActivityLog($pdo, $tanod_id, 'evidence_handover', 
                     "Submitted evidence handover #$handover_id: $item_type");
                 
                 // If case_id is provided and cases table exists, update case evidence count
@@ -180,17 +176,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_handover'])) {
 
 // Fetch relevant handover records based on user role
 try {
-    // Get total count for pagination
     if ($user_role === 'tanod') {
-        // Tanods see their own handovers
+        // Get total count for pagination
         $count_stmt = $pdo->prepare("
             SELECT COUNT(*) as total
             FROM evidence_handovers eh
             WHERE eh.tanod_id = ?
         ");
-        $count_stmt->execute([$user_id]);
+        $count_stmt->execute([$tanod_id]);
+        $total_result = $count_stmt->fetch(PDO::FETCH_ASSOC);
+        $total_records = $total_result['total'];
+        $total_pages = ceil($total_records / $per_page);
         
-        $main_query = "
+        // Tanods see their own handovers with pagination
+        $stmt = $pdo->prepare("
             SELECT eh.*, 
                    u_tanod.first_name as tanod_first, u_tanod.last_name as tanod_last,
                    u_recipient.first_name as recipient_first, u_recipient.last_name as recipient_last,
@@ -206,49 +205,14 @@ try {
             WHERE eh.tanod_id = ?
             ORDER BY eh.handover_date DESC
             LIMIT ? OFFSET ?
-        ";
-    } else {
-        // Secretaries, admins, captains see handovers where they are recipients
-        $count_stmt = $pdo->prepare("
-            SELECT COUNT(*) as total
-            FROM evidence_handovers eh
-            WHERE eh.handover_to = ?
         ");
-        $count_stmt->execute([$user_id]);
+        $stmt->bindValue(1, $tanod_id, PDO::PARAM_INT);
+        $stmt->bindValue(2, $per_page, PDO::PARAM_INT);
+        $stmt->bindValue(3, $offset, PDO::PARAM_INT);
+        $stmt->execute();
+        $handovers = $stmt->fetchAll(PDO::FETCH_ASSOC);
         
-        $main_query = "
-            SELECT eh.*, 
-                   u_tanod.first_name as tanod_first, u_tanod.last_name as tanod_last,
-                   u_recipient.first_name as recipient_first, u_recipient.last_name as recipient_last,
-                   u_recipient.role as recipient_role,
-                   u_recipient.barangay_position as recipient_position,
-                   u_acknowledged.first_name as acknowledged_first, u_acknowledged.last_name as acknowledged_last,
-                   c.case_number, c.title as case_title
-            FROM evidence_handovers eh
-            JOIN users u_tanod ON eh.tanod_id = u_tanod.id
-            JOIN users u_recipient ON eh.handover_to = u_recipient.id
-            LEFT JOIN users u_acknowledged ON eh.acknowledged_by = u_acknowledged.id
-            LEFT JOIN cases c ON eh.case_id = c.id
-            WHERE eh.handover_to = ?
-            ORDER BY eh.handover_date DESC
-            LIMIT ? OFFSET ?
-        ";
-    }
-    
-    $total_result = $count_stmt->fetch(PDO::FETCH_ASSOC);
-    $total_records = $total_result['total'];
-    $total_pages = ceil($total_records / $per_page);
-    
-    // Fetch handovers with pagination
-    $stmt = $pdo->prepare($main_query);
-    $stmt->bindValue(1, $user_id, PDO::PARAM_INT);
-    $stmt->bindValue(2, $per_page, PDO::PARAM_INT);
-    $stmt->bindValue(3, $offset, PDO::PARAM_INT);
-    $stmt->execute();
-    $handovers = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    
-    // Fetch secretaries and admins for dropdown (Tanod only)
-    if ($is_tanod) {
+        // Fetch secretaries and admins for dropdown (Tanod only)
         $recipient_stmt = $pdo->prepare("
             SELECT id, CONCAT(first_name, ' ', last_name) as full_name, role, barangay_position 
             FROM users 
@@ -643,10 +607,10 @@ function generatePageUrl($page) {
                 <div class="flex items-center gap-3">
                     <div class="text-right">
                         <p class="text-sm text-gray-600">Logged in as</p>
-                        <p class="font-semibold text-gray-900"><?php echo htmlspecialchars($user_name); ?></p>
-                        <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full <?php echo $is_tanod ? 'bg-primary-100 text-primary-700' : 'bg-green-100 text-green-700'; ?> text-xs font-medium">
-                            <i class="fas <?php echo $is_tanod ? 'fa-shield-alt' : 'fa-file-alt'; ?>"></i>
-                            <?php echo ucfirst($user_role); ?>
+                        <p class="font-semibold text-gray-900"><?php echo htmlspecialchars($tanod_name); ?></p>
+                        <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-primary-100 text-primary-700 text-xs font-medium">
+                            <i class="fas fa-shield-alt"></i>
+                            Tanod
                         </span>
                     </div>
                     <div class="w-12 h-12 rounded-full bg-gradient-to-r from-primary-500 to-primary-700 flex items-center justify-center text-white font-bold">
@@ -752,8 +716,7 @@ function generatePageUrl($page) {
 
         <!-- Main Content Grid -->
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <?php if ($is_tanod): ?>
-            <!-- Left Column: New Handover Form (Only for Tanods) -->
+            <!-- Left Column: New Handover Form -->
             <div class="lg:col-span-1">
                 <div class="glass-morphism rounded-2xl p-6 h-full">
                     <div class="flex items-center justify-between mb-6">
@@ -931,17 +894,16 @@ function generatePageUrl($page) {
                     </div>
                 </div>
             </div>
-            <?php endif; ?>
             
             <!-- Right Column: Evidence Records -->
-            <div class="<?php echo $is_tanod ? 'lg:col-span-2' : 'lg:col-span-3'; ?>">
+            <div class="lg:col-span-2">
                 <div class="glass-morphism rounded-2xl p-6">
                     <!-- Header -->
                     <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
                         <div>
                             <h2 class="text-xl font-bold text-gray-900 mb-2 flex items-center gap-2">
                                 <i class="fas fa-history text-primary-600"></i>
-                                <?php echo $is_tanod ? 'My Evidence Handovers' : 'Evidence Handovers Assigned to Me'; ?>
+                                My Evidence Handovers
                             </h2>
                             <div class="flex flex-wrap items-center gap-3">
                                 <p class="text-gray-600">
@@ -1003,17 +965,13 @@ function generatePageUrl($page) {
                             </div>
                             <h3 class="text-2xl font-bold text-gray-800 mb-4">No Evidence Handovers Found</h3>
                             <p class="text-gray-600 max-w-md mx-auto mb-8">
-                                <?php echo $is_tanod ? 
-                                    'Start by submitting your first evidence handover. Ensure proper documentation and chain of custody for all evidence transfers.' : 
-                                    'No evidence has been handed over to you yet. When Tanods submit evidence handovers to you, they will appear here.'; ?>
+                                Start by submitting your first evidence handover. Ensure proper documentation and chain of custody for all evidence transfers.
                             </p>
-                            <?php if ($is_tanod): ?>
                             <button onclick="document.getElementById('handoverForm').scrollIntoView({behavior: 'smooth'})"
                                     class="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-primary-600 to-primary-700 text-white font-semibold rounded-lg hover:from-primary-700 hover:to-primary-800 transition shadow-md hover:shadow-lg">
                                 <i class="fas fa-plus"></i>
                                 Log First Evidence
                             </button>
-                            <?php endif; ?>
                         </div>
                     <?php else: ?>
                         <!-- Evidence Cards -->
@@ -1229,7 +1187,7 @@ function generatePageUrl($page) {
     <!-- JavaScript -->
     <script>
     // Character counter for description
-    document.getElementById('itemDescription')?.addEventListener('input', function() {
+    document.getElementById('itemDescription').addEventListener('input', function() {
         const charCount = this.value.length;
         document.getElementById('charCount').textContent = charCount + ' characters';
         
@@ -1242,63 +1200,57 @@ function generatePageUrl($page) {
         }
     });
     
-    // Form validation (only for Tanods)
-    const handoverForm = document.getElementById('handoverForm');
-    if (handoverForm) {
-        handoverForm.addEventListener('submit', function(e) {
-            let isValid = true;
-            
-            // Validate evidence type
-            const itemType = document.getElementById('itemType');
-            if (!itemType.value) {
-                itemType.classList.add('border-red-500');
-                isValid = false;
-            } else {
-                itemType.classList.remove('border-red-500');
-            }
-            
-            // Validate description
-            const description = document.getElementById('itemDescription');
-            if (description.value.length < 20) {
-                document.getElementById('descriptionError').classList.remove('hidden');
-                description.classList.add('border-red-500');
-                isValid = false;
-            } else {
-                document.getElementById('descriptionError').classList.add('hidden');
-                description.classList.remove('border-red-500');
-            }
-            
-            // Validate recipient
-            const recipient = document.getElementById('handoverTo');
-            if (!recipient.value) {
-                recipient.classList.add('border-red-500');
-                isValid = false;
-            } else {
-                recipient.classList.remove('border-red-500');
-            }
-            
-            if (!isValid) {
-                e.preventDefault();
-                showToast('Please fix the errors in the form before submitting.', 'error');
-            } else {
-                // Show loading state
-                const submitBtn = document.getElementById('submitBtn');
-                const originalText = submitBtn.innerHTML;
-                submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Processing...';
-                submitBtn.disabled = true;
-            }
-        });
-    }
+    // Form validation
+    document.getElementById('handoverForm').addEventListener('submit', function(e) {
+        let isValid = true;
+        
+        // Validate evidence type
+        const itemType = document.getElementById('itemType');
+        if (!itemType.value) {
+            itemType.classList.add('border-red-500');
+            isValid = false;
+        } else {
+            itemType.classList.remove('border-red-500');
+        }
+        
+        // Validate description
+        const description = document.getElementById('itemDescription');
+        if (description.value.length < 20) {
+            document.getElementById('descriptionError').classList.remove('hidden');
+            description.classList.add('border-red-500');
+            isValid = false;
+        } else {
+            document.getElementById('descriptionError').classList.add('hidden');
+            description.classList.remove('border-red-500');
+        }
+        
+        // Validate recipient
+        const recipient = document.getElementById('handoverTo');
+        if (!recipient.value) {
+            recipient.classList.add('border-red-500');
+            isValid = false;
+        } else {
+            recipient.classList.remove('border-red-500');
+        }
+        
+        if (!isValid) {
+            e.preventDefault();
+            showToast('Please fix the errors in the form before submitting.', 'error');
+        } else {
+            // Show loading state
+            const submitBtn = document.getElementById('submitBtn');
+            const originalText = submitBtn.innerHTML;
+            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Processing...';
+            submitBtn.disabled = true;
+        }
+    });
     
-    // Reset form (only for Tanods)
-    const resetBtn = document.getElementById('resetBtn');
-    if (resetBtn) {
-        resetBtn.addEventListener('click', function() {
-            document.querySelectorAll('.border-red-500').forEach(el => el.classList.remove('border-red-500'));
-            document.getElementById('descriptionError')?.classList.add('hidden');
-            document.getElementById('charCount').textContent = '0 characters';
-        });
-    }
+    // Reset form
+    document.getElementById('resetBtn').addEventListener('click', function() {
+        document.querySelectorAll('.border-red-500').forEach(el => el.classList.remove('border-red-500'));
+        document.getElementById('descriptionError').classList.add('hidden');
+        document.getElementById('charCount').textContent = '0 characters';
+    });
     
     // Filter Functions
     function filterByStatus(status) {
