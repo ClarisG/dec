@@ -1,756 +1,820 @@
 <?php
+// sec/secretary_dashboard.php - UPDATED VERSION WITH LEIR LOGO
 session_start();
-require_once 'config/database.php';
 
-// Check if user is logged in and has secretary role
+// Check if user is logged in and is secretary
 if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'secretary') {
-    header('Location: login.php');
-    exit();
+    header("Location: ../login.php");
+    exit;
 }
 
+// Include database configuration
+require_once '../config/database.php';
+
+// Get secretary information
 $user_id = $_SESSION['user_id'];
-$barangay = $_SESSION['barangay'] ?? '';
+$user_name = $_SESSION['first_name'] . ' ' . $_SESSION['last_name'];
 
 // Database connection
-$conn = new mysqli(DB_HOST, DB_USER, DB_PASS, DB_NAME);
-if ($conn->connect_error) {
-    die("Connection failed: " . $conn->connect_error);
+try {
+    $conn = getDbConnection();
+} catch(PDOException $e) {
+    die("Database connection failed: " . $e->getMessage());
 }
 
-// Initialize variables
-$message = '';
-$error = '';
-$current_date = date('Y-m-d');
+// Handle module switching
+$module = isset($_GET['module']) ? $_GET['module'] : 'dashboard';
+$valid_modules = ['dashboard', 'case', 'compliance', 'documents', 'referral', 'profile', 'classification_review'];
+if (!in_array($module, $valid_modules)) {
+    $module = 'dashboard';
+}
 
-// Handle form submissions
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    if (isset($_POST['update_report_status'])) {
-        // Update report status
-        $report_id = intval($_POST['report_id']);
-        $new_status = $conn->real_escape_string($_POST['status']);
-        $notes = $conn->real_escape_string($_POST['notes'] ?? '');
-        
-        // Check if report belongs to secretary's barangay
-        $check_sql = "SELECT id FROM reports WHERE id = ? AND barangay = ?";
-        $check_stmt = $conn->prepare($check_sql);
-        $check_stmt->bind_param("is", $report_id, $barangay);
-        $check_stmt->execute();
-        $check_stmt->store_result();
-        
-        if ($check_stmt->num_rows > 0) {
-            // Update report status
-            $update_sql = "UPDATE reports SET status = ?, updated_at = NOW() WHERE id = ?";
-            $update_stmt = $conn->prepare($update_sql);
-            $update_stmt->bind_param("si", $new_status, $report_id);
-            
-            // Add to status history
-            $history_sql = "INSERT INTO report_status_history (report_id, status, updated_by, notes, created_at) 
-                           VALUES (?, ?, ?, ?, NOW())";
-            $history_stmt = $conn->prepare($history_sql);
-            $history_stmt->bind_param("isis", $report_id, $new_status, $user_id, $notes);
-            
-            if ($update_stmt->execute() && $history_stmt->execute()) {
-                $message = "Report status updated successfully!";
-                
-                // Create notification for report owner
-                $notif_sql = "INSERT INTO user_notifications (user_id, title, message, type, related_id, related_type, created_at)
-                             SELECT user_id, 'Report Status Updated', 'Your report status has been changed to: $new_status', 
-                             'info', ?, 'report', NOW() FROM reports WHERE id = ?";
-                $notif_stmt = $conn->prepare($notif_sql);
-                $notif_stmt->bind_param("ii", $report_id, $report_id);
-                $notif_stmt->execute();
-            } else {
-                $error = "Failed to update report status: " . $conn->error;
-            }
-        } else {
-            $error = "Report not found or unauthorized access!";
-        }
-    }
+// Handle actions based on module
+if ($module == 'case' && isset($_POST['assign_case'])) {
+    // Handle case assignment
+    $case_id = $_POST['case_id'];
+    $lupon_member = $_POST['lupon_member'];
     
-    if (isset($_POST['create_announcement'])) {
-        // Create new announcement
-        $title = $conn->real_escape_string($_POST['title']);
-        $content = $conn->real_escape_string($_POST['content']);
-        $priority = $conn->real_escape_string($_POST['priority']);
-        $target_role = $conn->real_escape_string($_POST['target_role']);
-        $is_emergency = isset($_POST['is_emergency']) ? 1 : 0;
-        $is_pinned = isset($_POST['is_pinned']) ? 1 : 0;
+    try {
+        $stmt = $conn->prepare("UPDATE reports SET assigned_lupon = :lupon, status = 'processing', assigned_at = NOW() WHERE id = :id");
+        $stmt->execute([':lupon' => $lupon_member, ':id' => $case_id]);
         
-        // Get user info for posted_by
-        $user_sql = "SELECT CONCAT(first_name, ' ', last_name) as full_name FROM users WHERE id = ?";
-        $user_stmt = $conn->prepare($user_sql);
-        $user_stmt->bind_param("i", $user_id);
-        $user_stmt->execute();
-        $user_result = $user_stmt->get_result();
-        $user_row = $user_result->fetch_assoc();
-        $posted_by = $user_row['full_name'];
-        
-        $announcement_sql = "INSERT INTO announcements (title, content, priority, target_role, barangay, 
-                           is_emergency, is_pinned, posted_by, created_at) 
-                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())";
-        $announcement_stmt = $conn->prepare($announcement_sql);
-        $announcement_stmt->bind_param("sssssiss", $title, $content, $priority, $target_role, 
-                                      $barangay, $is_emergency, $is_pinned, $posted_by);
-        
-        if ($announcement_stmt->execute()) {
-            $message = "Announcement created successfully!";
-            
-            // Log activity
-            $activity_sql = "INSERT INTO activity_logs (user_id, action, description, ip_address, created_at)
-                           VALUES (?, 'announcement_create', ?, ?, NOW())";
-            $activity_stmt = $conn->prepare($activity_sql);
-            $description = "Created announcement: $title";
-            $ip_address = $_SERVER['REMOTE_ADDR'];
-            $activity_stmt->bind_param("iss", $user_id, $description, $ip_address);
-            $activity_stmt->execute();
-        } else {
-            $error = "Failed to create announcement: " . $conn->error;
-        }
-    }
-    
-    if (isset($_POST['update_announcement'])) {
-        // Update announcement status
-        $announcement_id = intval($_POST['announcement_id']);
-        $is_active = isset($_POST['is_active']) ? 1 : 0;
-        
-        $update_sql = "UPDATE announcements SET is_active = ?, updated_at = NOW() WHERE id = ? AND barangay = ?";
-        $update_stmt = $conn->prepare($update_sql);
-        $update_stmt->bind_param("iis", $is_active, $announcement_id, $barangay);
-        
-        if ($update_stmt->execute()) {
-            $message = "Announcement updated successfully!";
-        } else {
-            $error = "Failed to update announcement: " . $conn->error;
-        }
+        $_SESSION['success'] = "Case #$case_id assigned to $lupon_member successfully!";
+        header("Location: secretary_dashboard.php?module=case");
+        exit;
+    } catch(PDOException $e) {
+        $_SESSION['error'] = "Failed to assign case: " . $e->getMessage();
     }
 }
 
-// Fetch dashboard statistics
-$stats_sql = "SELECT 
-    (SELECT COUNT(*) FROM reports WHERE barangay = ? AND status = 'pending') as pending_reports,
-    (SELECT COUNT(*) FROM reports WHERE barangay = ? AND status = 'assigned') as assigned_reports,
-    (SELECT COUNT(*) FROM reports WHERE barangay = ? AND status = 'investigating') as investigating_reports,
-    (SELECT COUNT(*) FROM reports WHERE barangay = ? AND status = 'resolved') as resolved_reports,
-    (SELECT COUNT(*) FROM announcements WHERE barangay = ? AND is_active = 1) as active_announcements,
-    (SELECT COUNT(*) FROM users WHERE barangay = ? AND user_type = 'citizen' AND status = 'active') as total_citizens";
+// Get user data including profile picture
+$user_query = "SELECT u.*, 
+                      IFNULL(u.barangay, 'Not specified') as barangay_display,
+                      u.permanent_address as user_address,
+                      u.profile_picture,
+                      u.is_active
+               FROM users u 
+               WHERE u.id = :id";
+$user_stmt = $conn->prepare($user_query);
+$user_stmt->execute([':id' => $user_id]);
+$user_data = $user_stmt->fetch(PDO::FETCH_ASSOC);
 
-$stats_stmt = $conn->prepare($stats_sql);
-$stats_stmt->bind_param("ssssss", $barangay, $barangay, $barangay, $barangay, $barangay, $barangay);
-$stats_stmt->execute();
-$stats_result = $stats_stmt->get_result();
-$stats = $stats_result->fetch_assoc();
+if ($user_data) {
+    $is_active = $user_data['is_active'] ?? 1;
+    $_SESSION['permanent_address'] = $user_data['user_address'];
+    $_SESSION['barangay'] = $user_data['barangay_display'];
+    $user_address = $user_data['user_address'];
+    $profile_picture = $user_data['profile_picture'];
+} else {
+    $is_active = 1;
+    $user_address = '';
+    $profile_picture = '';
+}
 
-// Fetch recent reports (last 10)
-$reports_sql = "SELECT r.*, rt.type_name, u.first_name, u.last_name 
-                FROM reports r 
-                JOIN report_types rt ON r.report_type_id = rt.id 
-                JOIN users u ON r.user_id = u.id 
-                WHERE r.barangay = ? 
-                ORDER BY r.created_at DESC 
-                LIMIT 10";
-$reports_stmt = $conn->prepare($reports_sql);
-$reports_stmt->bind_param("s", $barangay);
-$reports_stmt->execute();
-$reports_result = $reports_stmt->get_result();
+// Get statistics for dashboard
+$stats = [];
+if ($module == 'dashboard') {
+    // Pending cases
+    $pending_query = "SELECT COUNT(*) as count FROM reports WHERE status = 'pending'";
+    $pending_stmt = $conn->prepare($pending_query);
+    $pending_stmt->execute();
+    $stats['pending_cases'] = $pending_stmt->fetchColumn();
+        // Add classification review stats
+    $review_stats_query = "SELECT COUNT(*) as count FROM reports 
+                          WHERE (ai_classification IS NOT NULL AND classification_override IS NULL) 
+                          AND status IN ('pending', 'pending_field_verification')";
+    $review_stats_stmt = $conn->prepare($review_stats_query);
+    $review_stats_stmt->execute();
+    $stats['pending_reviews'] = $review_stats_stmt->fetchColumn();
+    
+    // Approaching deadline (cases filed > 12 days ago)
+    $deadline_query = "SELECT COUNT(*) as count FROM reports WHERE status IN ('pending', 'assigned', 'investigating') 
+                      AND DATEDIFF(NOW(), created_at) >= 12";
+    $deadline_stmt = $conn->prepare($deadline_query);
+    $deadline_stmt->execute();
+    $stats['approaching_deadline'] = $deadline_stmt->fetchColumn();
+    
+    // Total reports
+    $total_reports_query = "SELECT COUNT(*) as count FROM reports";
+    $total_reports_stmt = $conn->prepare($total_reports_query);
+    $total_reports_stmt->execute();
+    $stats['total_reports'] = $total_reports_stmt->fetchColumn();
+    
+    // Recent announcements
+    $announce_query = "SELECT * FROM announcements 
+                      WHERE (target_role = 'secretary' OR target_role = 'all')
+                      AND is_active = 1
+                      ORDER BY created_at DESC 
+                      LIMIT 5";
+    $announce_stmt = $conn->prepare($announce_query);
+    $announce_stmt->execute();
+    $announcements = $announce_stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+    // Get recent reports for secretary
+    $recent_reports_query = "SELECT r.*, u.first_name, u.last_name 
+                            FROM reports r 
+                            LEFT JOIN users u ON r.user_id = u.id 
+                            ORDER BY r.created_at DESC 
+                            LIMIT 5";
+    $recent_stmt = $conn->prepare($recent_reports_query);
+    $recent_stmt->execute();
+    $recent_stmt->execute();
+    $recent_reports = $recent_stmt->fetchAll(PDO::FETCH_ASSOC);
+    $recent_stmt->closeCursor();
+}
 
-// Fetch active announcements
-$announcements_sql = "SELECT * FROM announcements 
-                     WHERE barangay = ? AND is_active = 1 
-                     ORDER BY is_pinned DESC, created_at DESC 
-                     LIMIT 5";
-$announcements_stmt = $conn->prepare($announcements_sql);
-$announcements_stmt->bind_param("s", $barangay);
-$announcements_stmt->execute();
-$announcements_result = $announcements_stmt->get_result();
+// Function to get module title
+function getModuleTitle($module) {
+    $titles = [
+        'dashboard' => 'Dashboard Overview',
+        'case' => 'Case & Blotter Management',
+        'compliance' => 'Compliance Monitoring',
+        'documents' => 'Document Generation',
+        'referral' => 'External Referral Desk',
+        'classification_review' => 'Report Classification Review',
+        'profile' => 'Profile Account'
+    ];
+    return $titles[$module] ?? 'Dashboard';
+}
 
-// Fetch report types for filtering
-$report_types_sql = "SELECT * FROM report_types ORDER BY category, type_name";
-$report_types_result = $conn->query($report_types_sql);
-
-// Fetch user info for the header
-$user_sql = "SELECT first_name, last_name, email FROM users WHERE id = ?";
-$user_stmt = $conn->prepare($user_sql);
-$user_stmt->bind_param("i", $user_id);
-$user_stmt->execute();
-$user_result = $user_stmt->get_result();
-$user_info = $user_result->fetch_assoc();
-
-// Close connection
-$conn->close();
+// Function to get module subtitle
+function getModuleSubtitle($module) {
+    $subtitles = [
+        'dashboard' => 'Overview of all secretary functions and quick actions',
+        'case' => 'Manage cases, assign blotter numbers, and track case progress',
+        'compliance' => 'Monitor case deadlines and RA 7160 compliance',
+        'documents' => 'Generate legal documents and forms for barangay proceedings',
+        'referral' => 'Handle VAWC, minor cases, and external agency referrals',
+        'classification_review' => 'Review and correct AI-predicted jurisdiction for reports',
+        'profile' => 'Manage your account information and activity log'
+    ];
+    return $subtitles[$module] ?? '';
+}
 ?>
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Secretary Dashboard - Barangay Management System</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.1/font/bootstrap-icons.css" rel="stylesheet">
+    <title>Secretary Dashboard - <?php echo getModuleTitle($module); ?></title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="icon" type="image/png" href="../images/10213.png">
     <style>
+        * {
+            font-family: 'Inter', sans-serif;
+        }
+        
         :root {
-            --primary-color: #2c3e50;
-            --secondary-color: #3498db;
-            --accent-color: #e74c3c;
-            --light-bg: #f8f9fa;
+            --primary-blue: #e3f2fd;
+            --secondary-blue: #bbdefb;
+            --accent-blue: #2196f3;
+            --dark-blue: #0d47a1;
+            --light-blue: #f5fbff;
         }
+        
         body {
-            background-color: #f5f6fa;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #f5fbff 0%, #e3f2fd 100%);
+            min-height: 100vh;
         }
-        .navbar {
-            background: linear-gradient(135deg, var(--primary-color), #1a252f);
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        
+        .glass-card {
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
         }
-        .sidebar {
-            background: white;
-            min-height: calc(100vh - 56px);
-            box-shadow: 2px 0 10px rgba(0,0,0,0.05);
+        
+        .module-card {
+            transition: all 0.3s ease;
+            border-left: 4px solid var(--accent-blue);
         }
-        .sidebar .nav-link {
-            color: #333;
-            padding: 12px 20px;
-            border-left: 3px solid transparent;
-            transition: all 0.3s;
+        
+        .module-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px rgba(33, 150, 243, 0.1);
+            border-left-color: var(--dark-blue);
         }
-        .sidebar .nav-link:hover {
-            background-color: #f8f9fa;
-            border-left: 3px solid var(--secondary-color);
-            color: var(--secondary-color);
-        }
-        .sidebar .nav-link.active {
-            background-color: #e3f2fd;
-            border-left: 3px solid var(--secondary-color);
-            color: var(--secondary-color);
-            font-weight: 500;
-        }
-        .card {
-            border: none;
-            border-radius: 10px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
-            transition: transform 0.2s;
-        }
-        .card:hover {
-            transform: translateY(-2px);
-        }
+        
         .stat-card {
-            border-left: 4px solid var(--secondary-color);
+            background: linear-gradient(135deg, #ffffff 0%, #f0f9ff 100%);
+            border: 1px solid #e0f2fe;
         }
-        .stat-card.pending {
-            border-left-color: #f39c12;
+        
+        .urgent {
+            border-left: 4px solid #ef4444;
+            background: linear-gradient(135deg, #fef2f2 0%, #fecaca 100%);
         }
-        .stat-card.resolved {
-            border-left-color: #27ae60;
+        
+        .warning {
+            border-left: 4px solid #f59e0b;
+            background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
         }
-        .badge-status {
-            font-size: 0.8em;
-            padding: 4px 8px;
+        
+        .success {
+            border-left: 4px solid #10b981;
+            background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
         }
-        .badge-pending { background-color: #f39c12; }
-        .badge-assigned { background-color: #3498db; }
-        .badge-investigating { background-color: #9b59b6; }
-        .badge-resolved { background-color: #27ae60; }
-        .badge-closed { background-color: #7f8c8d; }
-        .table-hover tbody tr:hover {
-            background-color: #f8f9fa;
+        
+        .sidebar {
+            background: linear-gradient(180deg, #1e3a8a 0%, #0d47a1 100%);
+            box-shadow: 4px 0 15px rgba(0, 0, 0, 0.1);
         }
-        .btn-primary {
-            background: linear-gradient(135deg, var(--secondary-color), #2980b9);
-            border: none;
-            padding: 8px 20px;
+        
+        .sidebar-link {
+            transition: all 0.3s ease;
+            border-left: 3px solid transparent;
         }
-        .btn-primary:hover {
-            background: linear-gradient(135deg, #2980b9, #1c6ea4);
+        
+        .sidebar-link:hover {
+            background: rgba(255, 255, 255, 0.1);
+            border-left-color: #60a5fa;
         }
-        .modal-header {
-            background: linear-gradient(135deg, var(--primary-color), #1a252f);
-            color: white;
+        
+        .sidebar-link.active {
+            background: rgba(255, 255, 255, 0.15);
+            border-left-color: #3b82f6;
         }
-        .search-box {
-            max-width: 300px;
+        
+        .case-table tr {
+            border-bottom: 1px solid #e5e7eb;
         }
+        
+        .case-table tr:hover {
+            background-color: #f8fafc;
+        }
+        
+        .badge {
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+        
+        .badge-pending {
+            background-color: #fef3c7;
+            color: #92400e;
+        }
+        
+        .badge-processing {
+            background-color: #dbeafe;
+            color: #1e40af;
+        }
+        
+        .badge-resolved {
+            background-color: #d1fae5;
+            color: #065f46;
+        }
+        
+        .badge-referred {
+            background-color: #f3e8ff;
+            color: #5b21b6;
+        }
+        
+        .badge-vawc {
+            background-color: #fee2e2;
+            color: #991b1b;
+        }
+        
+        .badge-minor {
+            background-color: #fef3c7;
+            color: #92400e;
+        }
+        
+        .animate-pulse {
+            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        /* Status badges */
+        .status-badge {
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .status-pending { background: #fed7d7; color: #9b2c2c; }
+        .status-submitted { background: #bee3f8; color: #2c5282; }
+        .status-investigating { background: #fef3c7; color: #92400e; }
+        .status-resolved { background: #c6f6d5; color: #065f46; }
+        .status-referred { background: #c6f6d5; color: #065f46; }
+        .status-closed { background: #e2e8f0; color: #4a5568; }
+        
+        /* Mobile Responsive */
         @media (max-width: 768px) {
             .sidebar {
-                min-height: auto;
+                transform: translateX(-100%);
+                position: fixed;
+                z-index: 50;
             }
-            .search-box {
-                max-width: 100%;
+            
+            .sidebar.active {
+                transform: translateX(0);
             }
+            
+            .overlay {
+                display: none;
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: rgba(0, 0, 0, 0.5);
+                z-index: 40;
+            }
+            
+            .overlay.active {
+                display: block;
+            }
+            
+            .main-content {
+                margin-left: 0 !important;
+                padding: 1rem !important;
+            }
+            
+            .mobile-bottom-nav {
+                position: fixed;
+                bottom: 0;
+                left: 0;
+                right: 0;
+                background: white;
+                box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
+                z-index: 100;
+            }
+            
+            .mobile-nav-active {
+                color: #2196f3;
+                position: relative;
+            }
+            
+            .mobile-nav-active::after {
+                content: '';
+                position: absolute;
+                bottom: -5px;
+                left: 50%;
+                transform: translateX(-50%);
+                width: 6px;
+                height: 6px;
+                background: #2196f3;
+                border-radius: 50%;
+            }
+            
+            .mobile-nav-badge {
+                position: absolute;
+                top: -5px;
+                right: 5px;
+                background: #ef4444;
+                color: white;
+                border-radius: 50%;
+                width: 18px;
+                height: 18px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 10px;
+                font-weight: 600;
+            }
+        }
+        
+        /* Card animations */
+        .card {
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+        }
+        
+        /* Module icons */
+        .module-icon {
+            width: 50px;
+            height: 50px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            margin-bottom: 15px;
+        }
+        
+        .module-1 { background: linear-gradient(135deg, #667eea, #764ba2); color: white; }
+        .module-2 { background: linear-gradient(135deg, #4299e1, #3182ce); color: white; }
+        .module-3 { background: linear-gradient(135deg, #38a169, #2f855a); color: white; }
+        .module-4 { background: linear-gradient(135deg, #d69e2e, #b7791f); color: white; }
+        
+        /* Active status animation */
+        .active-status {
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.7; }
+            100% { opacity: 1; }
+        }
+        
+        /* Notification badge */
+        .notification-badge {
+            position: absolute;
+            top: -8px;
+            right: -8px;
+            background: #e53e3e;
+            color: white;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            display: flex;
+                align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        
+        /* Progress bar */
+        .progress-bar {
+            height: 8px;
+            background: #e2e8f0;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            border-radius: 4px;
+            transition: width 0.5s ease;
         }
     </style>
 </head>
-<body>
-    <!-- Navigation Bar -->
-    <nav class="navbar navbar-expand-lg navbar-dark">
-        <div class="container-fluid">
-            <a class="navbar-brand" href="#">
-                <i class="bi bi-building"></i> Barangay Secretary Dashboard
-            </a>
-            <div class="d-flex align-items-center">
-                <span class="text-white me-3">
-                    <i class="bi bi-person-circle"></i> 
-                    <?php echo htmlspecialchars($user_info['first_name'] . ' ' . $user_info['last_name']); ?>
-                </span>
-                <a href="logout.php" class="btn btn-outline-light btn-sm">
-                    <i class="bi bi-box-arrow-right"></i> Logout
+<body class="min-h-screen">
+    <!-- Mobile Overlay -->
+    <div class="overlay md:hidden" id="mobileOverlay"></div>
+    
+    <!-- Desktop Sidebar -->
+    <div class="sidebar w-64 min-h-screen fixed left-0 top-0 z-40 hidden md:block">
+        <div class="p-6">
+            <!-- LEIR Logo -->
+            <div class="flex items-center space-x-3 mb-8 pb-4 border-b border-blue-400/30">
+                <div class="w-10 h-10 flex items-center justify-center">
+                    <img src="../images/10213.png" alt="Logo" class="w-19 h-22 object-contain">
+                </div>
+                <div>
+                    <h1 class="text-xl font-bold text-white">LEIR</h1>
+                    <p class="text-blue-200 text-sm">Secretary System</p>
+                </div>
+            </div>
+            
+            <!-- User Profile -->
+            <div class="mb-8">
+                <div class="flex items-center space-x-3 p-3 bg-white/10 rounded-lg">
+                    <div class="relative">
+                        <?php 
+                        $profile_pic_path = "../uploads/profile_pictures/" . ($profile_picture ?? '');
+                        if (!empty($profile_picture) && file_exists($profile_pic_path)): 
+                        ?>
+                            <img src="<?php echo $profile_pic_path; ?>" 
+                                 alt="Profile" class="w-10 h-10 rounded-full object-cover border-2 border-white shadow-sm">
+                        <?php else: ?>
+                            <div class="w-10 h-10 rounded-full bg-gradient-to-r from-blue-600 to-blue-500 flex items-center justify-center text-white font-bold">
+                                <?php echo strtoupper(substr($_SESSION['first_name'], 0, 1)); ?>
+                            </div>
+                        <?php endif; ?>
+                        <div class="absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-white <?php echo $is_active ? 'bg-green-500' : 'bg-red-500'; ?>"></div>
+                    </div>
+                    <div>
+                        <p class="text-white font-medium truncate"><?php echo htmlspecialchars($user_name); ?></p>
+                        <p class="text-blue-200 text-sm">Secretary</p>
+                    </div>
+                </div>
+                <div class="mt-3 ml-3">
+                    <p class="text-sm text-blue-200 flex items-center">
+                        <i class="fas fa-map-marker-alt mr-2 text-xs"></i>
+                        <span class="truncate"><?php echo htmlspecialchars($user_address ?? 'Barangay Office'); ?></span>
+                    </p>
+                </div>
+            </div>
+            
+            <nav class="space-y-2">
+                <a href="?module=dashboard" class="sidebar-link block p-3 text-white rounded-lg <?php echo $module == 'dashboard' ? 'active' : ''; ?>">
+                    <i class="fas fa-tachometer-alt mr-3"></i>
+                    Dashboard Overview
+                </a>
+
+                  <!-- NEW: Classification Review as second module -->
+    <a href="?module=classification_review" class="sidebar-link block p-3 text-white rounded-lg <?php echo $module == 'classification_review' ? 'active' : ''; ?>">
+        <i class="fas fa-robot mr-3"></i>
+        Classification Review
+        <!-- Add notification badge if there are pending reviews -->
+        <?php
+        // Check for reports needing review
+        if ($module == 'dashboard' || $module == 'classification_review') {
+            try {
+                $review_query = "SELECT COUNT(*) as count FROM reports 
+                                WHERE (ai_classification IS NOT NULL AND classification_override IS NULL) 
+                                AND status IN ('pending', 'pending_field_verification')";
+                $review_stmt = $conn->prepare($review_query);
+                $review_stmt->execute();
+                $pending_reviews = $review_stmt->fetchColumn();
+                
+                if ($pending_reviews > 0): ?>
+                    <span class="float-right bg-yellow-500 text-white text-xs rounded-full w-6 h-6 flex items-center justify-center">
+                        <?php echo min($pending_reviews, 9); ?>
+                    </span>
+                <?php endif;
+            } catch (Exception $e) {
+                // Silently handle error
+            }
+        }
+        ?>
+    </a>
+                <a href="?module=case" class="sidebar-link block p-3 text-white rounded-lg <?php echo $module == 'case' ? 'active' : ''; ?>">
+                    <i class="fas fa-gavel mr-3"></i>
+                    Case-Blotter Management
+                    <?php if (isset($stats['pending_cases']) && $stats['pending_cases'] > 0): ?>
+                        <span class="float-right bg-red-500 text-white text-xs rounded-full w-6 h-6 flex items-center justify-center">
+                            <?php echo min($stats['pending_cases'], 9); ?>
+                        </span>
+                    <?php endif; ?>
+                </a>
+                <a href="?module=compliance" class="sidebar-link block p-3 text-white rounded-lg <?php echo $module == 'compliance' ? 'active' : ''; ?>">
+                    <i class="fas fa-clock mr-3"></i>
+                    Compliance Monitoring
+                </a>
+                <a href="?module=documents" class="sidebar-link block p-3 text-white rounded-lg <?php echo $module == 'documents' ? 'active' : ''; ?>">
+                    <i class="fas fa-file-pdf mr-3"></i>
+                    Document Generation
+                </a>
+                <a href="?module=referral" class="sidebar-link block p-3 text-white rounded-lg <?php echo $module == 'referral' ? 'active' : ''; ?>">
+                    <i class="fas fa-exchange-alt mr-3"></i>
+                    External Referral Desk
+                </a>
+                <a href="?module=classification_review" class="sidebar-link block p-3 text-white rounded-lg <?php echo $module == 'classification_review' ? 'active' : ''; ?>">
+                    <i class="fas fa-robot mr-3"></i>
+                    Classification Review
+                </a>
+            </nav>
+            
+            <!-- Status Toggle -->
+            <div class="mt-8 pt-8 border-t border-blue-400/30">
+                <div class="mb-4">
+                    <button class="w-full flex items-center p-3 rounded-lg <?php echo $is_active ? 'bg-green-500/20 text-green-300 hover:bg-green-500/30' : 'bg-red-500/20 text-red-300 hover:bg-red-500/30'; ?> transition-colors">
+                        <i class="fas fa-power-off mr-3"></i>
+                        <span class="font-medium flex-1 text-left">Status: <?php echo $is_active ? 'Active' : 'Inactive'; ?></span>
+                        <div class="relative">
+                            <div class="w-10 h-6 flex items-center <?php echo $is_active ? 'bg-green-500' : 'bg-gray-400'; ?> rounded-full p-1 cursor-pointer transition-colors">
+                                <div class="bg-white w-4 h-4 rounded-full shadow-md transform <?php echo $is_active ? 'translate-x-4' : 'translate-x-0'; ?> transition-transform"></div>
+                            </div>
+                        </div>
+                    </button>
+                </div>
+                
+                <a href="../logout.php" class="flex items-center p-3 text-blue-200 hover:text-white hover:bg-white/10 rounded-lg transition">
+                    <i class="fas fa-sign-out-alt mr-3"></i>
+                    Logout
                 </a>
             </div>
         </div>
-    </nav>
-
-    <div class="container-fluid">
-        <div class="row">
-            <!-- Sidebar -->
-            <div class="col-lg-2 col-md-3 p-0">
-                <div class="sidebar">
-                    <div class="p-3">
-                        <h5 class="text-muted mb-3">Navigation</h5>
-                        <ul class="nav flex-column">
-                            <li class="nav-item">
-                                <a class="nav-link active" href="#">
-                                    <i class="bi bi-speedometer2"></i> Dashboard
-                                </a>
-                            </li>
-                            <li class="nav-item">
-                                <a class="nav-link" href="#" data-bs-toggle="modal" data-bs-target="#createAnnouncementModal">
-                                    <i class="bi bi-megaphone"></i> Create Announcement
-                                </a>
-                            </li>
-                            <li class="nav-item">
-                                <a class="nav-link" href="reports.php">
-                                    <i class="bi bi-file-text"></i> All Reports
-                                </a>
-                            </li>
-                            <li class="nav-item">
-                                <a class="nav-link" href="announcements.php">
-                                    <i class="bi bi-newspaper"></i> Announcements
-                                </a>
-                            </li>
-                            <li class="nav-item">
-                                <a class="nav-link" href="citizens.php">
-                                    <i class="bi bi-people"></i> Citizens
-                                </a>
-                            </li>
-                            <li class="nav-item">
-                                <a class="nav-link" href="profile.php">
-                                    <i class="bi bi-person"></i> My Profile
-                                </a>
-                            </li>
-                        </ul>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Main Content -->
-            <div class="col-lg-10 col-md-9 p-4">
-                <!-- Alerts -->
-                <?php if ($message): ?>
-                    <div class="alert alert-success alert-dismissible fade show" role="alert">
-                        <i class="bi bi-check-circle"></i> <?php echo $message; ?>
-                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                    </div>
-                <?php endif; ?>
-                
-                <?php if ($error): ?>
-                    <div class="alert alert-danger alert-dismissible fade show" role="alert">
-                        <i class="bi bi-exclamation-triangle"></i> <?php echo $error; ?>
-                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                    </div>
-                <?php endif; ?>
-
-                <!-- Page Header -->
-                <div class="d-flex justify-content-between align-items-center mb-4">
-                    <div>
-                        <h2 class="mb-1">Dashboard</h2>
-                        <p class="text-muted mb-0">
-                            <i class="bi bi-geo-alt"></i> Barangay: <?php echo htmlspecialchars($barangay); ?>
-                        </p>
-                    </div>
-                    <div class="search-box">
-                        <div class="input-group">
-                            <input type="text" class="form-control" placeholder="Search reports...">
-                            <button class="btn btn-outline-secondary" type="button">
-                                <i class="bi bi-search"></i>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Statistics Cards -->
-                <div class="row mb-4">
-                    <div class="col-md-2 col-sm-6 mb-3">
-                        <div class="card stat-card">
-                            <div class="card-body">
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <div>
-                                        <h6 class="text-muted mb-1">Pending</h6>
-                                        <h3 class="mb-0"><?php echo $stats['pending_reports']; ?></h3>
-                                    </div>
-                                    <div class="icon-circle bg-warning">
-                                        <i class="bi bi-clock text-white"></i>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-2 col-sm-6 mb-3">
-                        <div class="card stat-card">
-                            <div class="card-body">
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <div>
-                                        <h6 class="text-muted mb-1">Assigned</h6>
-                                        <h3 class="mb-0"><?php echo $stats['assigned_reports']; ?></h3>
-                                    </div>
-                                    <div class="icon-circle bg-info">
-                                        <i class="bi bi-person-check text-white"></i>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-2 col-sm-6 mb-3">
-                        <div class="card stat-card">
-                            <div class="card-body">
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <div>
-                                        <h6 class="text-muted mb-1">Investigating</h6>
-                                        <h3 class="mb-0"><?php echo $stats['investigating_reports']; ?></h3>
-                                    </div>
-                                    <div class="icon-circle bg-purple">
-                                        <i class="bi bi-search text-white"></i>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-2 col-sm-6 mb-3">
-                        <div class="card stat-card resolved">
-                            <div class="card-body">
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <div>
-                                        <h6 class="text-muted mb-1">Resolved</h6>
-                                        <h3 class="mb-0"><?php echo $stats['resolved_reports']; ?></h3>
-                                    </div>
-                                    <div class="icon-circle bg-success">
-                                        <i class="bi bi-check-circle text-white"></i>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-2 col-sm-6 mb-3">
-                        <div class="card">
-                            <div class="card-body">
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <div>
-                                        <h6 class="text-muted mb-1">Announcements</h6>
-                                        <h3 class="mb-0"><?php echo $stats['active_announcements']; ?></h3>
-                                    </div>
-                                    <div class="icon-circle bg-secondary">
-                                        <i class="bi bi-megaphone text-white"></i>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-2 col-sm-6 mb-3">
-                        <div class="card">
-                            <div class="card-body">
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <div>
-                                        <h6 class="text-muted mb-1">Citizens</h6>
-                                        <h3 class="mb-0"><?php echo $stats['total_citizens']; ?></h3>
-                                    </div>
-                                    <div class="icon-circle bg-primary">
-                                        <i class="bi bi-people text-white"></i>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Main Content Row -->
-                <div class="row">
-                    <!-- Recent Reports -->
-                    <div class="col-lg-8 mb-4">
-                        <div class="card">
-                            <div class="card-header d-flex justify-content-between align-items-center">
-                                <h5 class="mb-0">Recent Reports</h5>
-                                <a href="reports.php" class="btn btn-sm btn-outline-primary">
-                                    View All <i class="bi bi-arrow-right"></i>
-                                </a>
-                            </div>
-                            <div class="card-body">
-                                <div class="table-responsive">
-                                    <table class="table table-hover">
-                                        <thead>
-                                            <tr>
-                                                <th>Report #</th>
-                                                <th>Type</th>
-                                                <th>Title</th>
-                                                <th>Reporter</th>
-                                                <th>Status</th>
-                                                <th>Date</th>
-                                                <th>Actions</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            <?php while ($report = $reports_result->fetch_assoc()): ?>
-                                                <tr>
-                                                    <td><?php echo htmlspecialchars($report['report_number']); ?></td>
-                                                    <td><?php echo htmlspecialchars($report['type_name']); ?></td>
-                                                    <td><?php echo htmlspecialchars(substr($report['title'], 0, 30)) . (strlen($report['title']) > 30 ? '...' : ''); ?></td>
-                                                    <td><?php echo htmlspecialchars($report['first_name'] . ' ' . $report['last_name']); ?></td>
-                                                    <td>
-                                                        <?php
-                                                        $status_class = 'badge-pending';
-                                                        if ($report['status'] === 'assigned') $status_class = 'badge-assigned';
-                                                        elseif ($report['status'] === 'investigating') $status_class = 'badge-investigating';
-                                                        elseif ($report['status'] === 'resolved') $status_class = 'badge-resolved';
-                                                        elseif ($report['status'] === 'closed') $status_class = 'badge-closed';
-                                                        ?>
-                                                        <span class="badge badge-status <?php echo $status_class; ?>">
-                                                            <?php echo ucfirst(str_replace('_', ' ', $report['status'])); ?>
-                                                        </span>
-                                                    </td>
-                                                    <td><?php echo date('M d, Y', strtotime($report['created_at'])); ?></td>
-                                                    <td>
-                                                        <button class="btn btn-sm btn-outline-primary" 
-                                                                data-bs-toggle="modal" 
-                                                                data-bs-target="#updateStatusModal"
-                                                                data-report-id="<?php echo $report['id']; ?>"
-                                                                data-current-status="<?php echo $report['status']; ?>">
-                                                            <i class="bi bi-pencil"></i> Update
-                                                        </button>
-                                                        <a href="view_report.php?id=<?php echo $report['id']; ?>" 
-                                                           class="btn btn-sm btn-outline-info">
-                                                            <i class="bi bi-eye"></i> View
-                                                        </a>
-                                                    </td>
-                                                </tr>
-                                            <?php endwhile; ?>
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Announcements & Quick Actions -->
-                    <div class="col-lg-4">
-                        <!-- Active Announcements -->
-                        <div class="card mb-4">
-                            <div class="card-header">
-                                <h5 class="mb-0">Active Announcements</h5>
-                            </div>
-                            <div class="card-body">
-                                <?php if ($announcements_result->num_rows > 0): ?>
-                                    <div class="list-group list-group-flush">
-                                        <?php while ($announcement = $announcements_result->fetch_assoc()): ?>
-                                            <div class="list-group-item border-0 px-0 py-2">
-                                                <div class="d-flex align-items-start">
-                                                    <?php if ($announcement['is_pinned']): ?>
-                                                        <i class="bi bi-pin-angle-fill text-warning me-2 mt-1"></i>
-                                                    <?php endif; ?>
-                                                    <div>
-                                                        <h6 class="mb-1"><?php echo htmlspecialchars($announcement['title']); ?></h6>
-                                                        <small class="text-muted">
-                                                            <i class="bi bi-calendar"></i> 
-                                                            <?php echo date('M d, Y', strtotime($announcement['created_at'])); ?>
-                                                            <?php if ($announcement['is_emergency']): ?>
-                                                                <span class="badge bg-danger ms-2">Emergency</span>
-                                                            <?php endif; ?>
-                                                        </small>
-                                                        <p class="mt-2 mb-0 small">
-                                                            <?php echo htmlspecialchars(substr($announcement['content'], 0, 80)) . '...'; ?>
-                                                        </p>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        <?php endwhile; ?>
-                                    </div>
-                                <?php else: ?>
-                                    <p class="text-muted mb-0">No active announcements.</p>
-                                <?php endif; ?>
-                            </div>
-                            <div class="card-footer bg-transparent">
-                                <a href="announcements.php" class="btn btn-sm btn-outline-primary w-100">
-                                    Manage Announcements
-                                </a>
-                            </div>
-                        </div>
-
-                        <!-- Quick Actions -->
-                        <div class="card">
-                            <div class="card-header">
-                                <h5 class="mb-0">Quick Actions</h5>
-                            </div>
-                            <div class="card-body">
-                                <div class="d-grid gap-2">
-                                    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createAnnouncementModal">
-                                        <i class="bi bi-megaphone"></i> Create Announcement
-                                    </button>
-                                    <a href="reports.php?filter=pending" class="btn btn-outline-primary">
-                                        <i class="bi bi-clock"></i> View Pending Reports
-                                    </a>
-                                    <a href="citizens.php" class="btn btn-outline-primary">
-                                        <i class="bi bi-people"></i> View Citizens List
-                                    </a>
-                                    <a href="generate_report.php" class="btn btn-outline-success">
-                                        <i class="bi bi-file-pdf"></i> Generate Monthly Report
-                                    </a>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
     </div>
 
-    <!-- Update Status Modal -->
-    <div class="modal fade" id="updateStatusModal" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <form method="POST" action="">
-                    <div class="modal-header">
-                        <h5 class="modal-title">Update Report Status</h5>
-                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-                    </div>
-                    <div class="modal-body">
-                        <input type="hidden" name="report_id" id="modalReportId">
-                        <input type="hidden" name="update_report_status" value="1">
-                        
-                        <div class="mb-3">
-                            <label class="form-label">Current Status</label>
-                            <input type="text" class="form-control" id="modalCurrentStatus" readonly>
-                        </div>
-                        
-                        <div class="mb-3">
-                            <label class="form-label">New Status</label>
-                            <select class="form-select" name="status" required>
-                                <option value="pending">Pending</option>
-                                <option value="assigned">Assigned</option>
-                                <option value="investigating">Investigating</option>
-                                <option value="resolved">Resolved</option>
-                                <option value="closed">Closed</option>
-                                <option value="referred">Referred</option>
-                            </select>
-                        </div>
-                        
-                        <div class="mb-3">
-                            <label class="form-label">Notes (Optional)</label>
-                            <textarea class="form-control" name="notes" rows="3" 
-                                      placeholder="Add any notes about the status update..."></textarea>
+    <!-- Main Content -->
+    <div class="main-content md:ml-64 flex-1 p-4 sm:p-6 lg:p-8">
+        <!-- Header -->
+        <header class="bg-white shadow-sm sticky top-0 z-30 mb-6">
+            <div class="px-4 py-4">
+                <div class="flex justify-between items-center">
+                    <!-- Left: Mobile Menu Button and Title -->
+                    <div class="flex items-center space-x-4">
+                        <button id="mobileMenuButton" class="md:hidden text-gray-600 hover:text-gray-900 focus:outline-none">
+                            <i class="fas fa-bars text-2xl"></i>
+                        </button>
+                        <div>
+                            <h1 class="text-2xl font-bold text-gray-800">
+                                <?php echo getModuleTitle($module); ?>
+                            </h1>
+                            <p class="text-gray-600 text-sm">
+                                <?php echo getModuleSubtitle($module); ?>
+                            </p>
                         </div>
                     </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                        <button type="submit" class="btn btn-primary">Update Status</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-
-    <!-- Create Announcement Modal -->
-    <div class="modal fade" id="createAnnouncementModal" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-lg">
-            <div class="modal-content">
-                <form method="POST" action="">
-                    <div class="modal-header">
-                        <h5 class="modal-title">Create New Announcement</h5>
-                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-                    </div>
-                    <div class="modal-body">
-                        <input type="hidden" name="create_announcement" value="1">
-                        
-                        <div class="row">
-                            <div class="col-md-8 mb-3">
-                                <label class="form-label">Title *</label>
-                                <input type="text" class="form-control" name="title" required 
-                                       placeholder="Enter announcement title">
-                            </div>
-                            <div class="col-md-4 mb-3">
-                                <label class="form-label">Priority</label>
-                                <select class="form-select" name="priority">
-                                    <option value="low">Low</option>
-                                    <option value="medium" selected>Medium</option>
-                                    <option value="high">High</option>
-                                </select>
-                            </div>
-                        </div>
-                        
-                        <div class="mb-3">
-                            <label class="form-label">Content *</label>
-                            <textarea class="form-control" name="content" rows="6" required 
-                                      placeholder="Enter announcement content..."></textarea>
-                        </div>
-                        
-                        <div class="row">
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label">Target Audience</label>
-                                <select class="form-select" name="target_role">
-                                    <option value="all">All Users</option>
-                                    <option value="citizen">Citizens Only</option>
-                                    <option value="tanod">Tanod Only</option>
-                                    <option value="secretary">Secretary Only</option>
-                                    <option value="captain">Captain Only</option>
-                                </select>
-                            </div>
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label">Options</label>
-                                <div class="form-check mb-2">
-                                    <input class="form-check-input" type="checkbox" name="is_emergency" id="emergencyCheck">
-                                    <label class="form-check-label" for="emergencyCheck">
-                                        Mark as Emergency Announcement
-                                    </label>
-                                </div>
-                                <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" name="is_pinned" id="pinnedCheck">
-                                    <label class="form-check-label" for="pinnedCheck">
-                                        Pin to Top
-                                    </label>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                        <button type="submit" class="btn btn-primary">Publish Announcement</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
-    <script>
-        // Update Status Modal Handler
-        document.addEventListener('DOMContentLoaded', function() {
-            var updateStatusModal = document.getElementById('updateStatusModal');
-            if (updateStatusModal) {
-                updateStatusModal.addEventListener('show.bs.modal', function(event) {
-                    var button = event.relatedTarget;
-                    var reportId = button.getAttribute('data-report-id');
-                    var currentStatus = button.getAttribute('data-current-status');
                     
-                    document.getElementById('modalReportId').value = reportId;
-                    document.getElementById('modalCurrentStatus').value = 
-                        currentStatus.charAt(0).toUpperCase() + currentStatus.slice(1).replace('_', ' ');
-                });
-            }
+                    <!-- Right: Notifications and User -->
+                    <div class="flex items-center space-x-4">
+                        <!-- Notifications -->
+                        <div class="relative">
+                            <i class="fas fa-bell text-gray-600 text-xl cursor-pointer hover:text-blue-600"></i>
+                            <span class="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full animate-pulse"></span>
+                        </div>
+                        
+                        <!-- User Dropdown -->
+                        <div class="relative">
+                            <button id="userMenuButton" class="flex items-center space-x-2 focus:outline-none">
+                                <?php 
+                                $profile_pic_path = "../uploads/profile_pictures/" . ($profile_picture ?? '');
+                                if (!empty($profile_picture) && file_exists($profile_pic_path)): 
+                                ?>
+                                    <img src="<?php echo $profile_pic_path; ?>" 
+                                         alt="Profile" class="w-10 h-10 rounded-full object-cover border-2 border-white shadow-sm">
+                                <?php else: ?>
+                                    <div class="w-10 h-10 rounded-full bg-gradient-to-r from-blue-600 to-blue-500 flex items-center justify-center text-white font-semibold">
+                                        <?php echo strtoupper(substr($_SESSION['first_name'], 0, 1)); ?>
+                                    </div>
+                                <?php endif; ?>
+                                <div class="hidden md:block text-left">
+                                    <p class="text-sm font-medium text-gray-800"><?php echo htmlspecialchars($_SESSION['first_name']); ?></p>
+                                    <p class="text-xs text-gray-500">Secretary</p>
+                                </div>
+                                <i class="fas fa-chevron-down text-gray-400 hidden md:block"></i>
+                            </button>
+                            
+                            <!-- User Dropdown Menu -->
+                            <div id="userDropdown" class="hidden absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-xl border z-40">
+                                <div class="p-4 border-b">
+                                    <div class="flex items-center space-x-3 mb-2">
+                                        <?php if (!empty($profile_picture) && file_exists($profile_pic_path)): ?>
+                                            <img src="<?php echo $profile_pic_path; ?>" 
+                                                 alt="Profile" class="w-10 h-10 rounded-full object-cover">
+                                        <?php else: ?>
+                                            <div class="w-10 h-10 rounded-full bg-gradient-to-r from-blue-600 to-blue-500 flex items-center justify-center text-white font-bold">
+                                                <?php echo strtoupper(substr($user_name, 0, 1)); ?>
+                                            </div>
+                                        <?php endif; ?>
+                                        <div>
+                                            <p class="text-sm font-medium text-gray-900"><?php echo htmlspecialchars($user_name); ?></p>
+                                            <p class="text-xs text-gray-500">Secretary</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="p-2">
+                                    <a href="?module=profile" class="flex items-center px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded">
+                                        <i class="fas fa-user mr-2"></i>
+                                        Profile Settings
+                                    </a>
+                                    <a href="../logout.php" class="flex items-center px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded">
+                                        <i class="fas fa-sign-out-alt mr-2"></i>
+                                        Logout
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Alerts -->
+        <?php if (isset($_SESSION['success'])): ?>
+        <div class="mb-6 p-4 bg-green-50 border-l-4 border-green-500 rounded-lg">
+            <div class="flex items-center">
+                <i class="fas fa-check-circle text-green-500 mr-3"></i>
+                <p class="text-green-700"><?php echo htmlspecialchars($_SESSION['success']); ?></p>
+            </div>
+        </div>
+        <?php unset($_SESSION['success']); ?>
+        <?php endif; ?>
+        
+        <?php if (isset($_SESSION['error'])): ?>
+        <div class="mb-6 p-4 bg-red-50 border-l-4 border-red-500 rounded-lg">
+            <div class="flex items-center">
+                <i class="fas fa-exclamation-circle text-red-500 mr-3"></i>
+                <p class="text-red-700"><?php echo htmlspecialchars($_SESSION['error']); ?></p>
+            </div>
+        </div>
+        <?php unset($_SESSION['error']); ?>
+        <?php endif; ?>
+
+        <!-- Load Module Content -->
+        <?php
+        $module_file = "modules/{$module}.php";
+        if (file_exists($module_file)) {
+            include $module_file;
+        } else {
+            echo "<div class='bg-white rounded-xl p-6'>";
+            echo "<h2 class='text-xl font-bold text-gray-800 mb-4'>Module Not Found</h2>";
+            echo "<p class='text-gray-600'>The requested module is not available.</p>";
+            echo "</div>";
+        }
+        ?>
+    </div>
+
+    <!-- Mobile Bottom Navigation -->
+    <div class="mobile-bottom-nav md:hidden">
+        <div class="flex justify-around items-center py-3">
+            <a href="?module=dashboard" class="flex flex-col items-center text-gray-600 <?php echo $module == 'dashboard' ? 'mobile-nav-active' : ''; ?>">
+                <i class="fas fa-home text-xl"></i>
+                <span class="text-xs mt-1">Home</span>
+            </a>
+                    <!-- NEW: Classification Review as second in mobile -->
+        <a href="?module=classification_review" class="flex flex-col items-center text-gray-600 <?php echo $module == 'classification_review' ? 'mobile-nav-active' : ''; ?>">
+            <i class="fas fa-robot text-xl"></i>
+            <span class="text-xs mt-1">Review AI</span>
+            <?php if (isset($pending_reviews) && $pending_reviews > 0): ?>
+                <span class="mobile-nav-badge"><?php echo min($pending_reviews, 9); ?></span>
+            <?php endif; ?>
+        </a>
             
-            // Auto-dismiss alerts after 5 seconds
-            setTimeout(function() {
-                var alerts = document.querySelectorAll('.alert');
-                alerts.forEach(function(alert) {
-                    var bsAlert = new bootstrap.Alert(alert);
-                    bsAlert.close();
-                });
-            }, 5000);
+            <a href="?module=case" class="flex flex-col items-center text-gray-600 <?php echo $module == 'case' ? 'mobile-nav-active' : ''; ?>">
+                <i class="fas fa-gavel text-xl"></i>
+                <span class="text-xs mt-1">Cases</span>
+                <?php if (isset($stats['pending_cases']) && $stats['pending_cases'] > 0): ?>
+                    <span class="mobile-nav-badge"><?php echo min($stats['pending_cases'], 9); ?></span>
+                <?php endif; ?>
+            </a>
+            
+            <a href="?module=compliance" class="flex flex-col items-center text-gray-600 <?php echo $module == 'compliance' ? 'mobile-nav-active' : ''; ?>">
+                <i class="fas fa-file-pdf text-xl"></i>
+                <span class="text-xs mt-1">Docs</span>
+            </a>
+            
+            <a href="?module=referral" class="flex flex-col items-center text-gray-600 <?php echo $module == 'referral' ? 'mobile-nav-active' : ''; ?>">
+                <i class="fas fa-exchange-alt text-xl"></i>
+                <span class="text-xs mt-1">Referral</span>
+            </a>
+            
+            <a href="?module=profile" class="flex flex-col items-center text-gray-600 <?php echo $module == 'profile' ? 'mobile-nav-active' : ''; ?>">
+                <i class="fas fa-user text-xl"></i>
+                <span class="text-xs mt-1">Profile</span>
+            </a>
+        </div>
+    </div>
+
+    <!-- Assignment Modal (for case module) - REMOVED (Handled by case.php) -->
+
+    <script>
+        // Mobile menu toggle
+        document.getElementById('mobileMenuButton').addEventListener('click', function() {
+            const sidebar = document.querySelector('.sidebar');
+            const overlay = document.getElementById('mobileOverlay');
+            sidebar.classList.toggle('active');
+            overlay.classList.toggle('active');
         });
+
+        // Close mobile menu when clicking overlay
+        document.getElementById('mobileOverlay').addEventListener('click', function() {
+            const sidebar = document.querySelector('.sidebar');
+            this.classList.remove('active');
+            sidebar.classList.remove('active');
+        });
+
+        // User dropdown
+        const userMenuButton = document.getElementById('userMenuButton');
+        const userDropdown = document.getElementById('userDropdown');
+        
+        if (userMenuButton && userDropdown) {
+            userMenuButton.addEventListener('click', function(e) {
+                e.stopPropagation();
+                userDropdown.classList.toggle('hidden');
+            });
+        }
+
+        // Close dropdown when clicking outside
+        document.addEventListener('click', function() {
+            if (userDropdown) userDropdown.classList.add('hidden');
+        });
+
+        // Assignment Modal Functions - REMOVED (Handled by case.php)
+        
+        // Auto-refresh for compliance monitoring
+        if (window.location.search.includes('module=compliance')) {
+            setInterval(() => {
+                // In real implementation, this would fetch updated data
+                console.log('Refreshing compliance data...');
+            }, 30000); // 30 seconds
+        }
+        
+        // Auto-hide success/error messages after 5 seconds
+        setTimeout(function() {
+            const alerts = document.querySelectorAll('.bg-green-50, .bg-red-50');
+            alerts.forEach(alert => {
+                alert.style.transition = 'opacity 0.5s';
+                alert.style.opacity = '0';
+                setTimeout(() => {
+                    if (alert.parentNode) {
+                        alert.remove();
+                    }
+                }, 500);
+            });
+        }, 5000);
+        
+        // Prevent form resubmission on refresh
+        if (window.history.replaceState) {
+            window.history.replaceState(null, null, window.location.href);
+        }
     </script>
 </body>
 </html>
+<?php
+// Close database connection
+if (isset($conn)) {
+    $conn = null;
+}
+?>
