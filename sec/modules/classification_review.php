@@ -47,7 +47,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_classification
             overridden_by = :user_id,
             overridden_at = NOW(),
             last_status_change = NOW(),
-            routing_updated = 1,
             category = CASE 
                 WHEN :classification = 'barangay' THEN 'Barangay Matter'
                 WHEN :classification = 'police' THEN 'Police Matter'
