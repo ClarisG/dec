@@ -555,26 +555,7 @@ function getModuleSubtitle($module) {
                     Document Generation
                 </a>
             </nav>
-            
-            <!-- Status Toggle -->
-            <div class="mt-8 pt-8 border-t border-blue-400/30">
-                <div class="mb-4">
-                    <button class="w-full flex items-center p-3 rounded-lg <?php echo $is_active ? 'bg-green-500/20 text-green-300 hover:bg-green-500/30' : 'bg-red-500/20 text-red-300 hover:bg-red-500/30'; ?> transition-colors">
-                        <i class="fas fa-power-off mr-3"></i>
-                        <span class="font-medium flex-1 text-left">Status: <?php echo $is_active ? 'Active' : 'Inactive'; ?></span>
-                        <div class="relative">
-                            <div class="w-10 h-6 flex items-center <?php echo $is_active ? 'bg-green-500' : 'bg-gray-400'; ?> rounded-full p-1 cursor-pointer transition-colors">
-                                <div class="bg-white w-4 h-4 rounded-full shadow-md transform <?php echo $is_active ? 'translate-x-4' : 'translate-x-0'; ?> transition-transform"></div>
-                            </div>
-                        </div>
-                    </button>
-                </div>
-                
-                <a href="../logout.php" class="flex items-center p-3 text-blue-200 hover:text-white hover:bg-white/10 rounded-lg transition">
-                    <i class="fas fa-sign-out-alt mr-3"></i>
-                    Logout
-                </a>
-            </div>
+                   
         </div>
     </div>
 
