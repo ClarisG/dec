@@ -27,7 +27,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_classification
         $conn->beginTransaction();
         
         // Get current report details for logging and routing
-        $stmt = $conn->prepare("SELECT r.*, u.id as user_id, u.email, u.phone, u.first_name, u.last_name 
+        $stmt = $conn->prepare("SELECT r.*, u.id as user_id, u.email, u.first_name, u.last_name 
                                FROM reports r 
                                LEFT JOIN users u ON r.user_id = u.id 
                                WHERE r.id = :id");
