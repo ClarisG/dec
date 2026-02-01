@@ -857,6 +857,61 @@ try {
 </div>
 
 <script>
+    // Handle notification clicks
+function handleNotificationClick(notificationId, reportId) {
+    fetch(`ajax/get_notification_details.php?notification_id=${notificationId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Highlight the specific report
+                highlightReport(reportId);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+        });
+}
+
+// Highlight report function
+function highlightReport(reportId) {
+    // Find and highlight the report
+    const reportElement = document.querySelector(`[data-report-id="${reportId}"]`);
+    if (reportElement) {
+        reportElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        reportElement.classList.add('bg-yellow-50', 'border', 'border-yellow-300', 'rounded-lg', 'highlight-new');
+        
+        // Show a toast notification
+        showToast('Report highlighted - showing updated classification', 'info');
+        
+        // Remove highlight after 5 seconds
+        setTimeout(() => {
+            reportElement.classList.remove('bg-yellow-50', 'border', 'border-yellow-300', 'rounded-lg', 'highlight-new');
+        }, 5000);
+    } else {
+        // If report not found in current view, redirect to page 1
+        const url = new URL(window.location.href);
+        url.searchParams.set('page', 1);
+        url.searchParams.set('highlight', reportId);
+        window.location.href = url.toString();
+    }
+}
+
+// Check for highlight parameter on page load
+document.addEventListener('DOMContentLoaded', function() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const highlightReportId = urlParams.get('highlight');
+    
+    if (highlightReportId) {
+        setTimeout(() => {
+            highlightReport(highlightReportId);
+            
+            // Remove highlight parameter from URL without reloading
+            const url = new URL(window.location.href);
+            url.searchParams.delete('highlight');
+            window.history.replaceState({}, '', url.toString());
+        }, 1000);
+    }
+});
 // Global variables
 const BASE_URL = "<?php echo BASE_URL; ?>";
 const AJAX_URL = "<?php echo AJAX_URL; ?>";

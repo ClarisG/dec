@@ -121,6 +121,27 @@ try {
     $recent_stmt->execute();
     $recent_reports = $recent_stmt->fetchAll(PDO::FETCH_ASSOC);
     
+    // Get unread notifications count
+    $notification_query = "SELECT COUNT(*) as unread_count FROM notifications 
+                          WHERE user_id = :user_id AND is_read = 0";
+    $notification_stmt = $conn->prepare($notification_query);
+    $notification_stmt->bindParam(':user_id', $user_id);
+    $notification_stmt->execute();
+    $notification_result = $notification_stmt->fetch(PDO::FETCH_ASSOC);
+    $unread_notifications = $notification_result['unread_count'] ?? 0;
+    
+    // Get latest notifications
+    $latest_notifications_query = "SELECT n.*, r.report_number 
+                                   FROM notifications n
+                                   LEFT JOIN reports r ON n.related_id = r.id
+                                   WHERE n.user_id = :user_id 
+                                   ORDER BY n.created_at DESC 
+                                   LIMIT 5";
+    $latest_notifications_stmt = $conn->prepare($latest_notifications_query);
+    $latest_notifications_stmt->bindParam(':user_id', $user_id);
+    $latest_notifications_stmt->execute();
+    $latest_notifications = $latest_notifications_stmt->fetchAll(PDO::FETCH_ASSOC);
+    
     // Get rate limit info
     $rate_limit_info = getRateLimitInfo($user_id);
     
@@ -444,17 +465,17 @@ function getModuleTitle($module) {
             animation: spin 1s linear infinite;
         }
         
-       /* Update line-clamp-2 class with full browser compatibility */
-.line-clamp-2 {
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    line-clamp: 2;
-    -webkit-box-orient: vertical;
-    -moz-box-orient: vertical;
-    box-orient: vertical;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
+        /* Update line-clamp-2 class with full browser compatibility */
+        .line-clamp-2 {
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            line-clamp: 2;
+            -webkit-box-orient: vertical;
+            -moz-box-orient: vertical;
+            box-orient: vertical;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
         
         .dropdown-menu {
             transform-origin: top right;
@@ -488,6 +509,27 @@ function getModuleTitle($module) {
             .mobile-bottom-nav {
                 display: none !important;
             }
+        }
+        
+        /* Notification badge animation */
+        .notification-pulse {
+            animation: notificationPulse 2s infinite;
+        }
+        
+        @keyframes notificationPulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+        
+        /* Highlight animation for new notifications */
+        .highlight-new {
+            animation: highlightFade 3s ease-out;
+        }
+        
+        @keyframes highlightFade {
+            0% { background-color: rgba(254, 243, 199, 0.8); }
+            100% { background-color: transparent; }
         }
     </style>
 </head>
@@ -641,31 +683,44 @@ function getModuleTitle($module) {
                         <div class="relative">
                             <button id="notificationButton" class="p-2 rounded-full text-gray-600 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500">
                                 <i class="fas fa-bell text-lg"></i>
-                                <?php if (count($announcements) > 0): ?>
-                                    <span class="absolute top-1 right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
-                                        <?php echo min(count($announcements), 9); ?>
+                                <?php if ($unread_notifications > 0): ?>
+                                    <span class="absolute top-1 right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center notification-pulse">
+                                        <?php echo min($unread_notifications, 9); ?>
                                     </span>
                                 <?php endif; ?>
                             </button>
                             <!-- Notification Dropdown -->
-                            <div id="notificationDropdown" class="hidden absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-lg border border-gray-200 z-50 dropdown-menu">
+                            <div id="notificationDropdown" class="hidden absolute right-0 mt-2 w-96 bg-white rounded-lg shadow-lg border border-gray-200 z-50 dropdown-menu">
                                 <div class="p-4 border-b border-gray-200">
                                     <h3 class="font-semibold text-gray-800">Notifications</h3>
-                                    <p class="text-sm text-gray-600">Latest announcements and updates</p>
+                                    <p class="text-sm text-gray-600">Latest updates and announcements</p>
                                 </div>
-                                <div class="max-h-96 overflow-y-auto">
-                                    <?php if (count($announcements) > 0): ?>
-                                        <?php foreach ($announcements as $announcement): ?>
-                                            <a href="?module=announcements" class="block p-4 border-b border-gray-100 hover:bg-gray-50">
+                                <div class="max-h-96 overflow-y-auto" id="notificationList">
+                                    <?php if (count($latest_notifications) > 0): ?>
+                                        <?php foreach ($latest_notifications as $notification): ?>
+                                            <a href="javascript:void(0)" onclick="handleNotificationClick(<?php echo $notification['id']; ?>, <?php echo $notification['related_id'] ?? 'null'; ?>)" 
+                                               class="block p-4 border-b border-gray-100 hover:bg-gray-50 transition-colors notification-item <?php echo $notification['is_read'] == 0 ? 'bg-yellow-50' : ''; ?>">
                                                 <div class="flex items-start">
                                                     <div class="flex-shrink-0">
-                                                        <div class="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
-                                                            <i class="fas fa-bullhorn text-blue-600 text-sm"></i>
-                                                        </div>
+                                                        <?php if ($notification['type'] == 'classification_change'): ?>
+                                                            <div class="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
+                                                                <i class="fas fa-sync-alt text-blue-600 text-sm"></i>
+                                                            </div>
+                                                        <?php else: ?>
+                                                            <div class="w-8 h-8 rounded-full bg-<?php echo $notification['type'] == 'warning' ? 'yellow' : ($notification['type'] == 'danger' ? 'red' : 'blue'); ?>-100 flex items-center justify-center">
+                                                                <i class="fas fa-<?php echo $notification['type'] == 'warning' ? 'exclamation-triangle' : ($notification['type'] == 'danger' ? 'exclamation-circle' : 'info-circle'); ?> text-<?php echo $notification['type'] == 'warning' ? 'yellow' : ($notification['type'] == 'danger' ? 'red' : 'blue'); ?>-600 text-sm"></i>
+                                                            </div>
+                                                        <?php endif; ?>
                                                     </div>
-                                                    <div class="ml-3">
-                                                        <p class="text-sm font-medium text-gray-800"><?php echo htmlspecialchars($announcement['title']); ?></p>
-                                                        <p class="text-xs text-gray-500 mt-1"><?php echo date('M d, Y', strtotime($announcement['created_at'])); ?></p>
+                                                    <div class="ml-3 flex-1">
+                                                        <p class="text-sm font-medium text-gray-800"><?php echo htmlspecialchars($notification['title']); ?></p>
+                                                        <p class="text-xs text-gray-600 mt-1"><?php echo htmlspecialchars(substr($notification['message'], 0, 80)); ?>...</p>
+                                                        <p class="text-xs text-gray-500 mt-1">
+                                                            <?php echo date('M d, Y h:i A', strtotime($notification['created_at'])); ?>
+                                                            <?php if ($notification['is_read'] == 0): ?>
+                                                                <span class="ml-2 inline-block w-2 h-2 bg-red-500 rounded-full"></span>
+                                                            <?php endif; ?>
+                                                        </p>
                                                     </div>
                                                 </div>
                                             </a>
@@ -678,8 +733,8 @@ function getModuleTitle($module) {
                                     <?php endif; ?>
                                 </div>
                                 <div class="p-3 border-t border-gray-200">
-                                    <a href="?module=announcements" class="block text-center text-blue-600 hover:text-blue-700 font-medium">
-                                        View All Notifications
+                                    <a href="?module=my-reports" class="block text-center text-blue-600 hover:text-blue-700 font-medium">
+                                        View All Reports
                                     </a>
                                 </div>
                             </div>
@@ -864,11 +919,11 @@ function getModuleTitle($module) {
                             <div class="card stat-card rounded-xl p-6">
                                 <div class="flex items-center justify-between">
                                     <div>
-                                        <p class="text-sm text-gray-500">New Announcements</p>
-                                        <h3 class="text-2xl font-bold text-blue-600"><?php echo count($announcements); ?></h3>
+                                        <p class="text-sm text-gray-500">New Notifications</p>
+                                        <h3 class="text-2xl font-bold text-blue-600"><?php echo $unread_notifications; ?></h3>
                                     </div>
                                     <div class="module-icon">
-                                        <i class="fas fa-bullhorn"></i>
+                                        <i class="fas fa-bell"></i>
                                     </div>
                                 </div>
                                 <div class="mt-4">
@@ -876,7 +931,7 @@ function getModuleTitle($module) {
                                         <span class="text-blue-500 mr-2">
                                             <i class="fas fa-bell"></i>
                                         </span>
-                                        <span class="text-gray-600">Latest community updates</span>
+                                        <span class="text-gray-600">Latest updates and alerts</span>
                                     </div>
                                 </div>
                             </div>
@@ -942,39 +997,53 @@ function getModuleTitle($module) {
                                 <?php endif; ?>
                             </div>
                             
-                            <!-- Latest Announcements -->
+                            <!-- Latest Notifications -->
                             <div class="card rounded-xl p-6">
                                 <div class="flex items-center justify-between mb-6">
-                                    <h3 class="text-lg font-semibold text-gray-800">Latest Announcements</h3>
-                                    <a href="?module=announcements" class="text-sm text-blue-600 hover:text-blue-700 font-medium flex items-center">
-                                        View All <i class="fas fa-arrow-right ml-1"></i>
-                                    </a>
+                                    <h3 class="text-lg font-semibold text-gray-800">Latest Notifications</h3>
+                                    <button onclick="refreshNotifications()" class="text-sm text-blue-600 hover:text-blue-700 font-medium flex items-center">
+                                        <i class="fas fa-sync-alt mr-1"></i> Refresh
+                                    </button>
                                 </div>
                                 
-                                <?php if (count($announcements) > 0): ?>
-                                    <div class="space-y-4">
-                                        <?php foreach ($announcements as $announcement): ?>
-                                            <div class="p-4 border rounded-lg hover:bg-gray-50 transition-colors">
+                                <?php if (count($latest_notifications) > 0): ?>
+                                    <div class="space-y-4" id="notificationContent">
+                                        <?php foreach ($latest_notifications as $notification): ?>
+                                            <div class="p-4 border rounded-lg hover:bg-gray-50 transition-colors <?php echo $notification['is_read'] == 0 ? 'bg-yellow-50 border-yellow-200' : ''; ?>">
                                                 <div class="flex items-start">
                                                     <div class="flex-shrink-0">
-                                                        <div class="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center">
-                                                            <i class="fas fa-bullhorn text-blue-600"></i>
-                                                        </div>
+                                                        <?php if ($notification['type'] == 'classification_change'): ?>
+                                                            <div class="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center">
+                                                                <i class="fas fa-sync-alt text-blue-600"></i>
+                                                            </div>
+                                                        <?php else: ?>
+                                                            <div class="w-10 h-10 rounded-lg bg-<?php echo $notification['type'] == 'warning' ? 'yellow' : ($notification['type'] == 'danger' ? 'red' : 'blue'); ?>-100 flex items-center justify-center">
+                                                                <i class="fas fa-<?php echo $notification['type'] == 'warning' ? 'exclamation-triangle' : ($notification['type'] == 'danger' ? 'exclamation-circle' : 'info-circle'); ?> text-<?php echo $notification['type'] == 'warning' ? 'yellow' : ($notification['type'] == 'danger' ? 'red' : 'blue'); ?>-600"></i>
+                                                            </div>
+                                                        <?php endif; ?>
                                                     </div>
                                                     <div class="ml-4 flex-1">
-                                                        <h4 class="font-medium text-gray-800"><?php echo htmlspecialchars($announcement['title']); ?></h4>
-                                                        <p class="text-sm text-gray-600 mt-1 line-clamp-2"><?php echo htmlspecialchars(substr($announcement['content'], 0, 100)); ?>...</p>
+                                                        <h4 class="font-medium text-gray-800"><?php echo htmlspecialchars($notification['title']); ?></h4>
+                                                        <p class="text-sm text-gray-600 mt-1"><?php echo htmlspecialchars(substr($notification['message'], 0, 100)); ?>...</p>
                                                         <div class="flex items-center mt-2 text-xs text-gray-500">
                                                             <span class="flex items-center">
-                                                                <i class="far fa-calendar mr-1"></i>
-                                                                <?php echo date('M d, Y', strtotime($announcement['created_at'])); ?>
+                                                                <i class="far fa-clock mr-1"></i>
+                                                                <?php echo date('M d, Y h:i A', strtotime($notification['created_at'])); ?>
                                                             </span>
-                                                            <?php if ($announcement['priority'] == 'high'): ?>
+                                                            <?php if ($notification['is_read'] == 0): ?>
                                                                 <span class="ml-4 px-2 py-1 bg-red-100 text-red-600 rounded-full text-xs font-medium">
-                                                                    <i class="fas fa-exclamation-triangle mr-1"></i> Important
+                                                                    <i class="fas fa-circle mr-1 text-xs"></i> New
                                                                 </span>
                                                             <?php endif; ?>
                                                         </div>
+                                                        <?php if ($notification['related_id']): ?>
+                                                            <div class="mt-2">
+                                                                <button onclick="handleNotificationClick(<?php echo $notification['id']; ?>, <?php echo $notification['related_id']; ?>)" 
+                                                                        class="text-xs text-blue-600 hover:text-blue-700 font-medium">
+                                                                    <i class="fas fa-external-link-alt mr-1"></i> View Report
+                                                                </button>
+                                                            </div>
+                                                        <?php endif; ?>
                                                     </div>
                                                 </div>
                                             </div>
@@ -983,9 +1052,9 @@ function getModuleTitle($module) {
                                 <?php else: ?>
                                     <div class="text-center py-8">
                                         <div class="w-16 h-16 mx-auto bg-gray-100 rounded-full flex items-center justify-center mb-4">
-                                            <i class="fas fa-bullhorn text-gray-400 text-2xl"></i>
+                                            <i class="fas fa-bell text-gray-400 text-2xl"></i>
                                         </div>
-                                        <p class="text-gray-500">No announcements yet</p>
+                                        <p class="text-gray-500">No notifications yet</p>
                                         <p class="text-sm text-gray-400 mt-1">Check back later for updates</p>
                                     </div>
                                 <?php endif; ?>
@@ -1201,6 +1270,76 @@ function getModuleTitle($module) {
                 };
                 updatePageTitle(titles[moduleName] || 'Dashboard');
             });
+        });
+        
+        // Handle notification click
+        function handleNotificationClick(notificationId, reportId = null) {
+            // Mark notification as read via AJAX
+            fetch(`ajax/get_notification_details.php?notification_id=${notificationId}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        // Remove highlight from notification item
+                        const notificationItem = document.querySelector(`.notification-item[onclick*="${notificationId}"]`);
+                        if (notificationItem) {
+                            notificationItem.classList.remove('bg-yellow-50');
+                            // Remove new indicator
+                            const newIndicator = notificationItem.querySelector('.bg-red-500');
+                            if (newIndicator) {
+                                newIndicator.remove();
+                            }
+                        }
+                        
+                        // If notification is related to a report, redirect to reports
+                        if (reportId) {
+                            // Update URL to show the specific report
+                            const url = new URL(window.location.href);
+                            url.searchParams.set('module', 'my-reports');
+                            url.searchParams.set('highlight', reportId);
+                            window.location.href = url.toString();
+                        }
+                    } else {
+                        console.error('Error marking notification as read:', data.error);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                });
+        }
+        
+        // Refresh notifications
+        function refreshNotifications() {
+            fetch('ajax/check_new_notifications.php')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.count > 0) {
+                        updateNotificationBadge(data.count);
+                        
+                        // If notification content exists, refresh it
+                        const notificationContent = document.getElementById('notificationContent');
+                        if (notificationContent) {
+                            // You could reload the notifications here or use a more sophisticated approach
+                            location.reload(); // Simple reload for now
+                        }
+                    }
+                });
+        }
+        
+        function updateNotificationBadge(count) {
+            // Update badge count in header
+            const badges = document.querySelectorAll('.notification-pulse');
+            badges.forEach(badge => {
+                badge.textContent = count > 9 ? '9+' : count;
+                badge.style.display = 'flex';
+            });
+        }
+        
+        // Auto-refresh notifications every 60 seconds
+        setInterval(refreshNotifications, 60000);
+        
+        // Check for new notifications on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            refreshNotifications();
         });
     </script>
 </body>

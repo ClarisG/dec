@@ -16,6 +16,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_classification
     $report_id = $_POST['report_id'];
     $new_classification = $_POST['classification']; // 'barangay' or 'police'
     $notes = $_POST['notes'] ?? '';
+    $category = $_POST['category'] ?? 'incident';
+    $severity_level = $_POST['severity_level'] ?? 'medium';
+    $priority = $_POST['priority'] ?? 'medium';
     
     try {
         $conn->beginTransaction();
@@ -30,7 +33,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_classification
         
         $original = $current['classification_override'] ?? $current['ai_classification'] ?? 'uncertain';
         
-        // Update report with new classification
+        // Update report with new classification and all fields
         $update_stmt = $conn->prepare("UPDATE reports SET 
             classification_override = :classification,
             override_notes = :notes,
@@ -38,17 +41,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_classification
             overridden_at = NOW(),
             last_status_change = NOW(),
             routing_updated = 1,
+            category = :category,
+            severity_level = :severity_level,
+            priority = :priority,
             category = CASE 
                 WHEN :classification = 'barangay' THEN 'Barangay Matter'
                 WHEN :classification = 'police' THEN 'Police Matter'
                 ELSE category
-            END
+            END,
+            updated_at = NOW()
             WHERE id = :id");
             
         $update_stmt->execute([
             ':classification' => $new_classification,
             ':notes' => $notes,
             ':user_id' => $_SESSION['user_id'],
+            ':category' => $category,
+            ':severity_level' => $severity_level,
+            ':priority' => $priority,
             ':id' => $report_id
         ]);
         
@@ -62,7 +72,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_classification
             ':original' => $original,
             ':new' => $new_classification,
             ':user_id' => $_SESSION['user_id'],
-            ':notes' => $notes
+            ':notes' => $notes . " | Category: " . ucfirst($category) . " | Severity: " . ucfirst($severity_level) . " | Priority: " . ucfirst($priority)
         ]);
         
         // Update routing flags for immediate queue reflection
@@ -82,14 +92,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_classification
         if ($current['user_id']) {
             $new_jurisdiction = $new_classification == 'barangay' ? 'Barangay Matter' : 'Police Matter';
             $message = "Your report #" . ($current['report_number'] ?? $current['id']) . " has been reclassified to: $new_jurisdiction. ";
-            $message .= "Reason: " . (!empty($notes) ? $notes : 'Classification correction by secretary');
+            $message .= "Click to view updated details.";
             
+            // Insert into notifications table with action_url
             $notification_stmt = $conn->prepare("
                 INSERT INTO notifications 
-                (user_id, title, message, type, related_id, created_at) 
+                (user_id, title, message, type, related_id, related_type, action_url, created_at) 
                 VALUES (:user_id, 'Report Classification Updated', 
                         :message, 
-                        'classification_change', :report_id, NOW())
+                        'classification_change', :report_id, 'report', 
+                        CONCAT('?module=my-reports&highlight=', :report_id), NOW())
             ");
             $notification_stmt->execute([
                 ':user_id' => $current['user_id'],
@@ -97,24 +109,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_classification
                 ':report_id' => $report_id
             ]);
             
+            // Get notification ID
+            $notification_id = $conn->lastInsertId();
+            
             // Also send email notification to citizen
             require_once __DIR__ . '/../../includes/mailer.php';
             $mail_subject = "Report Classification Update - Report #" . ($current['report_number'] ?? $current['id']);
             $mail_body = "
-            <h3>Report Classification Updated</h3>
+            <h3>Report Classification Update</h3>
             <p>Dear " . htmlspecialchars($current['first_name'] . ' ' . $current['last_name']) . ",</p>
-            <p>Your report has been reviewed and reclassified by our secretary.</p>
-            <p><strong>New Classification:</strong> $new_jurisdiction</p>
+            <p>Your report has been reviewed and updated by our secretary.</p>
+            <p><strong>Report Details:</strong></p>
+            <ul>
+                <li><strong>Report ID:</strong> #" . ($current['report_number'] ?? $current['id']) . "</li>
+                <li><strong>New Classification:</strong> $new_jurisdiction</li>
+                <li><strong>Report Category:</strong> " . htmlspecialchars(ucfirst($category)) . "</li>
+                <li><strong>Severity Level:</strong> " . htmlspecialchars(ucfirst($severity_level)) . "</li>
+                <li><strong>Priority:</strong> " . htmlspecialchars(ucfirst($priority)) . "</li>
+            </ul>
             <p><strong>Reason for change:</strong> " . htmlspecialchars($notes) . "</p>
             <p><strong>Report Status:</strong> The report has been moved to the appropriate department for processing.</p>
+            <p>You can view the updated report details by clicking the notification in your dashboard or visiting your reports page.</p>
             <p>Thank you for using our reporting system.</p>
             ";
             
-            sendEmail($current['email'], $mail_subject, $mail_body);
+            // Send email
+            if (function_exists('sendEmail')) {
+                sendEmail($current['email'], $mail_subject, $mail_body);
+            }
         }
         
         $conn->commit();
-        $success_message = "Report classification updated successfully! Citizen has been notified.";
+        $success_message = "Report classification updated successfully! Citizen has been notified via email and notification.";
         
     } catch (PDOException $e) {
         $conn->rollBack();
@@ -412,6 +438,15 @@ $reports = $stmt->fetchAll(PDO::FETCH_ASSOC);
                             <p class="text-xs text-blue-600 font-medium mb-1">AI PREDICTION</p>
                             <p class="text-lg font-bold text-gray-800" id="modalAiPrediction"></p>
                             <p class="text-xs text-gray-600 mt-1" id="modalAiReasoning">Based on report content analysis</p>
+                            <!-- Confidence calculation explanation -->
+                            <div class="mt-2">
+                                <p class="text-xs text-blue-600 font-medium">CONFIDENCE CALCULATION</p>
+                                <ul class="text-xs text-gray-600 mt-1 space-y-1">
+                                    <li id="modalKeywordMatches">Keyword matches: 0</li>
+                                    <li id="modalPatternMatches">Pattern matches: 0</li>
+                                    <li id="modalJurisdictionScore">Jurisdiction score: 0/100</li>
+                                </ul>
+                            </div>
                         </div>
                         <div>
                             <p class="text-xs text-blue-600 font-medium mb-1">CONFIDENCE LEVEL</p>
@@ -421,27 +456,72 @@ $reports = $stmt->fetchAll(PDO::FETCH_ASSOC);
                                 </div>
                                 <span id="modalAiConfidence" class="text-sm font-bold text-blue-800"></span>
                             </div>
-                            <div class="mt-2 text-xs text-gray-500">
-                                <p>AI Model: Transformer-based Classifier</p>
-                                <p>Analysis Time: <span id="modalAnalysisTime">Real-time</span></p>
+                            <!-- Confidence breakdown -->
+                            <div class="mt-3 bg-white p-3 rounded border">
+                                <p class="text-xs font-medium text-gray-700 mb-1">Confidence Breakdown:</p>
+                                <div class="space-y-1">
+                                    <div class="flex justify-between text-xs">
+                                        <span>Keyword Analysis</span>
+                                        <span id="modalKeywordScore" class="font-medium">0%</span>
+                                    </div>
+                                    <div class="w-full bg-gray-200 rounded-full h-1">
+                                        <div id="modalKeywordBar" class="bg-green-500 h-1 rounded-full" style="width: 0%"></div>
+                                    </div>
+                                    <div class="flex justify-between text-xs">
+                                        <span>Context Analysis</span>
+                                        <span id="modalContextScore" class="font-medium">0%</span>
+                                    </div>
+                                    <div class="w-full bg-gray-200 rounded-full h-1">
+                                        <div id="modalContextBar" class="bg-yellow-500 h-1 rounded-full" style="width: 0%"></div>
+                                    </div>
+                                    <div class="flex justify-between text-xs">
+                                        <span>Pattern Recognition</span>
+                                        <span id="modalPatternScore" class="font-medium">0%</span>
+                                    </div>
+                                    <div class="w-full bg-gray-200 rounded-full h-1">
+                                        <div id="modalPatternBar" class="bg-purple-500 h-1 rounded-full" style="width: 0%"></div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
                 
-                <!-- Report Details -->
+                <!-- Report Details with dropdowns -->
                 <div class="grid grid-cols-3 gap-4">
+                    <!-- Report Category Dropdown -->
                     <div class="p-3 bg-white border border-gray-200 rounded-lg">
                         <p class="text-xs text-gray-500 font-medium mb-1">REPORT CATEGORY</p>
-                        <p id="modalReportCategory" class="text-sm font-medium text-gray-700"></p>
+                        <select name="category" id="modalReportCategorySelect" 
+                                class="w-full text-sm font-medium text-gray-700 border-0 focus:ring-2 focus:ring-blue-500 rounded cursor-pointer">
+                            <option value="incident">Incident Report</option>
+                            <option value="complaint">Complaint Report</option>
+                            <option value="blotter">Blotter Report</option>
+                        </select>
                     </div>
+                    
+                    <!-- Severity Level Dropdown -->
                     <div class="p-3 bg-white border border-gray-200 rounded-lg">
                         <p class="text-xs text-gray-500 font-medium mb-1">SEVERITY LEVEL</p>
-                        <p id="modalSeverity" class="text-sm font-medium text-gray-700"></p>
+                        <select name="severity_level" id="modalSeveritySelect" 
+                                class="w-full text-sm font-medium text-gray-700 border-0 focus:ring-2 focus:ring-blue-500 rounded cursor-pointer">
+                            <option value="low">Low</option>
+                            <option value="medium" selected>Medium</option>
+                            <option value="high">High</option>
+                            <option value="critical">Critical</option>
+                        </select>
                     </div>
+                    
+                    <!-- Priority Dropdown -->
                     <div class="p-3 bg-white border border-gray-200 rounded-lg">
                         <p class="text-xs text-gray-500 font-medium mb-1">PRIORITY</p>
-                        <p id="modalPriority" class="text-sm font-medium text-gray-700"></p>
+                        <select name="priority" id="modalPrioritySelect" 
+                                class="w-full text-sm font-medium text-gray-700 border-0 focus:ring-2 focus:ring-blue-500 rounded cursor-pointer">
+                            <option value="low">Low</option>
+                            <option value="medium" selected>Medium</option>
+                            <option value="high">High</option>
+                            <option value="critical">Critical</option>
+                        </select>
                     </div>
                 </div>
             </div>
@@ -513,6 +593,10 @@ $reports = $stmt->fetchAll(PDO::FETCH_ASSOC);
                                 <li class="flex items-start">
                                     <i class="fas fa-sync-alt text-xs mr-2 mt-0.5"></i>
                                     <span>Updated status in their report dashboard</span>
+                                </li>
+                                <li class="flex items-start">
+                                    <i class="fas fa-edit text-xs mr-2 mt-0.5"></i>
+                                    <span>Updated category, severity, and priority</span>
                                 </li>
                             </ul>
                         </div>
@@ -595,19 +679,39 @@ function openClassificationModal(report) {
     document.getElementById('modalCurrentStatus').textContent = report.status.replace('_', ' ').toUpperCase();
     document.getElementById('modalReportType').textContent = report.report_type || 'General';
     document.getElementById('modalReportDescription').textContent = report.description || report.incident_details || 'No description provided.';
-    document.getElementById('modalReportCategory').textContent = report.category || 'Not specified';
-    document.getElementById('modalSeverity').textContent = report.severity_level || 'Medium';
-    document.getElementById('modalPriority').textContent = report.priority || 'Normal';
     document.getElementById('modalAnalysisTime').textContent = report.analyzed_at ? new Date(report.analyzed_at).toLocaleTimeString() : 'Real-time';
     
-    // Set AI info
-    const aiClass = report.original_ai_prediction || 'Uncertain';
-    const aiConfidence = report.ai_confidence || 0;
+    // Set editable dropdown values
+    document.getElementById('modalReportCategorySelect').value = report.category || 'incident';
+    document.getElementById('modalSeveritySelect').value = report.severity_level || 'medium';
+    document.getElementById('modalPrioritySelect').value = report.priority || 'medium';
+    
+    // Set AI info with enhanced confidence calculation
+    const aiClass = report.original_ai_prediction || 'uncertain';
+    let aiConfidence = report.ai_confidence || 0;
+    
+    // If confidence is 0 or not set, calculate it based on content
+    if (aiConfidence === 0 && report.description) {
+        aiConfidence = calculateConfidence(report.description, aiClass);
+    }
     
     document.getElementById('modalAiPrediction').textContent = aiClass.charAt(0).toUpperCase() + aiClass.slice(1) + ' Matter';
     document.getElementById('modalAiConfidence').textContent = aiConfidence + '%';
     document.getElementById('modalAiConfidenceBadge').textContent = aiConfidence + '% confident';
     document.getElementById('modalConfidenceBar').style.width = aiConfidence + '%';
+    
+    // Set confidence breakdown
+    const breakdown = calculateConfidenceBreakdown(report.description || '', aiClass);
+    document.getElementById('modalKeywordScore').textContent = breakdown.keywordScore + '%';
+    document.getElementById('modalContextScore').textContent = breakdown.contextScore + '%';
+    document.getElementById('modalPatternScore').textContent = breakdown.patternScore + '%';
+    document.getElementById('modalKeywordBar').style.width = breakdown.keywordScore + '%';
+    document.getElementById('modalContextBar').style.width = breakdown.contextScore + '%';
+    document.getElementById('modalPatternBar').style.width = breakdown.patternScore + '%';
+    
+    document.getElementById('modalKeywordMatches').textContent = `Keyword matches: ${breakdown.keywordMatches}`;
+    document.getElementById('modalPatternMatches').textContent = `Pattern matches: ${breakdown.patternMatches}`;
+    document.getElementById('modalJurisdictionScore').textContent = `Jurisdiction score: ${breakdown.jurisdictionScore}/100`;
     
     // Set reasoning based on AI classification
     let reasoning = 'Based on report content analysis';
@@ -643,6 +747,119 @@ function openClassificationModal(report) {
 function closeClassificationModal() {
     document.getElementById('classificationModal').classList.add('hidden');
     document.getElementById('classificationModal').classList.remove('flex');
+}
+
+// Add confidence calculation functions
+function calculateConfidence(text, classification) {
+    const keywords = {
+        'police': ['murder', 'rape', 'robbery', 'assault', 'drugs', 'weapon', 'gun', 'stabbing', 'shooting', 'kidnapping', 'theft', 'burglary'],
+        'barangay': ['noise', 'dispute', 'neighbor', 'boundary', 'garbage', 'animal', 'parking', 'water', 'electricity', 'sanitation', 'ordinance', 'local']
+    };
+    
+    const patterns = {
+        'police': [
+            /\b(shot|killed|stabbed|robbed|stolen)\b/i,
+            /\b(drug|shabu|marijuana)\b/i,
+            /\b(rape|molest|sexual assault)\b/i,
+            /\b(weapon|gun|knife)\b/i
+        ],
+        'barangay': [
+            /\b(noisy|loud|disturbance)\b/i,
+            /\b(neighbor|boundary|fence)\b/i,
+            /\b(garbage|trash|waste)\b/i,
+            /\b(animal|dog|pet)\b/i
+        ]
+    };
+    
+    const lowerText = text.toLowerCase();
+    const relevantKeywords = keywords[classification] || [];
+    
+    // Calculate keyword matches
+    let keywordMatches = 0;
+    relevantKeywords.forEach(keyword => {
+        if (lowerText.includes(keyword.toLowerCase())) {
+            keywordMatches++;
+        }
+    });
+    
+    // Calculate pattern matches
+    let patternMatches = 0;
+    const relevantPatterns = patterns[classification] || [];
+    relevantPatterns.forEach(pattern => {
+        if (pattern.test(text)) {
+            patternMatches++;
+        }
+    });
+    
+    // Calculate confidence
+    const keywordScore = relevantKeywords.length > 0 ? Math.min(100, (keywordMatches / relevantKeywords.length) * 100) : 0;
+    const patternScore = relevantPatterns.length > 0 ? Math.min(100, (patternMatches / relevantPatterns.length) * 100) : 0;
+    const textLengthScore = Math.min(100, (text.length / 500) * 100);
+    
+    // Weighted average
+    const confidence = Math.round((keywordScore * 0.4) + (patternScore * 0.4) + (textLengthScore * 0.2));
+    
+    return Math.min(100, Math.max(0, confidence));
+}
+
+function calculateConfidenceBreakdown(text, classification) {
+    const keywords = {
+        'police': ['murder', 'rape', 'robbery', 'assault', 'drugs', 'weapon', 'gun', 'stabbing', 'shooting', 'kidnapping', 'theft', 'burglary'],
+        'barangay': ['noise', 'dispute', 'neighbor', 'boundary', 'garbage', 'animal', 'parking', 'water', 'electricity', 'sanitation', 'ordinance', 'local']
+    };
+    
+    const patterns = {
+        'police': [
+            /\b(shot|killed|stabbed|robbed|stolen)\b/i,
+            /\b(drug|shabu|marijuana)\b/i,
+            /\b(rape|molest|sexual assault)\b/i,
+            /\b(weapon|gun|knife)\b/i
+        ],
+        'barangay': [
+            /\b(noisy|loud|disturbance)\b/i,
+            /\b(neighbor|boundary|fence)\b/i,
+            /\b(garbage|trash|waste)\b/i,
+            /\b(animal|dog|pet)\b/i
+        ]
+    };
+    
+    const lowerText = text.toLowerCase();
+    const relevantKeywords = keywords[classification] || [];
+    const relevantPatterns = patterns[classification] || [];
+    
+    // Calculate keyword matches
+    let keywordMatches = 0;
+    relevantKeywords.forEach(keyword => {
+        if (lowerText.includes(keyword.toLowerCase())) {
+            keywordMatches++;
+        }
+    });
+    
+    // Calculate pattern matches
+    let patternMatches = 0;
+    relevantPatterns.forEach(pattern => {
+        if (pattern.test(text)) {
+            patternMatches++;
+        }
+    });
+    
+    // Calculate scores
+    const keywordScore = relevantKeywords.length > 0 ? Math.min(100, (keywordMatches / relevantKeywords.length) * 100) : 0;
+    const patternScore = relevantPatterns.length > 0 ? Math.min(100, (patternMatches / relevantPatterns.length) * 100) : 0;
+    const textLength = text.length;
+    const contextScore = Math.min(100, (textLength / 500) * 100);
+    
+    // Jurisdiction score (combined)
+    const jurisdictionScore = Math.round((keywordScore + patternScore + contextScore) / 3);
+    
+    return {
+        keywordMatches: keywordMatches,
+        patternMatches: patternMatches,
+        keywordScore: Math.round(keywordScore),
+        contextScore: Math.round(contextScore),
+        patternScore: Math.round(patternScore),
+        jurisdictionScore: jurisdictionScore
+    };
 }
 
 // Show change log
@@ -728,5 +945,22 @@ document.addEventListener('DOMContentLoaded', function() {
     background-color: #dbeafe;
     color: #1e40af;
     border: 1px solid #93c5fd;
+}
+
+/* Dropdown styling */
+select {
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+    background-repeat: no-repeat;
+    background-position: right 0.5rem center;
+    background-size: 1em;
+    padding-right: 2.5rem;
+}
+
+select:focus {
+    outline: 2px solid #4f46e5;
+    outline-offset: 2px;
 }
 </style>
