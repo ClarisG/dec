@@ -826,6 +826,9 @@ function logActivity($conn, $user_id, $action) {
                     
                     <!-- Right: Actions -->
                     <div class="flex items-center space-x-4">
+                        <!-- Notifications Component -->
+                        <?php include '../components/notification_button.php'; ?>
+                        
                         <!-- Quick Stats -->
                         <div class="hidden md:flex items-center space-x-4">
                             <div class="text-right">

@@ -598,13 +598,8 @@ function getModuleSubtitle($module) {
                     
                     <!-- Right: Notifications and User -->
                     <div class="flex items-center space-x-4">
-                        <!-- Notifications -->
-                        <div class="relative">
-                            <button onclick="showNotifications()" class="relative">
-                                <i class="fas fa-bell text-gray-600 text-xl cursor-pointer hover:text-green-600"></i>
-                                <span class="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full animate-pulse"></span>
-                            </button>
-                        </div>
+                        <!-- Notifications Component -->
+                        <?php include '../components/notification_button.php'; ?>
                         
                         <!-- User Dropdown -->
                         <div class="relative">

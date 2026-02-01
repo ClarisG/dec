@@ -577,17 +577,8 @@ function getModuleSubtitle($module) {
                     
                     <!-- Right: Notifications and User -->
                     <div class="flex items-center space-x-4">
-                        <!-- Notifications -->
-                        <div class="relative">
-                            <button onclick="toggleNotifications()" class="relative p-2 text-gray-600 hover:text-blue-600 rounded-full hover:bg-gray-100">
-                                <i class="fas fa-bell text-xl"></i>
-                                <?php if (isset($stats['pending_approval']) && $stats['pending_approval'] > 0): ?>
-                                    <span class="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full text-white text-xs flex items-center justify-center animate-pulse">
-                                        <?php echo min($stats['pending_approval'], 9); ?>
-                                    </span>
-                                <?php endif; ?>
-                            </button>
-                        </div>
+                        <!-- Notifications Component -->
+                        <?php include '../components/notification_button.php'; ?>
                         
                         <!-- Quick Stats -->
                         <div class="hidden lg:flex items-center space-x-4">
