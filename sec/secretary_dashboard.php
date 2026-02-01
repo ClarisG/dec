@@ -554,10 +554,6 @@ function getModuleSubtitle($module) {
                     <i class="fas fa-file-pdf mr-3"></i>
                     Document Generation
                 </a>
-                <a href="?module=classification_review" class="sidebar-link block p-3 text-white rounded-lg <?php echo $module == 'classification_review' ? 'active' : ''; ?>">
-                    <i class="fas fa-robot mr-3"></i>
-                    Classification Review
-                </a>
             </nav>
             
             <!-- Status Toggle -->
