@@ -1,5 +1,5 @@
 <?php
-// sec/modules/classification_review.php - Enhanced Version
+// sec/modules/classification_review.php - Enhanced Version with Full Functionality
 
 if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'secretary') {
     exit('Unauthorized');
@@ -16,7 +16,7 @@ require_once __DIR__ . '/../../includes/email_helper.php';
 
 // Handle classification override
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_classification'])) {
-    $report_id = $_POST['report_id'];
+    $report_id = intval($_POST['report_id']);
     $new_classification = $_POST['classification']; // 'barangay' or 'police'
     $notes = $_POST['notes'] ?? '';
     $category = $_POST['category'] ?? 'incident';
@@ -34,6 +34,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_classification
         $stmt->execute([':id' => $report_id]);
         $current = $stmt->fetch(PDO::FETCH_ASSOC);
         
+        if (!$current) {
+            throw new Exception("Report not found");
+        }
+        
         $original = $current['classification_override'] ?? $current['ai_classification'] ?? 'uncertain';
         
         // Update report with new classification and all fields
@@ -44,14 +48,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_classification
             overridden_at = NOW(),
             last_status_change = NOW(),
             routing_updated = 1,
-            category = :category,
-            severity_level = :severity_level,
-            priority = :priority,
             category = CASE 
                 WHEN :classification = 'barangay' THEN 'Barangay Matter'
                 WHEN :classification = 'police' THEN 'Police Matter'
-                ELSE category
+                ELSE :category
             END,
+            severity_level = :severity_level,
+            priority = :priority,
             updated_at = NOW()
             WHERE id = :id");
             
@@ -79,23 +82,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_classification
         ]);
         
         // Update routing flags for immediate queue reflection
-        $routing_stmt = $conn->prepare("
-            UPDATE report_routing 
-            SET needs_update = 1, 
-                last_updated = NOW(),
-                updated_by = :user_id
-            WHERE report_id = :report_id
-        ");
-        $routing_stmt->execute([
-            ':user_id' => $_SESSION['user_id'],
-            ':report_id' => $report_id
-        ]);
+        try {
+            $routing_stmt = $conn->prepare("
+                UPDATE report_routing 
+                SET needs_update = 1, 
+                    last_updated = NOW(),
+                    updated_by = :user_id
+                WHERE report_id = :report_id
+            ");
+            $routing_stmt->execute([
+                ':user_id' => $_SESSION['user_id'],
+                ':report_id' => $report_id
+            ]);
+        } catch (Exception $e) {
+            // Routing table might not exist, continue anyway
+        }
         
         // Create notification for citizen about classification change
         if ($current['user_id']) {
             $new_jurisdiction = $new_classification == 'barangay' ? 'Barangay Matter' : 'Police Matter';
-            $message = "Your report #" . ($current['report_number'] ?? $current['id']) . " has been reclassified to: $new_jurisdiction. ";
-            $message .= "Click to view updated details.";
+            $message = "Your report #" . ($current['report_number'] ?? $current['id']) . " has been reclassified to: $new_jurisdiction. Click to view updated details.";
             
             // Insert into notifications table with action_url
             $notification_stmt = $conn->prepare("
@@ -112,10 +118,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_classification
                 ':report_id' => $report_id
             ]);
             
-            // Get notification ID
-            $notification_id = $conn->lastInsertId();
-            
-            // Also send email notification to citizen
+            // Send email notification to citizen
             $mail_subject = "Report Classification Update - Report #" . ($current['report_number'] ?? $current['id']);
             $mail_body = "
             <h3>Report Classification Update</h3>
@@ -142,7 +145,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_classification
         $conn->commit();
         $success_message = "Report classification updated successfully! Citizen has been notified via email and notification.";
         
-    } catch (PDOException $e) {
+    } catch (Exception $e) {
         $conn->rollBack();
         $error_message = "Error updating classification: " . $e->getMessage();
     }
@@ -272,8 +275,9 @@ $reports = $stmt->fetchAll(PDO::FETCH_ASSOC);
                         $needs_review = empty($report['classification_override']);
                         $row_class = $needs_review ? 'bg-yellow-50 hover:bg-yellow-100' : 'hover:bg-gray-50';
                         ?>
-                        <tr class="<?php echo $row_class; ?> transition-colors report-row" 
-                            data-review-status="<?php echo $needs_review ? 'needs_review' : 'reviewed'; ?>">
+                        <tr class="<?php echo $row_class; ?> transition-colors report-row cursor-pointer" 
+                            data-review-status="<?php echo $needs_review ? 'needs_review' : 'reviewed'; ?>"
+                            onclick="openClassificationModal(<?php echo htmlspecialchars(json_encode($report)); ?>)">
                             <td class="p-4 align-top">
                                 <span class="block font-medium text-gray-900">#<?php echo htmlspecialchars($report['report_number'] ?? $report['id']); ?></span>
                                 <span class="text-xs text-gray-500"><?php echo date('M d, Y h:i A', strtotime($report['created_at'])); ?></span>
@@ -351,7 +355,7 @@ $reports = $stmt->fetchAll(PDO::FETCH_ASSOC);
                             </td>
                             <td class="p-4 align-top">
                                 <?php if ($report['change_count'] > 0): ?>
-                                    <button onclick="showChangeLog(<?php echo $report['id']; ?>)" 
+                                    <button onclick="event.stopPropagation(); showChangeLog(<?php echo $report['id']; ?>)" 
                                             class="text-blue-600 hover:text-blue-800 text-sm font-medium hover:underline">
                                         <i class="fas fa-history mr-1"></i> <?php echo $report['change_count']; ?> change(s)
                                     </button>
@@ -359,7 +363,7 @@ $reports = $stmt->fetchAll(PDO::FETCH_ASSOC);
                                     <span class="text-gray-400 text-sm">No changes</span>
                                 <?php endif; ?>
                             </td>
-                            <td class="p-4 align-top">
+                            <td class="p-4 align-top" onclick="event.stopPropagation();">
                                 <button onclick="openClassificationModal(<?php echo htmlspecialchars(json_encode($report)); ?>)" 
                                         class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors">
                                     <i class="fas fa-eye mr-1"></i> View & Review
@@ -390,11 +394,11 @@ $reports = $stmt->fetchAll(PDO::FETCH_ASSOC);
         <div class="bg-gray-50 px-6 py-4 border-b border-gray-100 flex justify-between items-center">
             <h3 class="text-lg font-bold text-gray-800">Report Classification Review</h3>
             <button onclick="closeClassificationModal()" class="text-gray-400 hover:text-gray-600 transition-colors">
-                <i class="fas fa-times"></i>
+                <i class="fas fa-times text-2xl"></i>
             </button>
         </div>
         
-        <form method="POST" action="" class="p-6">
+        <form method="POST" action="" class="p-6 overflow-y-auto max-h-[calc(100vh-200px)]">
             <input type="hidden" name="report_id" id="modalReportId">
             <input type="hidden" name="update_classification" value="1">
             
@@ -452,9 +456,9 @@ $reports = $stmt->fetchAll(PDO::FETCH_ASSOC);
                             <p class="text-xs text-blue-600 font-medium mb-1">CONFIDENCE LEVEL</p>
                             <div class="flex items-center">
                                 <div class="w-full bg-gray-200 rounded-full h-3 mr-2">
-                                    <div id="modalConfidenceBar" class="bg-blue-600 h-3 rounded-full"></div>
+                                    <div id="modalConfidenceBar" class="bg-blue-600 h-3 rounded-full transition-all duration-300"></div>
                                 </div>
-                                <span id="modalAiConfidence" class="text-sm font-bold text-blue-800"></span>
+                                <span id="modalAiConfidence" class="text-sm font-bold text-blue-800 min-w-[40px]"></span>
                             </div>
                             <!-- Confidence breakdown -->
                             <div class="mt-3 bg-white p-3 rounded border">
@@ -465,21 +469,21 @@ $reports = $stmt->fetchAll(PDO::FETCH_ASSOC);
                                         <span id="modalKeywordScore" class="font-medium">0%</span>
                                     </div>
                                     <div class="w-full bg-gray-200 rounded-full h-1">
-                                        <div id="modalKeywordBar" class="bg-green-500 h-1 rounded-full" style="width: 0%"></div>
+                                        <div id="modalKeywordBar" class="bg-green-500 h-1 rounded-full transition-all duration-300" style="width: 0%"></div>
                                     </div>
                                     <div class="flex justify-between text-xs">
                                         <span>Context Analysis</span>
                                         <span id="modalContextScore" class="font-medium">0%</span>
                                     </div>
                                     <div class="w-full bg-gray-200 rounded-full h-1">
-                                        <div id="modalContextBar" class="bg-yellow-500 h-1 rounded-full" style="width: 0%"></div>
+                                        <div id="modalContextBar" class="bg-yellow-500 h-1 rounded-full transition-all duration-300" style="width: 0%"></div>
                                     </div>
                                     <div class="flex justify-between text-xs">
                                         <span>Pattern Recognition</span>
                                         <span id="modalPatternScore" class="font-medium">0%</span>
                                     </div>
                                     <div class="w-full bg-gray-200 rounded-full h-1">
-                                        <div id="modalPatternBar" class="bg-purple-500 h-1 rounded-full" style="width: 0%"></div>
+                                        <div id="modalPatternBar" class="bg-purple-500 h-1 rounded-full transition-all duration-300" style="width: 0%"></div>
                                     </div>
                                 </div>
                             </div>
@@ -493,7 +497,7 @@ $reports = $stmt->fetchAll(PDO::FETCH_ASSOC);
                     <div class="p-3 bg-white border border-gray-200 rounded-lg">
                         <p class="text-xs text-gray-500 font-medium mb-1">REPORT CATEGORY</p>
                         <select name="category" id="modalReportCategorySelect" 
-                                class="w-full text-sm font-medium text-gray-700 border-0 focus:ring-2 focus:ring-blue-500 rounded cursor-pointer">
+                                class="w-full text-sm font-medium text-gray-700 border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded cursor-pointer p-2">
                             <option value="incident">Incident Report</option>
                             <option value="complaint">Complaint Report</option>
                             <option value="blotter">Blotter Report</option>
@@ -504,7 +508,7 @@ $reports = $stmt->fetchAll(PDO::FETCH_ASSOC);
                     <div class="p-3 bg-white border border-gray-200 rounded-lg">
                         <p class="text-xs text-gray-500 font-medium mb-1">SEVERITY LEVEL</p>
                         <select name="severity_level" id="modalSeveritySelect" 
-                                class="w-full text-sm font-medium text-gray-700 border-0 focus:ring-2 focus:ring-blue-500 rounded cursor-pointer">
+                                class="w-full text-sm font-medium text-gray-700 border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded cursor-pointer p-2">
                             <option value="low">Low</option>
                             <option value="medium" selected>Medium</option>
                             <option value="high">High</option>
@@ -516,7 +520,7 @@ $reports = $stmt->fetchAll(PDO::FETCH_ASSOC);
                     <div class="p-3 bg-white border border-gray-200 rounded-lg">
                         <p class="text-xs text-gray-500 font-medium mb-1">PRIORITY</p>
                         <select name="priority" id="modalPrioritySelect" 
-                                class="w-full text-sm font-medium text-gray-700 border-0 focus:ring-2 focus:ring-blue-500 rounded cursor-pointer">
+                                class="w-full text-sm font-medium text-gray-700 border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded cursor-pointer p-2">
                             <option value="low">Low</option>
                             <option value="medium" selected>Medium</option>
                             <option value="high">High</option>
@@ -544,8 +548,8 @@ $reports = $stmt->fetchAll(PDO::FETCH_ASSOC);
                     
                     <div class="grid grid-cols-2 gap-4">
                         <label class="cursor-pointer relative">
-                            <input type="radio" name="classification" value="barangay" class="peer sr-only" id="radioBarangay">
-                            <div class="p-4 rounded-lg border-2 border-gray-200 peer-checked:border-green-500 peer-checked:bg-green-50 transition-all text-center h-full">
+                            <input type="radio" name="classification" value="barangay" class="peer sr-only" id="radioBarangay" required>
+                            <div class="p-4 rounded-lg border-2 border-gray-200 peer-checked:border-green-500 peer-checked:bg-green-50 transition-all text-center h-full hover:border-green-300">
                                 <i class="fas fa-home text-2xl mb-2 text-gray-400 peer-checked:text-green-600"></i>
                                 <div class="font-bold text-gray-700 peer-checked:text-green-800">Barangay Matter</div>
                                 <div class="text-xs text-gray-500 mt-1">Local disputes, minor offenses</div>
@@ -553,8 +557,8 @@ $reports = $stmt->fetchAll(PDO::FETCH_ASSOC);
                         </label>
                         
                         <label class="cursor-pointer relative">
-                            <input type="radio" name="classification" value="police" class="peer sr-only" id="radioPolice">
-                            <div class="p-4 rounded-lg border-2 border-gray-200 peer-checked:border-red-500 peer-checked:bg-red-50 transition-all text-center h-full">
+                            <input type="radio" name="classification" value="police" class="peer sr-only" id="radioPolice" required>
+                            <div class="p-4 rounded-lg border-2 border-gray-200 peer-checked:border-red-500 peer-checked:bg-red-50 transition-all text-center h-full hover:border-red-300">
                                 <i class="fas fa-shield-alt text-2xl mb-2 text-gray-400 peer-checked:text-red-600"></i>
                                 <div class="font-bold text-gray-700 peer-checked:text-red-800">Police Matter</div>
                                 <div class="text-xs text-gray-500 mt-1">Criminal offenses, investigations</div>
@@ -567,7 +571,7 @@ $reports = $stmt->fetchAll(PDO::FETCH_ASSOC);
                 <div class="mb-4">
                     <label class="block text-sm font-medium text-gray-700 mb-2">Reason for Correction:</label>
                     <textarea name="notes" id="modalNotes" rows="3" required 
-                              class="w-full rounded-lg border-gray-300 border p-3 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-shadow" 
+                              class="w-full rounded-lg border border-gray-300 p-3 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-shadow" 
                               placeholder="Explain why you are changing the AI classification. This will be sent to the citizen."></textarea>
                     <p class="text-xs text-gray-500 mt-1">This explanation will be included in the notification sent to the citizen.</p>
                 </div>
@@ -628,7 +632,7 @@ $reports = $stmt->fetchAll(PDO::FETCH_ASSOC);
             </button>
         </div>
         
-        <div class="p-6">
+        <div class="p-6 max-h-96 overflow-y-auto">
             <div id="changeLogContent" class="space-y-4">
                 <!-- Change logs will be loaded here -->
             </div>
@@ -668,18 +672,22 @@ function filterReports(filterType) {
 
 // Open classification modal with full report details
 function openClassificationModal(report) {
+    if (!report || !report.id) {
+        console.error('Invalid report data');
+        return;
+    }
+    
     document.getElementById('modalReportId').value = report.id;
     
     // Set report info
     document.getElementById('modalReportNumber').textContent = report.report_number || '#' + report.id;
-    document.getElementById('modalCitizenName').textContent = report.first_name + ' ' + report.last_name;
+    document.getElementById('modalCitizenName').textContent = (report.first_name || '') + ' ' + (report.last_name || '');
     document.getElementById('modalDateFiled').textContent = new Date(report.created_at).toLocaleDateString('en-US', {
         year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit'
     });
-    document.getElementById('modalCurrentStatus').textContent = report.status.replace('_', ' ').toUpperCase();
+    document.getElementById('modalCurrentStatus').textContent = (report.status || 'unknown').replace('_', ' ').toUpperCase();
     document.getElementById('modalReportType').textContent = report.report_type || 'General';
     document.getElementById('modalReportDescription').textContent = report.description || report.incident_details || 'No description provided.';
-    document.getElementById('modalAnalysisTime').textContent = report.analyzed_at ? new Date(report.analyzed_at).toLocaleTimeString() : 'Real-time';
     
     // Set editable dropdown values
     document.getElementById('modalReportCategorySelect').value = report.category || 'incident';
@@ -723,7 +731,7 @@ function openClassificationModal(report) {
     document.getElementById('modalAiReasoning').textContent = reasoning;
     
     // Select current classification
-    const current = report.current_jurisdiction.toLowerCase();
+    const current = (report.current_jurisdiction || '').toLowerCase();
     if (current === 'barangay') {
         document.getElementById('radioBarangay').checked = true;
     } else if (current === 'police') {
@@ -869,7 +877,7 @@ async function showChangeLog(reportId) {
         const data = await response.json();
         
         let html = '';
-        if (data.length > 0) {
+        if (data && data.length > 0) {
             data.forEach(log => {
                 const date = new Date(log.created_at);
                 html += `
@@ -962,5 +970,28 @@ select {
 select:focus {
     outline: 2px solid #4f46e5;
     outline-offset: 2px;
+}
+
+/* Modal scrolling */
+.overflow-y-auto {
+    scrollbar-width: thin;
+    scrollbar-color: #cbd5e1 #f1f5f9;
+}
+
+.overflow-y-auto::-webkit-scrollbar {
+    width: 6px;
+}
+
+.overflow-y-auto::-webkit-scrollbar-track {
+    background: #f1f5f9;
+}
+
+.overflow-y-auto::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 3px;
+}
+
+.overflow-y-auto::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
 }
 </style>
