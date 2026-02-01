@@ -11,6 +11,9 @@ if (!isset($conn)) {
     $conn = getDbConnection();
 }
 
+// Include email helper functions
+require_once __DIR__ . '/../../includes/email_helper.php';
+
 // Handle classification override
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_classification'])) {
     $report_id = $_POST['report_id'];
@@ -113,7 +116,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_classification
             $notification_id = $conn->lastInsertId();
             
             // Also send email notification to citizen
-            require_once __DIR__ . '/../../includes/mailer.php';
             $mail_subject = "Report Classification Update - Report #" . ($current['report_number'] ?? $current['id']);
             $mail_body = "
             <h3>Report Classification Update</h3>
@@ -133,10 +135,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_classification
             <p>Thank you for using our reporting system.</p>
             ";
             
-            // Send email
-            if (function_exists('sendEmail')) {
-                sendEmail($current['email'], $mail_subject, $mail_body);
-            }
+            // Send email using sendEmailNotification function
+            sendEmailNotification($current['email'], $current['first_name'] . ' ' . $current['last_name'], $mail_subject, $mail_body);
         }
         
         $conn->commit();

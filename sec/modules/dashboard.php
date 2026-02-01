@@ -114,14 +114,14 @@
                         </div>
                     </a>
                     
-                    <a href="?module=referral" class="module-card bg-white rounded-lg p-4 shadow-sm hover:shadow-md">
+                    <a href="?module=classification_review" class="module-card bg-white rounded-lg p-4 shadow-sm hover:shadow-md">
                         <div class="flex items-center">
-                            <div class="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center mr-3">
-                                <i class="fas fa-shield-alt text-red-600"></i>
+                            <div class="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center mr-3">
+                                <i class="fas fa-robot text-purple-600"></i>
                             </div>
                             <div>
-                                <p class="font-medium text-gray-800">VAWC Referral</p>
-                                <p class="text-sm text-gray-600">Confidential protocol</p>
+                                <p class="font-medium text-gray-800">Classification Review</p>
+                                <p class="text-sm text-gray-600">AI verification & referral</p>
                             </div>
                         </div>
                     </a>

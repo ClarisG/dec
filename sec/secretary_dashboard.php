@@ -554,10 +554,6 @@ function getModuleSubtitle($module) {
                     <i class="fas fa-file-pdf mr-3"></i>
                     Document Generation
                 </a>
-                <a href="?module=referral" class="sidebar-link block p-3 text-white rounded-lg <?php echo $module == 'referral' ? 'active' : ''; ?>">
-                    <i class="fas fa-exchange-alt mr-3"></i>
-                    External Referral Desk
-                </a>
                 <a href="?module=classification_review" class="sidebar-link block p-3 text-white rounded-lg <?php echo $module == 'classification_review' ? 'active' : ''; ?>">
                     <i class="fas fa-robot mr-3"></i>
                     Classification Review
@@ -609,11 +605,8 @@ function getModuleSubtitle($module) {
                     
                     <!-- Right: Notifications and User -->
                     <div class="flex items-center space-x-4">
-                        <!-- Notifications -->
-                        <div class="relative">
-                            <i class="fas fa-bell text-gray-600 text-xl cursor-pointer hover:text-blue-600"></i>
-                            <span class="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full animate-pulse"></span>
-                        </div>
+                        <!-- Notifications Component -->
+                        <?php include '../components/notification_button.php'; ?>
                         
                         <!-- User Dropdown -->
                         <div class="relative">
