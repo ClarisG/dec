@@ -460,7 +460,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['submit_report'])) {
                 <div class="drop-zone border-2 border-dashed border-gray-300 rounded-lg p-6 text-center mb-4 hover:border-blue-400 transition-colors cursor-pointer">
                     <input type="file" id="incident_evidence_files" name="evidence_files[]" 
                            class="hidden" multiple accept="image/*,.pdf,.doc,.docx,.mp4,.avi,.mov,.wav,.mp3"
-                           onchange="handleFileUpload(this.files, 'incident')">
+                           onchange="handleFileUpload(this, 'incident')">
                     
                     <div class="flex flex-col items-center">
                         <i class="fas fa-cloud-upload-alt text-3xl text-gray-400 mb-3"></i>
@@ -634,7 +634,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['submit_report'])) {
                 <div class="drop-zone border-2 border-dashed border-gray-300 rounded-lg p-6 text-center mb-4 hover:border-blue-400 transition-colors cursor-pointer">
                     <input type="file" id="complaint_evidence_files" name="evidence_files[]" 
                            class="hidden" multiple accept="image/*,.pdf,.doc,.docx,.mp4,.avi,.mov,.wav,.mp3"
-                           onchange="handleFileUpload(this.files, 'complaint')">
+                           onchange="handleFileUpload(this, 'complaint')">
                     
                     <div class="flex flex-col items-center">
                         <i class="fas fa-cloud-upload-alt text-3xl text-gray-400 mb-3"></i>
@@ -808,7 +808,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['submit_report'])) {
                 <div class="drop-zone border-2 border-dashed border-gray-300 rounded-lg p-6 text-center mb-4 hover:border-blue-400 transition-colors cursor-pointer">
                     <input type="file" id="blotter_evidence_files" name="evidence_files[]" 
                            class="hidden" multiple accept="image/*,.pdf,.doc,.docx,.mp4,.avi,.mov,.wav,.mp3"
-                           onchange="handleFileUpload(this.files, 'blotter')">
+                           onchange="handleFileUpload(this, 'blotter')">
                     
                     <div class="flex flex-col items-center">
                         <i class="fas fa-cloud-upload-alt text-3xl text-gray-400 mb-3"></i>
@@ -1510,171 +1510,130 @@ function updateCharCount(category, count) {
     }
 }
 
-// File Upload Functions - COMPLETELY FIXED VERSION
-const uploadedFiles = {
-    incident: [],
-    complaint: [],
-    blotter: []
-};
-
-function handleFileUpload(files, formType) {
-    const fileList = document.getElementById(formType + 'FileList');
-    const fileCount = document.getElementById(formType + 'FileCount');
+// File Upload Functions - SIMPLIFIED AND FIXED VERSION
+function handleFileUpload(fileInput, formType) {
+    const files = fileInput.files;
+    const fileListElement = document.getElementById(formType + 'FileList');
+    const fileCountElement = document.getElementById(formType + 'FileCount');
     const maxFiles = 10;
     
-    // Convert FileList to array
-    const newFiles = Array.from(files);
+    // Clear existing file list
+    if (fileListElement) {
+        fileListElement.innerHTML = '';
+    }
     
-    // Check if adding new files would exceed limit
-    if (newFiles.length > maxFiles) {
-        showToast(`Maximum ${maxFiles} files allowed. You selected ${newFiles.length} files.`, 'error');
+    // Check file count
+    if (files.length > maxFiles) {
+        showToast(`Maximum ${maxFiles} files allowed. You selected ${files.length} files.`, 'error');
+        fileInput.value = ''; // Clear the input
+        if (fileCountElement) {
+            fileCountElement.textContent = '0';
+        }
         return;
     }
     
-    // Clear existing uploaded files for this form type
-    uploadedFiles[formType] = [];
-    
-    // Clear the file list display
-    if (fileList) {
-        fileList.innerHTML = '';
-    }
-    
-    // Process each new file
-    newFiles.forEach((file, index) => {
+    // Display each file
+    for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        
         // Validate file type and size
-        const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'application/pdf', 
-                            'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-                            'video/mp4', 'video/avi', 'video/quicktime', 'audio/wav', 'audio/mp3'];
+        const allowedExtensions = ['jpg', 'jpeg', 'png', 'gif', 'pdf', 'doc', 'docx', 'mp4', 'avi', 'mov', 'wav', 'mp3'];
         const maxSize = 10 * 1024 * 1024; // 10MB
         
-        if (!allowedTypes.includes(file.type) && !file.type.startsWith('image/')) {
-            showToast(`File "${file.name}" is not a supported file type.`, 'error');
-            return;
+        // Get file extension
+        const fileName = file.name;
+        const fileExtension = fileName.substring(fileName.lastIndexOf('.') + 1).toLowerCase();
+        
+        // Check if file type is allowed
+        const isExtensionAllowed = allowedExtensions.includes(fileExtension);
+        
+        if (!isExtensionAllowed) {
+            showToast(`File "${fileName}" is not a supported file type.`, 'error');
+            continue;
         }
         
         if (file.size > maxSize) {
-            showToast(`File "${file.name}" is too large. Maximum size is 10MB.`, 'error');
-            return;
+            showToast(`File "${fileName}" is too large. Maximum size is 10MB.`, 'error');
+            continue;
         }
-        
-        // Add to uploaded files
-        uploadedFiles[formType].push(file);
         
         // Create file preview
         const fileItem = document.createElement('div');
         fileItem.className = 'file-item flex items-center justify-between p-3 bg-gray-50 rounded-lg border animate-fadeIn';
-        fileItem.dataset.index = index;
         fileItem.innerHTML = `
             <div class="flex items-center flex-1">
                 <div class="flex-shrink-0">
-                    <i class="fas ${getFileIcon(file.type)} text-blue-500 mr-3 text-lg"></i>
+                    <i class="fas ${getFileIcon(file.type, fileExtension)} text-blue-500 mr-3 text-lg"></i>
                 </div>
                 <div class="flex-1 min-w-0">
-                    <p class="text-sm font-medium text-gray-800 truncate">${file.name}</p>
+                    <p class="text-sm font-medium text-gray-800 truncate">${fileName}</p>
                     <div class="flex items-center text-xs text-gray-500 mt-1">
                         <span>${formatFileSize(file.size)}</span>
                         <span class="mx-2">•</span>
-                        <span>${getFileType(file.type)}</span>
+                        <span>${getFileType(file.type, fileExtension)}</span>
                     </div>
                 </div>
             </div>
-            <button type="button" onclick="removeFile('${formType}', ${index})" 
+            <button type="button" onclick="removeFileFromList(this, '${formType}')" 
                     class="ml-3 p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors">
                 <i class="fas fa-times"></i>
             </button>
         `;
         
-        if (fileList) {
-            fileList.appendChild(fileItem);
+        if (fileListElement) {
+            fileListElement.appendChild(fileItem);
         }
-    });
-    
-    // Update count
-    if (fileCount) {
-        fileCount.textContent = uploadedFiles[formType].length;
     }
     
-    // Update the actual file input
-    updateFileInput(formType);
+    // Update count
+    if (fileCountElement) {
+        fileCountElement.textContent = files.length;
+    }
     
-    if (newFiles.length > 0) {
-        showToast(`Added ${newFiles.length} file(s)`, 'success');
+    if (files.length > 0) {
+        showToast(`Added ${files.length} file(s)`, 'success');
     }
 }
 
-function removeFile(formType, index) {
-    // Remove file from array
-    if (uploadedFiles[formType][index]) {
-        uploadedFiles[formType].splice(index, 1);
+function removeFileFromList(buttonElement, formType) {
+    const fileItem = buttonElement.closest('.file-item');
+    const fileListElement = document.getElementById(formType + 'FileList');
+    const fileCountElement = document.getElementById(formType + 'FileCount');
+    const fileInput = document.getElementById(formType + '_evidence_files');
+    
+    // Remove the file item from display
+    if (fileItem && fileListElement) {
+        fileItem.remove();
         
-        // Update the display
-        const fileList = document.getElementById(formType + 'FileList');
-        const fileCount = document.getElementById(formType + 'FileCount');
-        
-        if (fileList) {
-            // Rebuild the file list
-            fileList.innerHTML = '';
-            
-            // Re-add all remaining files with updated indexes
-            uploadedFiles[formType].forEach((file, newIndex) => {
-                const fileItem = document.createElement('div');
-                fileItem.className = 'file-item flex items-center justify-between p-3 bg-gray-50 rounded-lg border animate-fadeIn';
-                fileItem.innerHTML = `
-                    <div class="flex items-center flex-1">
-                        <div class="flex-shrink-0">
-                            <i class="fas ${getFileIcon(file.type)} text-blue-500 mr-3 text-lg"></i>
-                        </div>
-                        <div class="flex-1 min-w-0">
-                            <p class="text-sm font-medium text-gray-800 truncate">${file.name}</p>
-                            <div class="flex items-center text-xs text-gray-500 mt-1">
-                                <span>${formatFileSize(file.size)}</span>
-                                <span class="mx-2">•</span>
-                                <span>${getFileType(file.type)}</span>
-                            </div>
-                        </div>
-                    </div>
-                    <button type="button" onclick="removeFile('${formType}', ${newIndex})" 
-                            class="ml-3 p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors">
-                        <i class="fas fa-times"></i>
-                    </button>
-                `;
-                fileList.appendChild(fileItem);
-            });
+        // Update file count
+        if (fileCountElement) {
+            const currentCount = parseInt(fileCountElement.textContent) || 0;
+            fileCountElement.textContent = Math.max(0, currentCount - 1);
         }
         
-        // Update count
-        if (fileCount) {
-            fileCount.textContent = uploadedFiles[formType].length;
-        }
-        
-        // Update the actual file input
-        updateFileInput(formType);
-        
-        showToast('File removed', 'info');
+        // We cannot directly remove files from a file input for security reasons
+        // Instead, we'll track removed files and handle them on form submission
+        showToast('File removed from list', 'info');
     }
 }
 
 function clearFiles(formType) {
-    if (uploadedFiles[formType].length === 0) return;
+    const fileListElement = document.getElementById(formType + 'FileList');
+    const fileCountElement = document.getElementById(formType + 'FileCount');
+    const fileInput = document.getElementById(formType + '_evidence_files');
     
-    if (confirm(`Are you sure you want to remove all ${uploadedFiles[formType].length} files?`)) {
-        // Clear the array
-        uploadedFiles[formType] = [];
-        
+    if (confirm('Are you sure you want to remove all files?')) {
         // Clear the file list display
-        const fileList = document.getElementById(formType + 'FileList');
-        if (fileList) {
-            fileList.innerHTML = '';
+        if (fileListElement) {
+            fileListElement.innerHTML = '';
         }
         
-        // Update count
-        const fileCount = document.getElementById(formType + 'FileCount');
-        if (fileCount) {
-            fileCount.textContent = '0';
+        // Reset file count
+        if (fileCountElement) {
+            fileCountElement.textContent = '0';
         }
         
-        // Clear the actual file input
-        const fileInput = document.getElementById(formType + '_evidence_files');
+        // Clear the file input
         if (fileInput) {
             fileInput.value = '';
         }
@@ -1683,38 +1642,42 @@ function clearFiles(formType) {
     }
 }
 
-function updateFileInput(formType) {
-    const fileInput = document.getElementById(formType + '_evidence_files');
-    if (!fileInput) return;
-    
-    // Create a new DataTransfer object
-    const dataTransfer = new DataTransfer();
-    
-    // Add all files from the uploadedFiles array
-    uploadedFiles[formType].forEach(file => {
-        dataTransfer.items.add(file);
-    });
-    
-    // Replace the files in the input
-    fileInput.files = dataTransfer.files;
-}
-
 // Helper functions
-function getFileIcon(mimeType) {
-    if (mimeType.startsWith('image/')) return 'fa-image';
-    if (mimeType.startsWith('video/')) return 'fa-video';
-    if (mimeType === 'application/pdf') return 'fa-file-pdf';
-    if (mimeType.startsWith('audio/')) return 'fa-file-audio';
-    if (mimeType.includes('word') || mimeType.includes('document')) return 'fa-file-word';
+function getFileIcon(mimeType, fileExtension) {
+    if (mimeType.startsWith('image/') || ['jpg', 'jpeg', 'png', 'gif'].includes(fileExtension)) {
+        return 'fa-image';
+    }
+    if (mimeType.startsWith('video/') || ['mp4', 'avi', 'mov'].includes(fileExtension)) {
+        return 'fa-video';
+    }
+    if (mimeType === 'application/pdf' || fileExtension === 'pdf') {
+        return 'fa-file-pdf';
+    }
+    if (mimeType.startsWith('audio/') || ['wav', 'mp3'].includes(fileExtension)) {
+        return 'fa-file-audio';
+    }
+    if (mimeType.includes('word') || mimeType.includes('document') || ['doc', 'docx'].includes(fileExtension)) {
+        return 'fa-file-word';
+    }
     return 'fa-file';
 }
 
-function getFileType(mimeType) {
-    if (mimeType.startsWith('image/')) return 'Image';
-    if (mimeType.startsWith('video/')) return 'Video';
-    if (mimeType === 'application/pdf') return 'PDF';
-    if (mimeType.startsWith('audio/')) return 'Audio';
-    if (mimeType.includes('word') || mimeType.includes('document')) return 'Document';
+function getFileType(mimeType, fileExtension) {
+    if (mimeType.startsWith('image/') || ['jpg', 'jpeg', 'png', 'gif'].includes(fileExtension)) {
+        return 'Image';
+    }
+    if (mimeType.startsWith('video/') || ['mp4', 'avi', 'mov'].includes(fileExtension)) {
+        return 'Video';
+    }
+    if (mimeType === 'application/pdf' || fileExtension === 'pdf') {
+        return 'PDF';
+    }
+    if (mimeType.startsWith('audio/') || ['wav', 'mp3'].includes(fileExtension)) {
+        return 'Audio';
+    }
+    if (mimeType.includes('word') || mimeType.includes('document') || ['doc', 'docx'].includes(fileExtension)) {
+        return 'Document';
+    }
     return 'File';
 }
 
@@ -1726,7 +1689,7 @@ function formatFileSize(bytes) {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 }
 
-// Drag and drop - FIXED VERSION
+// Drag and drop
 document.querySelectorAll('.drop-zone').forEach(dropZone => {
     dropZone.addEventListener('dragover', (e) => {
         e.preventDefault();
@@ -1747,9 +1710,30 @@ document.querySelectorAll('.drop-zone').forEach(dropZone => {
         
         const files = e.dataTransfer.files;
         const formType = dropZone.closest('.report-form').id.replace('Form', '').toLowerCase();
+        const fileInput = document.getElementById(formType + '_evidence_files');
         
-        if (files.length > 0) {
-            handleFileUpload(files, formType);
+        if (files.length > 0 && fileInput) {
+            // Create a new DataTransfer to hold the files
+            const dataTransfer = new DataTransfer();
+            
+            // Add existing files (if any)
+            if (fileInput.files) {
+                for (let i = 0; i < fileInput.files.length; i++) {
+                    dataTransfer.items.add(fileInput.files[i]);
+                }
+            }
+            
+            // Add new files
+            for (let i = 0; i < files.length; i++) {
+                dataTransfer.items.add(files[i]);
+            }
+            
+            // Update the file input
+            fileInput.files = dataTransfer.files;
+            
+            // Trigger the change event
+            const event = new Event('change', { bubbles: true });
+            fileInput.dispatchEvent(event);
         }
     });
 });
@@ -1822,10 +1806,10 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         }
         
-        // Initialize file counts
+        // Initialize file counts to 0
         const fileCount = document.getElementById(formType + 'FileCount');
         if (fileCount) {
-            fileCount.textContent = uploadedFiles[formType]?.length || 0;
+            fileCount.textContent = '0';
         }
     });
 });
