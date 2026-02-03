@@ -178,18 +178,26 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                                         error_log("No master code assigned for personnel");
                                     }
                                 } else {
-                                    // Check if citizen has verified email
+                                    // Check if citizen has verified email - SIMPLIFIED LOGIC
                                     error_log("Email verified status for citizen: " . $user['email_verified'] . " (type: " . gettype($user['email_verified']) . ")");
                                     
-                                    // More flexible verification check
+                                    // Simple verification check - if email_verified field has any non-empty value
                                     $email_verified = false;
                                     if (isset($user['email_verified'])) {
-                                        if (is_numeric($user['email_verified'])) {
-                                            $email_verified = (int)$user['email_verified'] == 1;
-                                        } elseif (is_string($user['email_verified'])) {
-                                            $email_verified = in_array(strtolower($user['email_verified']), ['1', 'true', 'yes', 'verified']);
-                                        } elseif (is_bool($user['email_verified'])) {
-                                            $email_verified = $user['email_verified'];
+                                        $ev = $user['email_verified'];
+                                        
+                                        // If it's NULL, empty string, '0', or 0, it's not verified
+                                        // Otherwise, assume it's verified
+                                        if (is_numeric($ev)) {
+                                            $email_verified = $ev != 0;
+                                        } elseif (is_string($ev)) {
+                                            $trimmed = trim($ev);
+                                            $email_verified = !empty($trimmed) && $trimmed !== '0' && strtolower($trimmed) !== 'false' && strtolower($trimmed) !== 'no';
+                                        } elseif (is_bool($ev)) {
+                                            $email_verified = $ev;
+                                        } else {
+                                            // For any other type (like timestamp), non-NULL means verified
+                                            $email_verified = true;
                                         }
                                     }
                                     
