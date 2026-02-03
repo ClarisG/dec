@@ -1,7 +1,7 @@
 <?php
 // admin/modules/tanod_tracker.php - TANOD ASSIGNMENT TRACKER MODULE
 
-// Get active Tanods with their status - REMOVED current_address as it doesn't exist in the table
+// Get active Tanods with their status
 $tanods_query = "SELECT u.id, u.first_name, u.last_name, u.contact_number,
                         ts.status as duty_status, ts.last_updated,
                         td.clock_in, td.clock_out, td.location_lat, td.location_lng
@@ -156,7 +156,6 @@ $key_locations = [
                                     <?php echo htmlspecialchars($tanod['first_name'] . ' ' . $tanod['last_name']); ?>
                                 </p>
                                 <p class="text-sm text-gray-500"><?php echo htmlspecialchars($tanod['contact_number']); ?></p>
-                                <!-- Removed current_address section since column doesn't exist -->
                             </div>
                         </div>
                         <div class="text-right">
@@ -277,45 +276,65 @@ $key_locations = [
 // Initialize map with Philippines and Barangay Commonwealth focus
 function initTanodMap() {
     // Center on Barangay Commonwealth, Quezon City
-    const map = L.map('tanodMap').setView([14.6945, 121.0790], 14);
+    const map = L.map('tanodMap', {
+        center: [14.6945, 121.0790],
+        zoom: 15,
+        minZoom: 12,
+        maxZoom: 18,
+        maxBounds: [
+            [4.5, 114],  // Southwest corner of Philippines
+            [21.5, 127]  // Northeast corner of Philippines
+        ],
+        maxBoundsViscosity: 1.0 // Prevents panning outside bounds
+    });
     
     // Use OpenStreetMap tiles
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '© OpenStreetMap contributors | Barangay Commonwealth, Quezon City'
+        attribution: '© OpenStreetMap contributors | Barangay Commonwealth, Quezon City',
+        noWrap: true, // Prevent wrapping to other parts of the world
+        bounds: [
+            [4.5, 114],  // Southwest corner of Philippines
+            [21.5, 127]  // Northeast corner of Philippines
+        ]
     }).addTo(map);
     
-    // Add Philippines boundary context (optional)
-    L.rectangle([[4.5, 114], [21.5, 127]], {
-        color: "#0044ff",
-        weight: 2,
-        fillOpacity: 0.05,
-        dashArray: '5, 5'
-    }).addTo(map).bindPopup("Philippines Territory");
-    
-    // Draw Barangay Commonwealth boundary
+    // Draw Barangay Commonwealth boundary - OUTER LINE HIGHLIGHTED
     const barangayBoundary = L.polygon(<?php echo json_encode($barangay_boundary); ?>, {
-        color: '#3b82f6',
-        weight: 3,
+        color: '#dc2626', // Red color for outer line
+        weight: 4, // Thicker line
+        opacity: 1,
         fillColor: '#1d4ed8',
         fillOpacity: 0.1,
-        dashArray: '10, 5'
+        dashArray: null // Solid line
     }).addTo(map);
     
-    // Add label for Barangay Commonwealth
-    barangayBoundary.bindPopup(`
+    // Add highlight for the outer line
+    const barangayOuterLine = L.polyline(<?php echo json_encode($barangay_boundary); ?>, {
+        color: '#ef4444', // Bright red for emphasis
+        weight: 8,
+        opacity: 0.3,
+        fill: false,
+        className: 'barangay-highlight-line'
+    }).addTo(map);
+    
+    // Add label for Barangay Commonwealth with a marker
+    const barangayCenter = L.marker([14.6945, 121.0790], {
+        icon: L.divIcon({
+            html: `<div class="bg-red-600 text-white px-3 py-1 rounded-lg font-bold shadow-lg">
+                     <i class="fas fa-map-marker-alt mr-1"></i>Barangay Commonwealth
+                   </div>`,
+            className: 'barangay-label',
+            iconSize: [200, 40],
+            iconAnchor: [100, 20]
+        })
+    }).addTo(map).bindPopup(`
         <div class="p-2">
             <h3 class="font-bold text-lg text-blue-700">Barangay Commonwealth</h3>
-            <p class="text-sm">Quezon City, Metro Manila</p>
+            <p class="text-sm">Quezon City, Metro Manila, Philippines</p>
             <p class="text-xs text-gray-600">Area: ~5.3 sq km | Population: ~200,000</p>
             <div class="mt-2">
-                <div class="flex items-center text-sm">
-                    <div class="w-3 h-3 rounded-full bg-blue-500 mr-2"></div>
-                    <span>Barangay Boundary</span>
-                </div>
-                <div class="flex items-center text-sm">
-                    <div class="w-3 h-3 rounded-full bg-purple-500 mr-2"></div>
-                    <span>Key Locations</span>
-                </div>
+                <p class="text-sm"><i class="fas fa-border-all mr-2"></i>Boundary Highlighted in Red</p>
+                <p class="text-xs text-gray-500">Zoom in for detailed view of zones and streets</p>
             </div>
         </div>
     `);
@@ -344,6 +363,9 @@ function initTanodMap() {
                 <p class="text-sm text-gray-600"><?php echo $location['address']; ?></p>
                 <p class="text-xs text-gray-500 mt-1">
                     <i class="fas fa-tag mr-1"></i><?php echo ucfirst($location['type']); ?> Location
+                </p>
+                <p class="text-xs text-gray-400 mt-2">
+                    <i class="fas fa-map-pin mr-1"></i>Zone: Barangay Commonwealth
                 </p>
             </div>
           `);
@@ -387,6 +409,10 @@ function initTanodMap() {
                                 <?php echo $tanod['duty_status']; ?>
                             </span>
                         </p>
+                        <p class="text-sm">
+                            <span class="font-medium">Location:</span> 
+                            <span class="text-gray-600">Barangay Commonwealth, Quezon City</span>
+                        </p>
                         <?php if ($tanod['clock_in']): ?>
                             <p class="text-sm">
                                 <span class="font-medium">On Duty Since:</span> 
@@ -399,11 +425,34 @@ function initTanodMap() {
         <?php endif; ?>
     <?php endforeach; ?>
     
+    // Add zoom controls
+    L.control.zoom({
+        position: 'topright',
+        zoomInText: '<i class="fas fa-search-plus"></i>',
+        zoomOutText: '<i class="fas fa-search-minus"></i>'
+    }).addTo(map);
+    
     // Add scale control
-    L.control.scale({imperial: false}).addTo(map);
+    L.control.scale({imperial: false, position: 'bottomleft'}).addTo(map);
+    
+    // Add coordinates display on mouse move
+    const coordDisplay = L.control({position: 'bottomright'});
+    coordDisplay.onAdd = function() {
+        this._div = L.DomUtil.create('div', 'bg-black bg-opacity-70 text-white p-2 rounded text-xs');
+        this._div.innerHTML = 'Move mouse to see coordinates';
+        return this._div;
+    };
+    coordDisplay.update = function(latlng) {
+        this._div.innerHTML = `Lat: ${latlng.lat.toFixed(5)}, Lng: ${latlng.lng.toFixed(5)}<br>Barangay Commonwealth`;
+    };
+    coordDisplay.addTo(map);
+    
+    map.on('mousemove', function(e) {
+        coordDisplay.update(e.latlng);
+    });
     
     // Add legend
-    const legend = L.control({position: 'bottomright'});
+    const legend = L.control({position: 'topright'});
     legend.onAdd = function() {
         const div = L.DomUtil.create('div', 'bg-white p-4 rounded-lg shadow-lg border border-gray-300');
         div.innerHTML = `
@@ -426,14 +475,50 @@ function initTanodMap() {
                     <span class="text-sm">Key Locations</span>
                 </div>
                 <div class="flex items-center">
-                    <div class="w-4 h-4 border-2 border-blue-500 bg-blue-100 mr-2"></div>
+                    <div class="w-4 h-4 border-4 border-red-600 bg-transparent mr-2"></div>
                     <span class="text-sm">Barangay Boundary</span>
+                </div>
+                <div class="flex items-center">
+                    <div class="w-4 h-4 bg-red-100 border border-red-300 mr-2"></div>
+                    <span class="text-sm">Barangay Area</span>
                 </div>
             </div>
         `;
         return div;
     };
     legend.addTo(map);
+    
+    // Add info about zoom levels
+    const infoControl = L.control({position: 'bottomright'});
+    infoControl.onAdd = function() {
+        const div = L.DomUtil.create('div', 'bg-blue-50 text-blue-800 p-2 rounded text-xs hidden md:block');
+        div.innerHTML = `
+            <i class="fas fa-info-circle mr-1"></i>
+            <span>Zoom: <span id="zoomLevel">${map.getZoom()}</span> | View: Barangay Commonwealth</span>
+        `;
+        return div;
+    };
+    infoControl.addTo(map);
+    
+    // Update zoom level display
+    map.on('zoomend', function() {
+        document.getElementById('zoomLevel').textContent = map.getZoom();
+    });
+    
+    // Add button to zoom to barangay
+    const zoomToBarangayControl = L.control({position: 'topright'});
+    zoomToBarangayControl.onAdd = function() {
+        const div = L.DomUtil.create('div', 'leaflet-bar leaflet-control');
+        const link = L.DomUtil.create('a', 'bg-white p-2 rounded shadow cursor-pointer');
+        link.innerHTML = '<i class="fas fa-crosshairs text-blue-600"></i>';
+        link.title = 'Zoom to Barangay Commonwealth';
+        link.onclick = function() {
+            map.setView([14.6945, 121.0790], 15);
+        };
+        div.appendChild(link);
+        return div;
+    };
+    zoomToBarangayControl.addTo(map);
 }
 
 // Initialize map when module loads
@@ -463,5 +548,40 @@ setInterval(() => {
 
 .leaflet-popup-content {
     min-width: 200px;
+}
+
+/* Highlighted barangay boundary */
+.barangay-highlight-line {
+    filter: drop-shadow(0 0 3px rgba(239, 68, 68, 0.5));
+}
+
+/* Custom map controls */
+.leaflet-control-zoom a {
+    width: 36px !important;
+    height: 36px !important;
+    line-height: 36px !important;
+    font-size: 18px !important;
+    background-color: white !important;
+    border: 1px solid #e5e7eb !important;
+}
+
+.leaflet-control-zoom a:hover {
+    background-color: #f3f4f6 !important;
+}
+
+/* Coordinates display */
+.leaflet-control-coordinates {
+    background: rgba(0, 0, 0, 0.8);
+    color: white;
+    font-family: monospace;
+    padding: 5px 10px;
+    border-radius: 4px;
+    font-size: 12px;
+}
+
+/* Barangay label */
+.barangay-label {
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+    font-size: 14px !important;
 }
 </style>
