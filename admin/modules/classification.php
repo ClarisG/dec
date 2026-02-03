@@ -325,6 +325,14 @@ $threshold = $threshold_stmt->fetchColumn() ?: 0.7;
             <input type="hidden" id="ruleId" name="rule_id" value="">
             <input type="hidden" name="save_rule" value="1">
             
+            <!-- Preserve search and pagination in form -->
+            <?php if (!empty($q)): ?>
+                <input type="hidden" name="q" value="<?php echo htmlspecialchars($q); ?>">
+            <?php endif; ?>
+            <?php if ($page > 1): ?>
+                <input type="hidden" name="page" value="<?php echo $page; ?>">
+            <?php endif; ?>
+            
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-2">Incident Type Name *</label>
@@ -396,11 +404,16 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('modalTitle').textContent = 'Add Classification Rule';
         document.getElementById('ruleForm').reset();
         document.getElementById('ruleId').value = '';
+        document.getElementById('category').selectedIndex = 0;
+        document.getElementById('jurisdiction').selectedIndex = 0;
         document.getElementById('ruleModal').classList.remove('hidden');
         document.getElementById('ruleModal').classList.add('flex');
     }
 
     window.editRule = function(ruleId) {
+        console.log('Editing rule:', ruleId);
+        console.log('Rule data available:', ruleData[ruleId]);
+        
         if (ruleData[ruleId]) {
             const rule = ruleData[ruleId];
             document.getElementById('modalTitle').textContent = 'Edit Classification Rule';
@@ -412,6 +425,8 @@ document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('ruleModal').classList.remove('hidden');
             document.getElementById('ruleModal').classList.add('flex');
         } else {
+            console.warn('Rule data not found for ID:', ruleId);
+            // Try to fetch via AJAX as fallback
             fetchAjaxRuleData(ruleId);
         }
     }
@@ -424,7 +439,9 @@ document.addEventListener('DOMContentLoaded', function() {
             })
             .then(rule => {
                 if (rule.error) throw new Error(rule.error);
+                // Update the local cache
                 ruleData[rule.id] = rule;
+                // Open the modal with the fetched data
                 editRule(rule.id);
             })
             .catch(error => {
@@ -437,7 +454,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (confirm('Are you sure you want to delete this classification rule?')) {
             const form = document.createElement('form');
             form.method = 'POST';
-            form.action = `?module=classification&q=<?php echo urlencode($q); ?>&page=<?php echo $page; ?>`;
+            form.action = '?module=classification';
 
             const deleteInput = document.createElement('input');
             deleteInput.type = 'hidden';
@@ -450,6 +467,27 @@ document.addEventListener('DOMContentLoaded', function() {
             idInput.name = 'rule_id';
             idInput.value = ruleId;
             form.appendChild(idInput);
+
+            // Preserve search and pagination
+            const searchParams = new URLSearchParams(window.location.search);
+            const q = searchParams.get('q');
+            const page = searchParams.get('page');
+            
+            if (q) {
+                const qInput = document.createElement('input');
+                qInput.type = 'hidden';
+                qInput.name = 'q';
+                qInput.value = q;
+                form.appendChild(qInput);
+            }
+            
+            if (page) {
+                const pageInput = document.createElement('input');
+                pageInput.type = 'hidden';
+                pageInput.name = 'page';
+                pageInput.value = page;
+                form.appendChild(pageInput);
+            }
 
             document.body.appendChild(form);
             form.submit();
@@ -468,45 +506,21 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // Handle search form submission
+    // Remove the search form submit handler that was causing issues
+    // Let the form submit naturally
     const searchForm = document.getElementById('searchForm');
     if(searchForm) {
-        searchForm.addEventListener('submit', function(e) {
-            e.preventDefault();
-            const searchVal = document.getElementById('searchInput').value;
-            // Go to page 1 for new search
-            window.location.href = `?module=classification&q=${encodeURIComponent(searchVal)}`;
-        });
+        // No JavaScript interference - let the form submit normally
+        console.log('Search form ready for normal submission');
     }
 
-    // Preserve search/page state in form submissions
+    // Fix form submission to preserve search parameters
     const ruleForm = document.getElementById('ruleForm');
     if(ruleForm) {
         ruleForm.addEventListener('submit', function(e) {
-            const searchParams = new URLSearchParams(window.location.search);
-            const q = searchParams.get('q');
-            const page = searchParams.get('page');
-
-            if (q) {
-                let input = document.querySelector('input[name="q"]');
-                if(!input) {
-                   input = document.createElement('input');
-                   input.type = 'hidden';
-                   input.name = 'q';
-                   this.appendChild(input);
-                }
-                input.value = q;
-            }
-            if (page) {
-                let input = document.querySelector('input[name="page"]');
-                if(!input) {
-                   input = document.createElement('input');
-                   input.type = 'hidden';
-                   input.name = 'page';
-                   this.appendChild(input);
-                }
-                input.value = page;
-            }
+            // The hidden inputs already handle preserving q and page
+            // Let the form submit normally
+            console.log('Rule form submitting...');
         });
     }
 });
