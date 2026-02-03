@@ -22,12 +22,14 @@ $total_records = (int)$count_stmt->fetchColumn();
 $total_pages = max(1, (int)ceil($total_records / $per_page));
 if ($page > $total_pages) { $page = $total_pages; $offset = ($page - 1) * $per_page; }
 
-// Get paginated rules
-$classification_sql = "SELECT * FROM report_types $where ORDER BY category, type_name LIMIT :limit OFFSET :offset";
+// Get paginated rules (inline limit/offset to avoid HY093 on some PDO setups)
+$limit = (int)$per_page;
+$off = (int)$offset;
+$classification_sql = "SELECT * FROM report_types $where ORDER BY category, type_name LIMIT $limit OFFSET $off";
 $classification_stmt = $conn->prepare($classification_sql);
-foreach ($params as $k => $v) { $classification_stmt->bindValue($k, $v, PDO::PARAM_STR); }
-$classification_stmt->bindValue(':limit', $per_page, PDO::PARAM_INT);
-$classification_stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+if ($q !== '') {
+    $classification_stmt->bindValue(':q', "%$q%", PDO::PARAM_STR);
+}
 $classification_stmt->execute();
 $classification_rules = $classification_stmt->fetchAll(PDO::FETCH_ASSOC);
 
