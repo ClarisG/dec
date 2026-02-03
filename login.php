@@ -148,8 +148,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     if ($stmt->rowCount() == 1) {
                         $user = $stmt->fetch(PDO::FETCH_ASSOC);
                         
-                        error_log("User found: ID=" . $user['id'] . ", Username=" . $user['username'] . ", Email=" . $user['email'] . ", Role=" . $user['role'] . ", Status=" . $user['status']);
-                        error_log("User password hash: " . $user['password']);
+                        error_log("User found: ID=" . $user['id'] . ", Username=" . $user['username'] . ", Email=" . $user['email'] . ", Role=" . $user['role'] . ", Status=" . $user['status'] . ", Email_verified=" . $user['email_verified']);
                         
                         // Verify password
                         if (password_verify($password, $user['password'])) {
@@ -180,7 +179,23 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                                     }
                                 } else {
                                     // Check if citizen has verified email
-                                    if ($user['email_verified'] == 1) {
+                                    error_log("Email verified status for citizen: " . $user['email_verified'] . " (type: " . gettype($user['email_verified']) . ")");
+                                    
+                                    // More flexible verification check
+                                    $email_verified = false;
+                                    if (isset($user['email_verified'])) {
+                                        if (is_numeric($user['email_verified'])) {
+                                            $email_verified = (int)$user['email_verified'] == 1;
+                                        } elseif (is_string($user['email_verified'])) {
+                                            $email_verified = in_array(strtolower($user['email_verified']), ['1', 'true', 'yes', 'verified']);
+                                        } elseif (is_bool($user['email_verified'])) {
+                                            $email_verified = $user['email_verified'];
+                                        }
+                                    }
+                                    
+                                    error_log("Email verified after processing: " . ($email_verified ? 'YES' : 'NO'));
+                                    
+                                    if ($email_verified) {
                                         // Set session variables for citizens (no master code required)
                                         error_log("User is citizen with verified email, logging in directly");
                                         
@@ -203,7 +218,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                                         redirectUser($user['role']);
                                     } else {
                                         $error = "Please verify your email address before logging in. Check your inbox (and spam folder) for the verification email.";
-                                        error_log("Citizen login failed - email not verified");
+                                        error_log("Citizen login failed - email not verified. Value: " . $user['email_verified']);
                                     }
                                 }
                             } else {
