@@ -106,24 +106,18 @@ $threshold = $threshold_stmt->fetchColumn() ?: 0.7;
 <div class="space-y-6">
     <!-- Incident Type Rules -->
     <div class="bg-white rounded-xl p-6 shadow-sm">
-        <div class="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-3">
-            <div>
-                <h2 class="text-2xl font-bold text-gray-900">Incident Type Classification</h2>
-                <p class="text-sm text-gray-500">Manage incident categories, keywords and jurisdiction</p>
-            </div>
-            <div class="flex items-center gap-2">
-                <form method="GET" action="" class="flex items-center">
-                    <input type="hidden" name="module" value="classification">
-                    <div class="relative">
-                        <input type="text" name="q" value="<?php echo htmlspecialchars($q ?? ''); ?>" placeholder="Search type or category..." class="pl-9 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"/>
-                        <span class="absolute left-2 top-2.5 text-gray-400"><i class="fas fa-search"></i></span>
-                    </div>
-                    <button class="ml-2 px-3 py-2 border border-gray-300 rounded-lg text-sm">Search</button>
-                </form>
-                <button onclick="showAddRuleModal()" class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-sm">
-                    <i class="fas fa-plus mr-2"></i>Add Rule
-                </button>
-            </div>
+        <div class="flex items-center justify-between mb-4 gap-3">
+            <form method="GET" action="" class="flex items-center flex-1 max-w-lg">
+                <input type="hidden" name="module" value="classification">
+                <div class="relative flex-1">
+                    <input type="text" name="q" value="<?php echo htmlspecialchars($q ?? ''); ?>" placeholder="Search type or category..." class="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"/>
+                    <span class="absolute left-2 top-2.5 text-gray-400"><i class="fas fa-search"></i></span>
+                </div>
+                <button type="submit" class="ml-2 px-3 py-2 border border-gray-300 rounded-lg text-sm">Search</button>
+            </form>
+            <button onclick="showAddRuleModal()" class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-sm whitespace-nowrap">
+                <i class="fas fa-plus mr-2"></i>Add Rule
+            </button>
         </div>
         
         <?php if (isset($_SESSION['success'])): ?>
@@ -139,14 +133,14 @@ $threshold = $threshold_stmt->fetchColumn() ?: 0.7;
         <?php endif; ?>
         
         <div class="overflow-x-auto">
-            <table class="min-w-full divide-y divide-gray-200">
+            <table class="min-w-full divide-y divide-gray-200 table-fixed">
                 <thead>
                     <tr>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Incident Type</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Keywords</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Jurisdiction</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/4">Incident Type</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/6">Category</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Keywords</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/6">Jurisdiction</th>
+                        <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-32">Actions</th>
                     </tr>
                 </thead>
                 <tbody id="rulesTableBody" class="bg-white divide-y divide-gray-200">
@@ -158,7 +152,7 @@ $threshold = $threshold_stmt->fetchColumn() ?: 0.7;
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                 <span class="capitalize"><?php echo htmlspecialchars($rule['category']); ?></span>
                             </td>
-                            <td class="px-6 py-4 text-sm text-gray-500">
+                            <td class="px-4 py-4 text-sm text-gray-500">
                                 <?php if ($rule['keywords']): ?>
                                     <?php 
                                     $keywords = explode(',', $rule['keywords']);
@@ -176,13 +170,13 @@ $threshold = $threshold_stmt->fetchColumn() ?: 0.7;
                                     <span class="text-gray-400 italic">No keywords</span>
                                 <?php endif; ?>
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap">
+                            <td class="px-4 py-4 whitespace-nowrap">
                                 <span class="px-3 py-1 rounded-full text-xs font-medium 
                                     <?php echo $rule['jurisdiction'] === 'police' ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800'; ?>">
                                     <?php echo htmlspecialchars(ucfirst($rule['jurisdiction'])); ?>
                                 </span>
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                            <td class="px-4 py-4 whitespace-nowrap text-right text-sm font-medium">
                                 <button onclick="editRule(<?php echo $rule['id']; ?>)" 
                                         class="text-purple-600 hover:text-purple-900 mr-3 px-2 py-1 hover:bg-purple-50 rounded">
                                     <i class="fas fa-edit"></i> Edit
