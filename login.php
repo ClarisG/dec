@@ -178,30 +178,51 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                                         error_log("No master code assigned for personnel");
                                     }
                                 } else {
-                                    // Check if citizen has verified email - SIMPLIFIED LOGIC
-                                    error_log("Email verified status for citizen: " . $user['email_verified'] . " (type: " . gettype($user['email_verified']) . ")");
+                                    // Check if citizen has verified email - IMPROVED LOGIC
+                                    error_log("=== EMAIL VERIFICATION DEBUG ===");
+                                    error_log("Email verified field value: " . var_export($user['email_verified'], true));
+                                    error_log("Email verified field type: " . gettype($user['email_verified']));
                                     
-                                    // Simple verification check - if email_verified field has any non-empty value
+                                    // Initialize email_verified as false
                                     $email_verified = false;
+                                    
                                     if (isset($user['email_verified'])) {
                                         $ev = $user['email_verified'];
                                         
-                                        // If it's NULL, empty string, '0', or 0, it's not verified
-                                        // Otherwise, assume it's verified
-                                        if (is_numeric($ev)) {
-                                            $email_verified = $ev != 0;
-                                        } elseif (is_string($ev)) {
-                                            $trimmed = trim($ev);
-                                            $email_verified = !empty($trimmed) && $trimmed !== '0' && strtolower($trimmed) !== 'false' && strtolower($trimmed) !== 'no';
+                                        // Handle different data types
+                                        if (is_string($ev)) {
+                                            $ev = trim($ev);
+                                            error_log("String value: '$ev'");
+                                            
+                                            // Check if it's a valid timestamp or non-empty string
+                                            if (!empty($ev) && $ev !== '0' && $ev !== '0000-00-00 00:00:00' && strtolower($ev) !== 'false' && strtolower($ev) !== 'no') {
+                                                $email_verified = true;
+                                                error_log("String indicates VERIFIED");
+                                            } else {
+                                                error_log("String indicates NOT VERIFIED");
+                                            }
+                                        } elseif (is_numeric($ev)) {
+                                            error_log("Numeric value: $ev");
+                                            $email_verified = ($ev != 0);
+                                            error_log("Numeric indicates: " . ($email_verified ? 'VERIFIED' : 'NOT VERIFIED'));
                                         } elseif (is_bool($ev)) {
+                                            error_log("Boolean value: " . ($ev ? 'true' : 'false'));
                                             $email_verified = $ev;
+                                            error_log("Boolean indicates: " . ($email_verified ? 'VERIFIED' : 'NOT VERIFIED'));
+                                        } elseif ($ev === null) {
+                                            error_log("NULL value");
+                                            $email_verified = false;
                                         } else {
-                                            // For any other type (like timestamp), non-NULL means verified
+                                            // Any other non-null value means verified
+                                            error_log("Other non-null type");
                                             $email_verified = true;
                                         }
+                                    } else {
+                                        error_log("email_verified field not set in user array");
                                     }
                                     
-                                    error_log("Email verified after processing: " . ($email_verified ? 'YES' : 'NO'));
+                                    error_log("Final email_verified decision: " . ($email_verified ? 'YES' : 'NO'));
+                                    error_log("=== END EMAIL VERIFICATION DEBUG ===");
                                     
                                     if ($email_verified) {
                                         // Set session variables for citizens (no master code required)
@@ -226,7 +247,12 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                                         redirectUser($user['role']);
                                     } else {
                                         $error = "Please verify your email address before logging in. Check your inbox (and spam folder) for the verification email.";
-                                        error_log("Citizen login failed - email not verified. Value: " . $user['email_verified']);
+                                        error_log("Citizen login failed - email not verified. Raw value: " . var_export($user['email_verified'], true));
+                                        
+                                        // Debug: Show what the actual value is
+                                        if (isset($user['email_verified'])) {
+                                            error_log("email_verified is set to: " . $user['email_verified']);
+                                        }
                                     }
                                 }
                             } else {
