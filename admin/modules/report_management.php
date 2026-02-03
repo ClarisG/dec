@@ -5,7 +5,7 @@
 $reports_query = "SELECT r.*, u.first_name as reporter_first, u.last_name as reporter_last,
                          u.contact_number as reporter_contact,
                          rt.type_name as incident_type,
-                         r.needs_verification, r.urgency_level, r.routing_status
+                         r.needs_verification, r.routing_status
                   FROM reports r
                   LEFT JOIN users u ON r.user_id = u.id
                   LEFT JOIN report_types rt ON r.report_type_id = rt.id
@@ -125,7 +125,7 @@ $available_users = $roles_stmt->fetchAll(PDO::FETCH_ASSOC);
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Reporter</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Incident Type</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Priority</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Urgency</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Routing</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Submitted</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
@@ -163,8 +163,8 @@ $available_users = $roles_stmt->fetchAll(PDO::FETCH_ASSOC);
                                     <?php echo ucfirst($report['priority']); ?>
                                 </span>
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                <?php echo htmlspecialchars($report['urgency_level'] ?? 'Normal'); ?>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 routing-status">
+                                <?php echo htmlspecialchars($report['routing_status'] ?? 'pending'); ?>
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap">
                                 <span class="status-badge <?php echo $report['needs_verification'] ? 'status-pending' : 'status-success'; ?>">
@@ -318,10 +318,84 @@ $available_users = $roles_stmt->fetchAll(PDO::FETCH_ASSOC);
             </div>
         </form>
     </div>
+<!-- Reports Analytics -->
+    <div class="bg-white rounded-xl p-6 shadow-sm">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="text-lg font-bold text-gray-800">Reports Analytics</h3>
+            <div class="space-x-2">
+                <select id="chartRange" class="p-2 border border-gray-300 rounded-lg text-sm">
+                    <option value="daily">Daily</option>
+                    <option value="weekly">Weekly</option>
+                    <option value="monthly">Monthly</option>
+                    <option value="yearly">Yearly</option>
+                </select>
+                <button onclick="printReportCharts()" class="px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                    <i class="fas fa-print mr-1"></i>Print
+                </button>
+            </div>
+        </div>
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <canvas id="reportsCountChart" height="160"></canvas>
+            <canvas id="classificationChart" height="160"></canvas>
+        </div>
+    </div>
+
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
 let currentReportId = null;
+
+function printReportCharts(){
+    window.print();
+}
+
+function buildCharts(range){
+    // Fetch aggregated data from existing ajax endpoints if available, else compute from $raw_reports embedded
+    const reports = <?php echo json_encode($raw_reports); ?>;
+    const byDate = {};
+    const byType = {};
+    reports.forEach(r=>{
+        const d = new Date(r.created_at);
+        let key = d.toISOString().slice(0,10);
+        if(range==='weekly'){
+            const onejan = new Date(d.getFullYear(),0,1);
+            const week = Math.ceil((((d - onejan) / 86400000) + onejan.getDay()+1)/7);
+            key = `${d.getFullYear()}-W${week}`;
+        }else if(range==='monthly'){
+            key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+        }else if(range==='yearly'){
+            key = `${d.getFullYear()}`;
+        }
+        byDate[key] = (byDate[key]||0)+1;
+        const t = r.incident_type || 'Unknown';
+        byType[t] = (byType[t]||0)+1;
+    });
+    const dateLabels = Object.keys(byDate).sort();
+    const dateValues = dateLabels.map(k=>byDate[k]);
+    const typeLabels = Object.keys(byType).sort();
+    const typeValues = typeLabels.map(k=>byType[k]);
+
+    if(window._rChart){ window._rChart.destroy(); }
+    if(window._cChart){ window._cChart.destroy(); }
+
+    const ctx1 = document.getElementById('reportsCountChart').getContext('2d');
+    window._rChart = new Chart(ctx1, {
+        type: 'bar',
+        data: { labels: dateLabels, datasets: [{ label: 'Reports', data: dateValues, backgroundColor: '#7c3aed' }]},
+        options: { responsive: true, plugins: { legend: { display: false } } }
+    });
+
+    const ctx2 = document.getElementById('classificationChart').getContext('2d');
+    window._cChart = new Chart(ctx2, {
+        type: 'pie',
+        data: { labels: typeLabels, datasets: [{ data: typeValues, backgroundColor: typeLabels.map(()=>`hsl(${Math.random()*360},70%,60%)`) }]},
+        options: { responsive: true }
+    });
+}
+
+document.getElementById('chartRange').addEventListener('change', (e)=>buildCharts(e.target.value));
+window.addEventListener('load', ()=>buildCharts('daily'));
 
 function viewReportDetails(reportId) {
     fetch(`handlers/get_report_details.php?id=${reportId}`)

@@ -230,7 +230,7 @@ $key_locations = [
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-2">Select Incident</label>
-                <select class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
+                <select id="quickIncident" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
                     <option value="">Choose incident to assign...</option>
                     <?php
                     $pending_incidents_query = "SELECT id, report_number, title FROM reports 
@@ -251,7 +251,7 @@ $key_locations = [
             
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-2">Assign to Tanod</label>
-                <select class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
+                <select id="quickTanod" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
                     <option value="">Select available Tanod...</option>
                     <?php foreach($tanods as $tanod): 
                         if ($tanod['duty_status'] === 'Available' || $tanod['duty_status'] === 'On-Duty'): ?>
@@ -265,7 +265,7 @@ $key_locations = [
         </div>
         
         <div class="mt-6">
-            <button class="w-full py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-medium">
+            <button onclick="assignQuickIncident()" class="w-full py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-medium">
                 <i class="fas fa-paper-plane mr-2"></i>Assign Incident
             </button>
         </div>
@@ -273,6 +273,33 @@ $key_locations = [
 </div>
 
 <script>
+function assignQuickIncident(){
+    const reportId = document.getElementById('quickIncident').value;
+    const tanodId = document.getElementById('quickTanod').value;
+    if(!reportId || !tanodId){
+        alert('Please select an incident and a tanod');
+        return;
+    }
+    const fd = new FormData();
+    fd.append('report_id', reportId);
+    fd.append('assigned_to', tanodId);
+    fd.append('officer_id', tanodId);
+    fd.append('tanod_id', tanodId);
+    fetch('../../handlers/assign_case.php', { method: 'POST', body: fd })
+    .then(r=>r.json())
+    .then(data=>{
+        if(data.success){
+            alert('Incident assigned successfully');
+            location.reload();
+        } else {
+            alert('Error: ' + (data.message || 'Failed to assign'));
+        }
+    }).catch(err=>{
+        console.error(err);
+        alert('Network error assigning incident');
+    });
+}
+
 // Initialize map with Philippines and Barangay Commonwealth focus
 function initTanodMap() {
     // Center on Barangay Commonwealth, Quezon City

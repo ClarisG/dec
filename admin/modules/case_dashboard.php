@@ -11,13 +11,13 @@ $filter_date_to = $_GET['date_to'] ?? date('Y-m-d');
 $cases_query = "SELECT r.*, rt.type_name as incident_type,
                        CONCAT(u.first_name, ' ', u.last_name) as complainant_name,
                        CONCAT(ut.first_name, ' ', ut.last_name) as tanod_name,
-                       hc.hearing_date, hc.hearing_status,
+                       NULL as hearing_date, NULL as hearing_status,
                        c.complainant_contact
                 FROM reports r
                 LEFT JOIN report_types rt ON r.report_type_id = rt.id
                 LEFT JOIN users u ON r.user_id = u.id
                 LEFT JOIN users ut ON r.assigned_tanod = ut.id
-                LEFT JOIN hearing_cases hc ON r.id = hc.report_id
+                /* hearing_cases removed to avoid missing table error */
                 LEFT JOIN complainants c ON r.complainant_id = c.id
                 WHERE r.status != 'draft' AND r.status != 'pending_field_verification'";
 

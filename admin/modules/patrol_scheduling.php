@@ -1,6 +1,26 @@
 <?php
 // admin/modules/patrol_scheduling.php - NEIGHBORHOOD PATROL SCHEDULING MODULE
 
+// Handle new patrol schedule submission
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['assign_patrol'])) {
+    try {
+        $insert = $conn->prepare("INSERT INTO tanod_schedules (user_id, schedule_date, shift_start, shift_end, patrol_route, notes, is_completed)
+            VALUES (:user_id, :schedule_date, :shift_start, :shift_end, :patrol_route, :notes, 0)");
+        $insert->execute([
+            ':user_id' => $_POST['tanod_id'],
+            ':schedule_date' => $_POST['schedule_date'],
+            ':shift_start' => $_POST['shift_start'],
+            ':shift_end' => $_POST['shift_end'],
+            ':patrol_route' => $_POST['patrol_route'] ?? null,
+            ':notes' => $_POST['schedule_notes'] ?? null,
+        ]);
+        echo '<script>alert("Patrol scheduled successfully"); window.location.href = window.location.href;</script>';
+        exit;
+    } catch (Exception $e) {
+        echo '<div class="p-3 bg-red-50 text-red-700 rounded">Error scheduling patrol: '.htmlspecialchars($e->getMessage()).'</div>';
+    }
+}
+
 // Get all Tanods
 $tanods_query = "SELECT id, first_name, last_name, contact_number, is_active 
                  FROM users 
@@ -10,9 +30,10 @@ $tanods_stmt = $conn->prepare($tanods_query);
 $tanods_stmt->execute();
 $all_tanods = $tanods_stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Get patrol schedules for the week
-$start_of_week = date('Y-m-d', strtotime('monday this week'));
-$end_of_week = date('Y-m-d', strtotime('sunday this week'));
+// Get patrol schedules for the week (support navigation)
+$baseDate = isset($_GET['week']) ? $_GET['week'] : date('Y-m-d');
+$start_of_week = date('Y-m-d', strtotime('monday this week', strtotime($baseDate)));
+$end_of_week = date('Y-m-d', strtotime('sunday this week', strtotime($baseDate)));
 
 $schedules_query = "SELECT ts.*, u.first_name, u.last_name,
                            CONCAT(u.first_name, ' ', u.last_name) as tanod_name
@@ -358,6 +379,25 @@ $patrol_routes = $routes_stmt->fetchAll(PDO::FETCH_ASSOC);
 </div>
 
 <script>
+function prevWeek(){
+    const d = new Date('<?php echo $start_of_week; ?>');
+    d.setDate(d.getDate() - 7);
+    const ymd = d.toISOString().slice(0,10);
+    const url = new URL(window.location.href);
+    url.searchParams.set('module','patrol_scheduling');
+    url.searchParams.set('week', ymd);
+    window.location.href = url.toString();
+}
+function nextWeek(){
+    const d = new Date('<?php echo $start_of_week; ?>');
+    d.setDate(d.getDate() + 7);
+    const ymd = d.toISOString().slice(0,10);
+    const url = new URL(window.location.href);
+    url.searchParams.set('module','patrol_scheduling');
+    url.searchParams.set('week', ymd);
+    window.location.href = url.toString();
+}
+
 function showRouteModal() {
     document.getElementById('modalRouteTitle').textContent = 'Add Patrol Route';
     document.getElementById('routeId').value = '';

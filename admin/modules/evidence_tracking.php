@@ -192,7 +192,69 @@ $key_audits = $key_audit_stmt->fetchAll(PDO::FETCH_ASSOC);
     </div>
 </div>
 
+<!-- Evidence Details Modal -->
+<div id="evidenceModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-2xl max-w-2xl w-full p-6 max-h-[90vh] overflow-y-auto">
+        <div class="flex justify-between items-center mb-4">
+            <h3 id="evidenceModalTitle" class="text-xl font-bold text-gray-800">Evidence Details</h3>
+            <button onclick="closeEvidenceModal()" class="text-gray-400 hover:text-gray-600">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div id="evidenceDetails" class="space-y-4"></div>
+    </div>
+</div>
+
 <script>
+function viewEvidenceDetails(id){
+    fetch(`ajax/get_evidence_details.php?id=${id}`)
+        .then(r=>r.json())
+        .then(ev=>{
+            const title = `Evidence: EVD-${String(id).padStart(6,'0')}`;
+            document.getElementById('evidenceModalTitle').textContent = title;
+            const html = `
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="bg-gray-50 p-4 rounded-lg">
+                        <p class="text-sm text-gray-600">Report #: <span class="font-medium">${ev.report_number || 'N/A'}</span></p>
+                        <p class="text-sm text-gray-600">Item: <span class="font-medium">${ev.item_description || 'N/A'}</span></p>
+                        <p class="text-sm text-gray-600">Type: <span class="font-medium">${ev.item_type || 'N/A'}</span></p>
+                    </div>
+                    <div class="bg-gray-50 p-4 rounded-lg">
+                        <p class="text-sm text-gray-600">Uploaded By: <span class="font-medium">${ev.uploader_name || 'Unknown'}</span></p>
+                        <p class="text-sm text-gray-600">Uploaded: ${ev.created_at ? new Date(ev.created_at).toLocaleString() : 'N/A'}</p>
+                        <p class="text-sm text-gray-600">Status: <span class="font-medium">${ev.status || 'pending'}</span></p>
+                    </div>
+                </div>
+                ${ev.preview_url ? `<div class='mt-4'><a class='text-blue-600 underline' href='${ev.preview_url}' target='_blank'><i class="fas fa-file"></i> View File</a></div>` : ''}
+                <div class="flex justify-end mt-4">
+                    ${ev.can_approve ? `<button onclick='approveEvidence(${id})' class='px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700'><i class="fas fa-check mr-1"></i>Approve</button>` : ''}
+                </div>
+            `;
+            document.getElementById('evidenceDetails').innerHTML = html;
+            document.getElementById('evidenceModal').classList.remove('hidden');
+            document.getElementById('evidenceModal').classList.add('flex');
+        })
+        .catch(()=>alert('Unable to load evidence details'));
+}
+function approveEvidence(id){
+    fetch('handlers/confirm_handover.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ handover_id: id })
+    }).then(r=>r.json()).then(data=>{
+        if(data.success){
+            alert('Evidence approved');
+            location.reload();
+        } else {
+            alert('Error: ' + (data.message || 'Approval failed'));
+        }
+    });
+}
+function closeEvidenceModal(){
+    document.getElementById('evidenceModal').classList.add('hidden');
+    document.getElementById('evidenceModal').classList.remove('flex');
+}
+
 function confirmHandover(handoverId) {
     if (confirm('Confirm that this evidence has been received?')) {
         fetch('handlers/confirm_handover.php', {

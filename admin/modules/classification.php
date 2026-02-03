@@ -6,100 +6,8 @@ $classification_query = "SELECT * FROM report_types ORDER BY category, type_name
 $classification_stmt = $conn->prepare($classification_query);
 $classification_stmt->execute();
 $classification_rules = $classification_stmt->fetchAll(PDO::FETCH_ASSOC);
-
-// Get AI model configuration
-$ai_config_query = "SELECT * FROM system_config WHERE config_key LIKE 'ai_%'";
-$ai_config_stmt = $conn->prepare($ai_config_query);
-$ai_config_stmt->execute();
-$ai_configs = $ai_config_stmt->fetchAll(PDO::FETCH_KEY_PAIR);
-
-// Get threshold configuration
-$threshold_query = "SELECT config_value FROM system_config WHERE config_key = 'classification_threshold'";
-$threshold_stmt = $conn->prepare($threshold_query);
-$threshold_stmt->execute();
-$threshold = $threshold_stmt->fetchColumn() ?: 0.7;
 ?>
 <div class="space-y-6">
-    <!-- AI Model Configuration -->
-    <div class="bg-white rounded-xl p-6 shadow-sm">
-        <div class="flex items-center justify-between mb-6">
-            <h2 class="text-xl font-bold text-gray-800">Transformer Model Configuration</h2>
-            <span class="text-sm text-gray-500">Police vs. Barangay Classification</span>
-        </div>
-        
-        <form method="POST" action="" class="space-y-6">
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">
-                        Classification Threshold
-                    </label>
-                    <div class="flex items-center space-x-4">
-                        <input type="range" name="threshold" min="0" max="1" step="0.05" value="<?php echo $threshold; ?>" 
-                               class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
-                               oninput="document.getElementById('thresholdValue').textContent = this.value">
-                        <span id="thresholdValue" class="text-lg font-bold text-purple-600 min-w-16">
-                            <?php echo $threshold; ?>
-                        </span>
-                    </div>
-                    <p class="text-sm text-gray-500 mt-1">
-                        Higher values = stricter police classification
-                    </p>
-                </div>
-                
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">
-                        Model Confidence Required
-                    </label>
-                    <select name="confidence_required" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
-                        <option value="high">High (90%+)</option>
-                        <option value="medium">Medium (70%+)</option>
-                        <option value="low" selected>Low (50%+)</option>
-                    </select>
-                </div>
-            </div>
-            
-            <div class="border-t pt-6">
-                <h3 class="text-lg font-semibold text-gray-800 mb-4">Keyword Weight Configuration</h3>
-                <div class="space-y-4">
-                    <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                        <div>
-                            <span class="font-medium text-gray-700">Violence-related keywords</span>
-                            <p class="text-sm text-gray-500">stab, kill, assault, murder</p>
-                        </div>
-                        <input type="number" name="weight_violence" min="1" max="10" value="9" 
-                               class="w-20 p-2 border border-gray-300 rounded-lg text-center">
-                    </div>
-                    <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                        <div>
-                            <span class="font-medium text-gray-700">Drug-related keywords</span>
-                            <p class="text-sm text-gray-500">drugs, shabu, marijuana</p>
-                        </div>
-                        <input type="number" name="weight_drugs" min="1" max="10" value="10" 
-                               class="w-20 p-2 border border-gray-300 rounded-lg text-center">
-                    </div>
-                    <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                        <div>
-                            <span class="font-medium text-gray-700">Theft-related keywords</span>
-                            <p class="text-sm text-gray-500">steal, rob, nakaw, burglar</p>
-                        </div>
-                        <input type="number" name="weight_theft" min="1" max="10" value="8" 
-                               class="w-20 p-2 border border-gray-300 rounded-lg text-center">
-                    </div>
-                </div>
-            </div>
-            
-            <div class="flex justify-end space-x-3">
-                <button type="button" class="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50">
-                    Test Model
-                </button>
-                <button type="submit" name="update_keywords" 
-                        class="px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700">
-                    Save Configuration
-                </button>
-            </div>
-        </form>
-    </div>
-    
     <!-- Incident Type Rules -->
     <div class="bg-white rounded-xl p-6 shadow-sm">
         <div class="flex items-center justify-between mb-6">
@@ -232,7 +140,7 @@ $threshold = $threshold_stmt->fetchColumn() ?: 0.7;
             </button>
         </div>
         
-        <form id="ruleForm" method="POST" action="handlers/save_classification_rule.php">
+        <form id="ruleForm" method="POST" action="handlers/save_classification_rule.php" onsubmit="return handleSaveRule(event)">
             <input type="hidden" id="ruleId" name="id">
             
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
@@ -298,6 +206,33 @@ $threshold = $threshold_stmt->fetchColumn() ?: 0.7;
 </div>
 
 <script>
+function handleSaveRule(e){
+    // Ensure required fields exist and submit via fetch to avoid full-page reload if desired
+    const form = document.getElementById('ruleForm');
+    const fd = new FormData(form);
+    // Basic client validation
+    if(!fd.get('type_name') || !fd.get('category') || !fd.get('jurisdiction')){
+        alert('Please complete required fields');
+        return false;
+    }
+    // Submit via fetch to the handler so "Save Rule" reliably works
+    fetch('handlers/save_classification_rule.php', { method: 'POST', body: fd })
+    .then(r=>r.json())
+    .then(data=>{
+        if(data.success){
+            // Reload to reflect new rule
+            window.location.reload();
+        }else{
+            alert('Error: ' + (data.message || 'Failed to save rule'));
+        }
+    }).catch(err=>{
+        alert('Network error while saving rule');
+        console.error(err);
+    });
+    e.preventDefault();
+    return false;
+}
+
 function showAddRuleModal() {
     document.getElementById('modalTitle').textContent = 'Add Classification Rule';
     document.getElementById('ruleId').value = '';
