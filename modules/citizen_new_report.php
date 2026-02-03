@@ -1510,7 +1510,7 @@ function updateCharCount(category, count) {
     }
 }
 
-// File Upload Functions - FIXED VERSION
+// File Upload Functions - COMPLETELY FIXED VERSION
 const uploadedFiles = {
     incident: [],
     complaint: [],
@@ -1526,12 +1526,21 @@ function handleFileUpload(files, formType) {
     const newFiles = Array.from(files);
     
     // Check if adding new files would exceed limit
-    if (uploadedFiles[formType].length + newFiles.length > maxFiles) {
-        showToast(`Maximum ${maxFiles} files allowed. You already have ${uploadedFiles[formType].length} files.`, 'error');
+    if (newFiles.length > maxFiles) {
+        showToast(`Maximum ${maxFiles} files allowed. You selected ${newFiles.length} files.`, 'error');
         return;
     }
     
-    newFiles.forEach(file => {
+    // Clear existing uploaded files for this form type
+    uploadedFiles[formType] = [];
+    
+    // Clear the file list display
+    if (fileList) {
+        fileList.innerHTML = '';
+    }
+    
+    // Process each new file
+    newFiles.forEach((file, index) => {
         // Validate file type and size
         const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'application/pdf', 
                             'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
@@ -1539,12 +1548,12 @@ function handleFileUpload(files, formType) {
         const maxSize = 10 * 1024 * 1024; // 10MB
         
         if (!allowedTypes.includes(file.type) && !file.type.startsWith('image/')) {
-            showToast(`File ${file.name} is not a supported file type.`, 'error');
+            showToast(`File "${file.name}" is not a supported file type.`, 'error');
             return;
         }
         
         if (file.size > maxSize) {
-            showToast(`File ${file.name} is too large. Maximum size is 10MB.`, 'error');
+            showToast(`File "${file.name}" is too large. Maximum size is 10MB.`, 'error');
             return;
         }
         
@@ -1554,8 +1563,7 @@ function handleFileUpload(files, formType) {
         // Create file preview
         const fileItem = document.createElement('div');
         fileItem.className = 'file-item flex items-center justify-between p-3 bg-gray-50 rounded-lg border animate-fadeIn';
-        fileItem.dataset.fileName = file.name;
-        fileItem.dataset.fileSize = file.size;
+        fileItem.dataset.index = index;
         fileItem.innerHTML = `
             <div class="flex items-center flex-1">
                 <div class="flex-shrink-0">
@@ -1570,16 +1578,23 @@ function handleFileUpload(files, formType) {
                     </div>
                 </div>
             </div>
-            <button type="button" onclick="removeFile('${formType}', this)" 
+            <button type="button" onclick="removeFile('${formType}', ${index})" 
                     class="ml-3 p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors">
                 <i class="fas fa-times"></i>
             </button>
         `;
-        fileList.appendChild(fileItem);
+        
+        if (fileList) {
+            fileList.appendChild(fileItem);
+        }
     });
     
     // Update count
-    fileCount.textContent = uploadedFiles[formType].length;
+    if (fileCount) {
+        fileCount.textContent = uploadedFiles[formType].length;
+    }
+    
+    // Update the actual file input
     updateFileInput(formType);
     
     if (newFiles.length > 0) {
@@ -1587,27 +1602,56 @@ function handleFileUpload(files, formType) {
     }
 }
 
-function removeFile(formType, buttonElement) {
-    const fileItem = buttonElement.closest('.file-item');
-    const fileName = fileItem.dataset.fileName;
-    const fileSize = parseInt(fileItem.dataset.fileSize);
-    
-    // Remove from uploadedFiles array
-    uploadedFiles[formType] = uploadedFiles[formType].filter(file => 
-        !(file.name === fileName && file.size === fileSize)
-    );
-    
-    // Remove from DOM with animation
-    fileItem.classList.add('animate-fadeOut');
-    setTimeout(() => {
-        fileItem.remove();
-    }, 300);
-    
-    // Update count
-    document.getElementById(formType + 'FileCount').textContent = uploadedFiles[formType].length;
-    updateFileInput(formType);
-    
-    showToast('File removed', 'info');
+function removeFile(formType, index) {
+    // Remove file from array
+    if (uploadedFiles[formType][index]) {
+        uploadedFiles[formType].splice(index, 1);
+        
+        // Update the display
+        const fileList = document.getElementById(formType + 'FileList');
+        const fileCount = document.getElementById(formType + 'FileCount');
+        
+        if (fileList) {
+            // Rebuild the file list
+            fileList.innerHTML = '';
+            
+            // Re-add all remaining files with updated indexes
+            uploadedFiles[formType].forEach((file, newIndex) => {
+                const fileItem = document.createElement('div');
+                fileItem.className = 'file-item flex items-center justify-between p-3 bg-gray-50 rounded-lg border animate-fadeIn';
+                fileItem.innerHTML = `
+                    <div class="flex items-center flex-1">
+                        <div class="flex-shrink-0">
+                            <i class="fas ${getFileIcon(file.type)} text-blue-500 mr-3 text-lg"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <p class="text-sm font-medium text-gray-800 truncate">${file.name}</p>
+                            <div class="flex items-center text-xs text-gray-500 mt-1">
+                                <span>${formatFileSize(file.size)}</span>
+                                <span class="mx-2">•</span>
+                                <span>${getFileType(file.type)}</span>
+                            </div>
+                        </div>
+                    </div>
+                    <button type="button" onclick="removeFile('${formType}', ${newIndex})" 
+                            class="ml-3 p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors">
+                        <i class="fas fa-times"></i>
+                    </button>
+                `;
+                fileList.appendChild(fileItem);
+            });
+        }
+        
+        // Update count
+        if (fileCount) {
+            fileCount.textContent = uploadedFiles[formType].length;
+        }
+        
+        // Update the actual file input
+        updateFileInput(formType);
+        
+        showToast('File removed', 'info');
+    }
 }
 
 function clearFiles(formType) {
@@ -1617,21 +1661,23 @@ function clearFiles(formType) {
         // Clear the array
         uploadedFiles[formType] = [];
         
-        // Remove all file items from DOM with animation
+        // Clear the file list display
         const fileList = document.getElementById(formType + 'FileList');
-        const fileItems = fileList.querySelectorAll('.file-item');
-        
-        fileItems.forEach(item => {
-            item.classList.add('animate-fadeOut');
-        });
-        
-        setTimeout(() => {
+        if (fileList) {
             fileList.innerHTML = '';
-        }, 300);
+        }
         
         // Update count
-        document.getElementById(formType + 'FileCount').textContent = '0';
-        updateFileInput(formType);
+        const fileCount = document.getElementById(formType + 'FileCount');
+        if (fileCount) {
+            fileCount.textContent = '0';
+        }
+        
+        // Clear the actual file input
+        const fileInput = document.getElementById(formType + '_evidence_files');
+        if (fileInput) {
+            fileInput.value = '';
+        }
         
         showToast('All files cleared', 'info');
     }
@@ -1639,6 +1685,7 @@ function clearFiles(formType) {
 
 function updateFileInput(formType) {
     const fileInput = document.getElementById(formType + '_evidence_files');
+    if (!fileInput) return;
     
     // Create a new DataTransfer object
     const dataTransfer = new DataTransfer();
@@ -1650,9 +1697,6 @@ function updateFileInput(formType) {
     
     // Replace the files in the input
     fileInput.files = dataTransfer.files;
-    
-    // Force a change event to ensure the input is updated
-    fileInput.dispatchEvent(new Event('change', { bubbles: true }));
 }
 
 // Helper functions
@@ -1766,15 +1810,22 @@ function showToast(message, type) {
 
 // Initialize when page loads
 document.addEventListener('DOMContentLoaded', function() {
-    // Initialize character counters
-    document.querySelectorAll('textarea[name="description"]').forEach(textarea => {
-        const formType = textarea.id.replace('Description', '').toLowerCase();
+    // Initialize character counters for all forms
+    ['incident', 'complaint', 'blotter'].forEach(formType => {
+        const textarea = document.getElementById(formType + 'Description');
         const charCount = document.getElementById(formType + 'CharCount');
-        if (charCount) {
+        
+        if (textarea && charCount) {
             charCount.textContent = textarea.value.length;
             textarea.addEventListener('input', function() {
                 charCount.textContent = this.value.length;
             });
+        }
+        
+        // Initialize file counts
+        const fileCount = document.getElementById(formType + 'FileCount');
+        if (fileCount) {
+            fileCount.textContent = uploadedFiles[formType]?.length || 0;
         }
     });
 });
