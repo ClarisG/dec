@@ -6,6 +6,82 @@ $classification_query = "SELECT * FROM report_types ORDER BY category, type_name
 $classification_stmt = $conn->prepare($classification_query);
 $classification_stmt->execute();
 $classification_rules = $classification_stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Handle form submission for saving rules
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_rule'])) {
+    try {
+        $type_name = $_POST['type_name'];
+        $category = $_POST['category'];
+        $keywords = $_POST['keywords'];
+        $jurisdiction = $_POST['jurisdiction'];
+        $severity_level = $_POST['severity_level'];
+        $rule_id = $_POST['rule_id'] ?? null;
+        
+        if ($rule_id) {
+            // Update existing rule
+            $update_query = "UPDATE report_types SET 
+                            type_name = :type_name,
+                            category = :category,
+                            keywords = :keywords,
+                            jurisdiction = :jurisdiction,
+                            severity_level = :severity_level
+                            WHERE id = :id";
+            $stmt = $conn->prepare($update_query);
+            $stmt->execute([
+                ':type_name' => $type_name,
+                ':category' => $category,
+                ':keywords' => $keywords,
+                ':jurisdiction' => $jurisdiction,
+                ':severity_level' => $severity_level,
+                ':id' => $rule_id
+            ]);
+            
+            $_SESSION['success'] = "Rule updated successfully!";
+        } else {
+            // Insert new rule
+            $insert_query = "INSERT INTO report_types 
+                            (type_name, category, keywords, jurisdiction, severity_level)
+                            VALUES (:type_name, :category, :keywords, :jurisdiction, :severity_level)";
+            $stmt = $conn->prepare($insert_query);
+            $stmt->execute([
+                ':type_name' => $type_name,
+                ':category' => $category,
+                ':keywords' => $keywords,
+                ':jurisdiction' => $jurisdiction,
+                ':severity_level' => $severity_level
+            ]);
+            
+            $_SESSION['success'] = "Rule added successfully!";
+        }
+        
+        header("Location: ?module=classification");
+        exit();
+    } catch (PDOException $e) {
+        $_SESSION['error'] = "Error saving rule: " . $e->getMessage();
+    }
+}
+
+// Handle delete rule
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_rule'])) {
+    try {
+        $rule_id = $_POST['rule_id'];
+        $delete_query = "DELETE FROM report_types WHERE id = :id";
+        $stmt = $conn->prepare($delete_query);
+        $stmt->execute([':id' => $rule_id]);
+        
+        $_SESSION['success'] = "Rule deleted successfully!";
+        header("Location: ?module=classification");
+        exit();
+    } catch (PDOException $e) {
+        $_SESSION['error'] = "Error deleting rule: " . $e->getMessage();
+    }
+}
+
+// Get threshold configuration
+$threshold_query = "SELECT config_value FROM system_config WHERE config_key = 'classification_threshold'";
+$threshold_stmt = $conn->prepare($threshold_query);
+$threshold_stmt->execute();
+$threshold = $threshold_stmt->fetchColumn() ?: 0.7;
 ?>
 <div class="space-y-6">
     <!-- Incident Type Rules -->
@@ -16,6 +92,18 @@ $classification_rules = $classification_stmt->fetchAll(PDO::FETCH_ASSOC);
                 <i class="fas fa-plus mr-2"></i>Add Rule
             </button>
         </div>
+        
+        <?php if (isset($_SESSION['success'])): ?>
+            <div class="mb-4 p-4 bg-green-100 text-green-700 rounded-lg">
+                <?php echo $_SESSION['success']; unset($_SESSION['success']); ?>
+            </div>
+        <?php endif; ?>
+        
+        <?php if (isset($_SESSION['error'])): ?>
+            <div class="mb-4 p-4 bg-red-100 text-red-700 rounded-lg">
+                <?php echo $_SESSION['error']; unset($_SESSION['error']); ?>
+            </div>
+        <?php endif; ?>
         
         <div class="overflow-x-auto">
             <table class="min-w-full divide-y divide-gray-200">
@@ -43,29 +131,36 @@ $classification_rules = $classification_stmt->fetchAll(PDO::FETCH_ASSOC);
                                     <?php 
                                     $keywords = explode(',', $rule['keywords']);
                                     foreach(array_slice($keywords, 0, 3) as $keyword): ?>
-                                        <span class="keyword-tag"><?php echo trim($keyword); ?></span>
+                                        <span class="inline-block bg-gray-100 text-gray-800 px-2 py-1 rounded text-xs mr-1 mb-1">
+                                            <?php echo trim($keyword); ?>
+                                        </span>
                                     <?php endforeach; ?>
                                     <?php if (count($keywords) > 3): ?>
-                                        <span class="keyword-tag">+<?php echo count($keywords) - 3; ?> more</span>
+                                        <span class="inline-block bg-gray-200 text-gray-600 px-2 py-1 rounded text-xs">
+                                            +<?php echo count($keywords) - 3; ?> more
+                                        </span>
                                     <?php endif; ?>
                                 <?php else: ?>
-                                    <span class="text-gray-400">No keywords</span>
+                                    <span class="text-gray-400 italic">No keywords</span>
                                 <?php endif; ?>
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap">
-                                <span class="status-badge <?php echo $rule['jurisdiction'] === 'police' ? 'status-warning' : 'status-success'; ?>">
-                                    <?php echo htmlspecialchars($rule['jurisdiction']); ?>
+                                <span class="px-3 py-1 rounded-full text-xs font-medium 
+                                    <?php echo $rule['jurisdiction'] === 'police' ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800'; ?>">
+                                    <?php echo htmlspecialchars(ucfirst($rule['jurisdiction'])); ?>
                                 </span>
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap">
                                 <span class="text-sm text-gray-500 capitalize"><?php echo $rule['severity_level']; ?></span>
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                <button onclick="editRule(<?php echo $rule['id']; ?>)" class="text-purple-600 hover:text-purple-900 mr-3">
-                                    <i class="fas fa-edit"></i>
+                                <button onclick="editRule(<?php echo $rule['id']; ?>)" 
+                                        class="text-purple-600 hover:text-purple-900 mr-3 px-2 py-1 hover:bg-purple-50 rounded">
+                                    <i class="fas fa-edit"></i> Edit
                                 </button>
-                                <button onclick="deleteRule(<?php echo $rule['id']; ?>)" class="text-red-600 hover:text-red-900">
-                                    <i class="fas fa-trash"></i>
+                                <button onclick="deleteRule(<?php echo $rule['id']; ?>)" 
+                                        class="text-red-600 hover:text-red-900 px-2 py-1 hover:bg-red-50 rounded">
+                                    <i class="fas fa-trash"></i> Delete
                                 </button>
                             </td>
                         </tr>
@@ -99,8 +194,9 @@ $classification_rules = $classification_stmt->fetchAll(PDO::FETCH_ASSOC);
                                 <span class="font-medium text-gray-800">Report: <?php echo htmlspecialchars($log['report_number']); ?></span>
                                 <p class="text-sm text-gray-600 truncate"><?php echo htmlspecialchars($log['title']); ?></p>
                             </div>
-                            <span class="status-badge <?php echo $log['predicted_jurisdiction'] === 'police' ? 'status-warning' : 
-                                                         ($log['predicted_jurisdiction'] === 'uncertain' ? 'status-pending' : 'status-success'); ?>">
+                            <span class="px-3 py-1 rounded-full text-xs font-medium 
+                                <?php echo $log['predicted_jurisdiction'] === 'police' ? 'bg-yellow-100 text-yellow-800' : 
+                                       ($log['predicted_jurisdiction'] === 'uncertain' ? 'bg-gray-100 text-gray-800' : 'bg-green-100 text-green-800'); ?>">
                                 <?php echo ucfirst($log['predicted_jurisdiction']); ?>
                             </span>
                         </div>
@@ -140,20 +236,23 @@ $classification_rules = $classification_stmt->fetchAll(PDO::FETCH_ASSOC);
             </button>
         </div>
         
-        <form id="ruleForm" method="POST" action="handlers/save_classification_rule.php" onsubmit="return handleSaveRule(event)">
-            <input type="hidden" id="ruleId" name="id">
+        <form id="ruleForm" method="POST" action="">
+            <input type="hidden" id="ruleId" name="rule_id" value="">
+            <input type="hidden" name="save_rule" value="1">
             
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">Incident Type Name</label>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Incident Type Name *</label>
                     <input type="text" name="type_name" required 
-                           class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
+                           class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                           placeholder="e.g., Theft, Assault, etc.">
                 </div>
                 
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">Category</label>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Category *</label>
                     <select name="category" required 
                             class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
+                        <option value="">Select Category</option>
                         <option value="incident">Incident</option>
                         <option value="complaint">Complaint</option>
                         <option value="blotter">Blotter</option>
@@ -171,20 +270,22 @@ $classification_rules = $classification_stmt->fetchAll(PDO::FETCH_ASSOC);
             
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">Jurisdiction</label>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Jurisdiction *</label>
                     <select name="jurisdiction" required 
                             class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
+                        <option value="">Select Jurisdiction</option>
                         <option value="barangay">Barangay</option>
                         <option value="police">Police</option>
                     </select>
                 </div>
                 
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">Severity Level</label>
-                    <select name="severity_level" 
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Severity Level *</label>
+                    <select name="severity_level" required
                             class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
+                        <option value="">Select Severity</option>
                         <option value="low">Low</option>
-                        <option value="medium" selected>Medium</option>
+                        <option value="medium">Medium</option>
                         <option value="high">High</option>
                         <option value="critical">Critical</option>
                     </select>
@@ -206,75 +307,63 @@ $classification_rules = $classification_stmt->fetchAll(PDO::FETCH_ASSOC);
 </div>
 
 <script>
-function handleSaveRule(e){
-    // Ensure required fields exist and submit via fetch to avoid full-page reload if desired
-    const form = document.getElementById('ruleForm');
-    const fd = new FormData(form);
-    // Basic client validation
-    if(!fd.get('type_name') || !fd.get('category') || !fd.get('jurisdiction')){
-        alert('Please complete required fields');
-        return false;
-    }
-    // Submit via fetch to the handler so "Save Rule" reliably works
-    fetch('handlers/save_classification_rule.php', { method: 'POST', body: fd })
-    .then(r=>r.json())
-    .then(data=>{
-        if(data.success){
-            // Reload to reflect new rule
-            window.location.reload();
-        }else{
-            alert('Error: ' + (data.message || 'Failed to save rule'));
-        }
-    }).catch(err=>{
-        alert('Network error while saving rule');
-        console.error(err);
-    });
-    e.preventDefault();
-    return false;
-}
-
 function showAddRuleModal() {
     document.getElementById('modalTitle').textContent = 'Add Classification Rule';
     document.getElementById('ruleId').value = '';
     document.getElementById('ruleForm').reset();
+    document.getElementById('ruleForm').type_name.value = '';
+    document.getElementById('ruleForm').category.value = '';
+    document.getElementById('ruleForm').keywords.value = '';
+    document.getElementById('ruleForm').jurisdiction.value = '';
+    document.getElementById('ruleForm').severity_level.value = '';
     document.getElementById('ruleModal').classList.remove('hidden');
     document.getElementById('ruleModal').classList.add('flex');
 }
 
 function editRule(ruleId) {
-    // Fetch rule data via AJAX
-    fetch(`handlers/get_classification_rule.php?id=${ruleId}`)
-        .then(response => response.json())
+    fetch(`ajax/get_classification_rule.php?id=${ruleId}`)
+        .then(response => {
+            if (!response.ok) throw new Error('Network response was not ok');
+            return response.json();
+        })
         .then(rule => {
             document.getElementById('modalTitle').textContent = 'Edit Classification Rule';
             document.getElementById('ruleId').value = rule.id;
-            document.getElementById('ruleForm').type_name.value = rule.type_name;
-            document.getElementById('ruleForm').category.value = rule.category;
-            document.getElementById('ruleForm').keywords.value = rule.keywords;
-            document.getElementById('ruleForm').jurisdiction.value = rule.jurisdiction;
-            document.getElementById('ruleForm').severity_level.value = rule.severity_level;
+            document.querySelector('[name="type_name"]').value = rule.type_name || '';
+            document.querySelector('[name="category"]').value = rule.category || '';
+            document.querySelector('[name="keywords"]').value = rule.keywords || '';
+            document.querySelector('[name="jurisdiction"]').value = rule.jurisdiction || '';
+            document.querySelector('[name="severity_level"]').value = rule.severity_level || '';
             
             document.getElementById('ruleModal').classList.remove('hidden');
             document.getElementById('ruleModal').classList.add('flex');
+        })
+        .catch(error => {
+            console.error('Error fetching rule:', error);
+            alert('Error loading rule details. Please try again.');
         });
 }
 
 function deleteRule(ruleId) {
     if (confirm('Are you sure you want to delete this classification rule?')) {
-        fetch('handlers/delete_classification_rule.php', {
+        const formData = new FormData();
+        formData.append('delete_rule', '1');
+        formData.append('rule_id', ruleId);
+        
+        fetch('', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ id: ruleId })
+            body: formData
         })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
+        .then(response => {
+            if (response.ok) {
                 location.reload();
             } else {
-                alert('Error: ' + data.message);
+                throw new Error('Network response was not ok');
             }
+        })
+        .catch(error => {
+            console.error('Error deleting rule:', error);
+            alert('Error deleting rule. Please try again.');
         });
     }
 }
@@ -291,4 +380,9 @@ window.onclick = function(event) {
         closeRuleModal();
     }
 }
+
+// Handle form submission
+document.getElementById('ruleForm').addEventListener('submit', function(e) {
+    // Validation is already handled by required attributes
+});
 </script>

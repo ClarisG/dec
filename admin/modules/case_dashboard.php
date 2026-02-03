@@ -7,19 +7,18 @@ $filter_type = $_GET['type'] ?? 'all';
 $filter_date_from = $_GET['date_from'] ?? date('Y-m-01');
 $filter_date_to = $_GET['date_to'] ?? date('Y-m-d');
 
-// Build query with filters (removed report_referrals references)
+// Build query with filters (FIXED: removed hearing_cases reference)
 $cases_query = "SELECT r.*, rt.type_name as incident_type,
                        CONCAT(u.first_name, ' ', u.last_name) as complainant_name,
                        CONCAT(ut.first_name, ' ', ut.last_name) as tanod_name,
-                       NULL as hearing_date, NULL as hearing_status,
                        c.complainant_contact
                 FROM reports r
                 LEFT JOIN report_types rt ON r.report_type_id = rt.id
                 LEFT JOIN users u ON r.user_id = u.id
                 LEFT JOIN users ut ON r.assigned_tanod = ut.id
-                /* hearing_cases removed to avoid missing table error */
                 LEFT JOIN complainants c ON r.complainant_id = c.id
-                WHERE r.status != 'draft' AND r.status != 'pending_field_verification'";
+                WHERE r.status != 'draft' 
+                AND r.status != 'pending_field_verification'";
 
 $params = [];
 
@@ -152,8 +151,6 @@ $report_types = $types_stmt->fetchAll(PDO::FETCH_COLUMN);
                             <option value="all" <?php echo $filter_status === 'all' ? 'selected' : ''; ?>>All Status</option>
                             <option value="open" <?php echo $filter_status === 'open' ? 'selected' : ''; ?>>Open</option>
                             <option value="investigating" <?php echo $filter_status === 'investigating' ? 'selected' : ''; ?>>Investigating</option>
-                            <option value="hearing" <?php echo $filter_status === 'hearing' ? 'selected' : ''; ?>>Hearing</option>
-                            <option value="referred" <?php echo $filter_status === 'referred' ? 'selected' : ''; ?>>Referred</option>
                             <option value="closed" <?php echo $filter_status === 'closed' ? 'selected' : ''; ?>>Closed</option>
                         </select>
                     </div>
@@ -233,10 +230,10 @@ $report_types = $types_stmt->fetchAll(PDO::FETCH_COLUMN);
                                 <?php echo htmlspecialchars($case['tanod_name'] ?? 'Not assigned'); ?>
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap">
-                                <span class="status-badge 
-                                    <?php echo $case['status'] === 'closed' ? 'status-success' : 
-                                           ($case['status'] === 'referred' ? 'status-warning' : 
-                                           ($case['status'] === 'investigating' ? 'status-active' : 'status-pending')); ?>">
+                                <span class="px-3 py-1 rounded-full text-xs font-medium 
+                                    <?php echo $case['status'] === 'closed' ? 'bg-green-100 text-green-800' : 
+                                           ($case['status'] === 'referred' ? 'bg-yellow-100 text-yellow-800' : 
+                                           ($case['status'] === 'investigating' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800')); ?>">
                                     <?php echo ucfirst($case['status']); ?>
                                 </span>
                             </td>
@@ -251,8 +248,8 @@ $report_types = $types_stmt->fetchAll(PDO::FETCH_COLUMN);
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                 <button onclick="viewAuditTrail(<?php echo $case['id']; ?>)" 
-                                        class="text-purple-600 hover:text-purple-900">
-                                    <i class="fas fa-history"></i>
+                                        class="text-purple-600 hover:text-purple-900 px-2 py-1 hover:bg-purple-50 rounded">
+                                    <i class="fas fa-history"></i> View
                                 </button>
                             </td>
                         </tr>
@@ -301,8 +298,8 @@ $report_types = $types_stmt->fetchAll(PDO::FETCH_COLUMN);
                                 <?php echo $status['count']; ?> (<?php echo round($percentage, 1); ?>%)
                             </span>
                         </div>
-                        <div class="progress-bar">
-                            <div class="progress-fill bg-purple-500" style="width: <?php echo $percentage; ?>%"></div>
+                        <div class="w-full bg-gray-200 rounded-full h-2">
+                            <div class="bg-purple-500 h-2 rounded-full" style="width: <?php echo $percentage; ?>%"></div>
                         </div>
                     </div>
                 <?php endforeach; ?>
@@ -343,7 +340,8 @@ $report_types = $types_stmt->fetchAll(PDO::FETCH_COLUMN);
                                     <i class="fas fa-user mr-1"></i>
                                     <?php echo htmlspecialchars($update['first_name'] . ' ' . $update['last_name']); ?>
                                 </div>
-                                <span class="status-badge <?php echo strpos($update['action'], 'update') !== false ? 'status-success' : 'status-info'; ?>">
+                                <span class="px-2 py-1 rounded text-xs 
+                                    <?php echo strpos($update['action'], 'update') !== false ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'; ?>">
                                     <?php echo htmlspecialchars($update['action']); ?>
                                 </span>
                             </div>
@@ -378,8 +376,11 @@ $report_types = $types_stmt->fetchAll(PDO::FETCH_COLUMN);
 
 <script>
 function viewAuditTrail(caseId) {
-    fetch(`handlers/get_case_audit_trail.php?id=${caseId}`)
-        .then(response => response.json())
+    fetch(`ajax/get_case_audit_trail.php?id=${caseId}`)
+        .then(response => {
+            if (!response.ok) throw new Error('Network response was not ok');
+            return response.json();
+        })
         .then(data => {
             document.getElementById('modalAuditTitle').textContent = `Audit Trail: ${data.report_number}`;
             
@@ -393,7 +394,7 @@ function viewAuditTrail(caseId) {
                             <p class="text-sm text-gray-600">Complainant: <span class="font-medium">${data.complainant_name}</span></p>
                         </div>
                         <div class="bg-gray-50 p-4 rounded-lg">
-                            <p class="text-sm text-gray-600">Current Status: <span class="status-badge ${getStatusClass(data.status)}">${data.status}</span></p>
+                            <p class="text-sm text-gray-600">Current Status: <span class="px-3 py-1 rounded-full text-xs font-medium ${getStatusClass(data.status)}">${data.status}</span></p>
                             <p class="text-sm text-gray-600">Assigned Tanod: <span class="font-medium">${data.tanod_name || 'Not assigned'}</span></p>
                             <p class="text-sm text-gray-600">Created: ${new Date(data.created_at).toLocaleString()}</p>
                         </div>
@@ -447,18 +448,28 @@ function viewAuditTrail(caseId) {
             document.getElementById('auditTrailContent').innerHTML = auditHtml;
             document.getElementById('auditTrailModal').classList.remove('hidden');
             document.getElementById('auditTrailModal').classList.add('flex');
+        })
+        .catch(error => {
+            console.error('Error fetching audit trail:', error);
+            document.getElementById('auditTrailContent').innerHTML = `
+                <div class="text-center py-8 text-red-500">
+                    <i class="fas fa-exclamation-triangle text-3xl mb-2"></i>
+                    <p>Error loading audit trail. Please try again.</p>
+                </div>
+            `;
+            document.getElementById('auditTrailModal').classList.remove('hidden');
+            document.getElementById('auditTrailModal').classList.add('flex');
         });
 }
 
 function getStatusClass(status) {
     const classes = {
-        'closed': 'status-success',
-        'referred': 'status-warning',
-        'investigating': 'status-active',
-        'open': 'status-pending',
-        'hearing': 'status-info'
+        'closed': 'bg-green-100 text-green-800',
+        'referred': 'bg-yellow-100 text-yellow-800',
+        'investigating': 'bg-blue-100 text-blue-800',
+        'open': 'bg-gray-100 text-gray-800'
     };
-    return classes[status] || 'status-pending';
+    return classes[status] || 'bg-gray-100 text-gray-800';
 }
 
 function getActivityColor(action) {

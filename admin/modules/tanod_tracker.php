@@ -197,8 +197,9 @@ $key_locations = [
                                     <span class="font-medium text-gray-800"><?php echo htmlspecialchars($assignment['report_number']); ?></span>
                                     <p class="text-sm text-gray-600 truncate"><?php echo htmlspecialchars($assignment['title']); ?></p>
                                 </div>
-                                <span class="status-badge <?php echo $assignment['priority'] === 'high' ? 'status-warning' : 
-                                                                 ($assignment['priority'] === 'critical' ? 'status-error' : 'status-success'); ?>">
+                                <span class="px-3 py-1 rounded-full text-xs font-medium 
+                                    <?php echo $assignment['priority'] === 'high' ? 'bg-yellow-100 text-yellow-800' : 
+                                           ($assignment['priority'] === 'critical' ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'); ?>">
                                     <?php echo ucfirst($assignment['priority']); ?>
                                 </span>
                             </div>
@@ -272,30 +273,42 @@ $key_locations = [
     </div>
 </div>
 
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
 <script>
-function assignQuickIncident(){
+function assignQuickIncident() {
     const reportId = document.getElementById('quickIncident').value;
     const tanodId = document.getElementById('quickTanod').value;
+    
     if(!reportId || !tanodId){
         alert('Please select an incident and a tanod');
         return;
     }
-    const fd = new FormData();
-    fd.append('report_id', reportId);
-    fd.append('assigned_to', tanodId);
-    fd.append('officer_id', tanodId);
-    fd.append('tanod_id', tanodId);
-    fetch('../../handlers/assign_case.php', { method: 'POST', body: fd })
-    .then(r=>r.json())
-    .then(data=>{
-        if(data.success){
-            alert('Incident assigned successfully');
+    
+    const formData = new FormData();
+    formData.append('report_id', reportId);
+    formData.append('tanod_id', tanodId);
+    formData.append('assign_case', '1');
+    
+    fetch('handlers/assign_case.php', { 
+        method: 'POST', 
+        body: formData 
+    })
+    .then(response => {
+        if (!response.ok) throw new Error('Network response was not ok');
+        return response.json();
+    })
+    .then(data => {
+        if (data.success) {
+            alert('Incident assigned successfully!');
             location.reload();
         } else {
-            alert('Error: ' + (data.message || 'Failed to assign'));
+            alert('Error: ' + (data.message || 'Failed to assign incident'));
         }
-    }).catch(err=>{
-        console.error(err);
+    })
+    .catch(err => {
+        console.error('Error:', err);
         alert('Network error assigning incident');
     });
 }
@@ -307,105 +320,64 @@ function initTanodMap() {
         center: [14.6945, 121.0790],
         zoom: 15,
         minZoom: 12,
-        maxZoom: 18,
-        maxBounds: [
-            [4.5, 114],  // Southwest corner of Philippines
-            [21.5, 127]  // Northeast corner of Philippines
-        ],
-        maxBoundsViscosity: 1.0 // Prevents panning outside bounds
+        maxZoom: 18
     });
     
     // Use OpenStreetMap tiles
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '© OpenStreetMap contributors | Barangay Commonwealth, Quezon City',
-        noWrap: true, // Prevent wrapping to other parts of the world
-        bounds: [
-            [4.5, 114],  // Southwest corner of Philippines
-            [21.5, 127]  // Northeast corner of Philippines
-        ]
+        maxZoom: 19
     }).addTo(map);
     
-    // Draw Barangay Commonwealth boundary - OUTER LINE HIGHLIGHTED
+    // Draw Barangay Commonwealth boundary with highlighted border
     const barangayBoundary = L.polygon(<?php echo json_encode($barangay_boundary); ?>, {
-        color: '#dc2626', // Red color for outer line
-        weight: 4, // Thicker line
+        color: '#dc2626',
+        weight: 4,
         opacity: 1,
         fillColor: '#1d4ed8',
-        fillOpacity: 0.1,
-        dashArray: null // Solid line
+        fillOpacity: 0.1
     }).addTo(map);
     
     // Add highlight for the outer line
     const barangayOuterLine = L.polyline(<?php echo json_encode($barangay_boundary); ?>, {
-        color: '#ef4444', // Bright red for emphasis
+        color: '#ef4444',
         weight: 8,
         opacity: 0.3,
-        fill: false,
-        className: 'barangay-highlight-line'
+        fill: false
     }).addTo(map);
     
-    // Add label for Barangay Commonwealth with a marker
-    const barangayCenter = L.marker([14.6945, 121.0790], {
-        icon: L.divIcon({
-            html: `<div class="bg-red-600 text-white px-3 py-1 rounded-lg font-bold shadow-lg">
-                     <i class="fas fa-map-marker-alt mr-1"></i>Barangay Commonwealth
-                   </div>`,
-            className: 'barangay-label',
-            iconSize: [200, 40],
-            iconAnchor: [100, 20]
-        })
-    }).addTo(map).bindPopup(`
-        <div class="p-2">
-            <h3 class="font-bold text-lg text-blue-700">Barangay Commonwealth</h3>
-            <p class="text-sm">Quezon City, Metro Manila, Philippines</p>
-            <p class="text-xs text-gray-600">Area: ~5.3 sq km | Population: ~200,000</p>
-            <div class="mt-2">
-                <p class="text-sm"><i class="fas fa-border-all mr-2"></i>Boundary Highlighted in Red</p>
-                <p class="text-xs text-gray-500">Zoom in for detailed view of zones and streets</p>
+    // Add label for Barangay Commonwealth
+    L.marker([14.6945, 121.0790]).addTo(map)
+        .bindPopup(`
+            <div class="p-2">
+                <h3 class="font-bold text-lg text-blue-700">Barangay Commonwealth</h3>
+                <p class="text-sm">Quezon City, Metro Manila, Philippines</p>
+                <p class="text-xs text-gray-600">Area: ~5.3 sq km | Population: ~200,000</p>
             </div>
-        </div>
-    `);
+        `);
     
     // Add key locations markers
     <?php foreach($key_locations as $location): ?>
-        const locationIcon<?php echo str_replace(' ', '', $location['name']); ?> = L.divIcon({
-            html: `<div class="bg-purple-600 w-6 h-6 rounded-full border-2 border-white shadow-lg flex items-center justify-center">
-                     <i class="fas fa-<?php echo $location['type'] === 'government' ? 'landmark' : 
-                                          ($location['type'] === 'school' ? 'graduation-cap' : 
-                                           ($location['type'] === 'police' ? 'shield-alt' : 
-                                            ($location['type'] === 'hospital' ? 'hospital' : 'store'))); ?> 
-                          text-white text-xs"></i>
-                   </div>`,
-            className: 'custom-div-icon',
-            iconSize: [24, 24],
-            iconAnchor: [12, 12]
-        });
-        
-        L.marker([<?php echo $location['lat']; ?>, <?php echo $location['lng']; ?>], { 
-            icon: locationIcon<?php echo str_replace(' ', '', $location['name']); ?>
-        }).addTo(map)
-          .bindPopup(`
-            <div class="p-2">
-                <h4 class="font-bold text-purple-700"><?php echo $location['name']; ?></h4>
-                <p class="text-sm text-gray-600"><?php echo $location['address']; ?></p>
-                <p class="text-xs text-gray-500 mt-1">
-                    <i class="fas fa-tag mr-1"></i><?php echo ucfirst($location['type']); ?> Location
-                </p>
-                <p class="text-xs text-gray-400 mt-2">
-                    <i class="fas fa-map-pin mr-1"></i>Zone: Barangay Commonwealth
-                </p>
-            </div>
-          `);
+        L.marker([<?php echo $location['lat']; ?>, <?php echo $location['lng']; ?>])
+            .addTo(map)
+            .bindPopup(`
+                <div class="p-2">
+                    <h4 class="font-bold text-purple-700"><?php echo $location['name']; ?></h4>
+                    <p class="text-sm text-gray-600"><?php echo $location['address']; ?></p>
+                    <p class="text-xs text-gray-500 mt-1">
+                        <i class="fas fa-tag mr-1"></i><?php echo ucfirst($location['type']); ?> Location
+                    </p>
+                </div>
+            `);
     <?php endforeach; ?>
     
     // Add Tanod markers from database
     <?php foreach($tanods as $tanod): ?>
         <?php if ($tanod['location_lat'] && $tanod['location_lng']): ?>
-            const iconColor<?php echo $tanod['id']; ?> = '<?php echo $tanod['duty_status'] === "On-Duty" ? "green" : 
-                                                              ($tanod['duty_status'] === "Available" ? "blue" : "gray"); ?>';
-            
-            const icon<?php echo $tanod['id']; ?> = L.divIcon({
-                html: `<div class="bg-${iconColor<?php echo $tanod['id']; ?>}-500 w-8 h-8 rounded-full border-2 border-white shadow-lg flex items-center justify-center animate-pulse">
+            const tanodIcon<?php echo $tanod['id']; ?> = L.divIcon({
+                html: `<div class="bg-<?php echo $tanod['duty_status'] === "On-Duty" ? "green" : 
+                                          ($tanod['duty_status'] === "Available" ? "blue" : "gray"); ?>-500 
+                              w-8 h-8 rounded-full border-2 border-white shadow-lg flex items-center justify-center">
                          <i class="fas fa-shield-alt text-white text-xs"></i>
                        </div>`,
                 className: 'custom-div-icon',
@@ -414,8 +386,7 @@ function initTanodMap() {
             });
             
             L.marker([<?php echo $tanod['location_lat']; ?>, <?php echo $tanod['location_lng']; ?>], { 
-                icon: icon<?php echo $tanod['id']; ?>,
-                zIndexOffset: 1000 // Make tanod markers appear above other markers
+                icon: tanodIcon<?php echo $tanod['id']; ?>
             }).addTo(map)
               .bindPopup(`
                 <div class="p-3">
@@ -436,10 +407,6 @@ function initTanodMap() {
                                 <?php echo $tanod['duty_status']; ?>
                             </span>
                         </p>
-                        <p class="text-sm">
-                            <span class="font-medium">Location:</span> 
-                            <span class="text-gray-600">Barangay Commonwealth, Quezon City</span>
-                        </p>
                         <?php if ($tanod['clock_in']): ?>
                             <p class="text-sm">
                                 <span class="font-medium">On Duty Since:</span> 
@@ -451,32 +418,6 @@ function initTanodMap() {
               `);
         <?php endif; ?>
     <?php endforeach; ?>
-    
-    // Add zoom controls
-    L.control.zoom({
-        position: 'topright',
-        zoomInText: '<i class="fas fa-search-plus"></i>',
-        zoomOutText: '<i class="fas fa-search-minus"></i>'
-    }).addTo(map);
-    
-    // Add scale control
-    L.control.scale({imperial: false, position: 'bottomleft'}).addTo(map);
-    
-    // Add coordinates display on mouse move
-    const coordDisplay = L.control({position: 'bottomright'});
-    coordDisplay.onAdd = function() {
-        this._div = L.DomUtil.create('div', 'bg-black bg-opacity-70 text-white p-2 rounded text-xs');
-        this._div.innerHTML = 'Move mouse to see coordinates';
-        return this._div;
-    };
-    coordDisplay.update = function(latlng) {
-        this._div.innerHTML = `Lat: ${latlng.lat.toFixed(5)}, Lng: ${latlng.lng.toFixed(5)}<br>Barangay Commonwealth`;
-    };
-    coordDisplay.addTo(map);
-    
-    map.on('mousemove', function(e) {
-        coordDisplay.update(e.latlng);
-    });
     
     // Add legend
     const legend = L.control({position: 'topright'});
@@ -505,60 +446,23 @@ function initTanodMap() {
                     <div class="w-4 h-4 border-4 border-red-600 bg-transparent mr-2"></div>
                     <span class="text-sm">Barangay Boundary</span>
                 </div>
-                <div class="flex items-center">
-                    <div class="w-4 h-4 bg-red-100 border border-red-300 mr-2"></div>
-                    <span class="text-sm">Barangay Area</span>
-                </div>
             </div>
         `;
         return div;
     };
     legend.addTo(map);
-    
-    // Add info about zoom levels
-    const infoControl = L.control({position: 'bottomright'});
-    infoControl.onAdd = function() {
-        const div = L.DomUtil.create('div', 'bg-blue-50 text-blue-800 p-2 rounded text-xs hidden md:block');
-        div.innerHTML = `
-            <i class="fas fa-info-circle mr-1"></i>
-            <span>Zoom: <span id="zoomLevel">${map.getZoom()}</span> | View: Barangay Commonwealth</span>
-        `;
-        return div;
-    };
-    infoControl.addTo(map);
-    
-    // Update zoom level display
-    map.on('zoomend', function() {
-        document.getElementById('zoomLevel').textContent = map.getZoom();
-    });
-    
-    // Add button to zoom to barangay
-    const zoomToBarangayControl = L.control({position: 'topright'});
-    zoomToBarangayControl.onAdd = function() {
-        const div = L.DomUtil.create('div', 'leaflet-bar leaflet-control');
-        const link = L.DomUtil.create('a', 'bg-white p-2 rounded shadow cursor-pointer');
-        link.innerHTML = '<i class="fas fa-crosshairs text-blue-600"></i>';
-        link.title = 'Zoom to Barangay Commonwealth';
-        link.onclick = function() {
-            map.setView([14.6945, 121.0790], 15);
-        };
-        div.appendChild(link);
-        return div;
-    };
-    zoomToBarangayControl.addTo(map);
 }
 
 // Initialize map when module loads
-setTimeout(initTanodMap, 100);
+document.addEventListener('DOMContentLoaded', function() {
+    setTimeout(initTanodMap, 100);
+});
 
-// Auto-refresh Tanod locations every 30 seconds
+// Auto-refresh every 30 seconds
 setInterval(() => {
-    fetch('handlers/get_tanod_locations.php')
-        .then(response => response.json())
-        .then(data => {
-            console.log('Updated Tanod locations:', data);
-            // Implementation for updating markers would go here
-        });
+    // Refresh the page to get updated locations
+    // In production, you would use AJAX to update markers only
+    console.log('Auto-refresh at: ' + new Date().toLocaleTimeString());
 }, 30000);
 </script>
 
@@ -577,11 +481,6 @@ setInterval(() => {
     min-width: 200px;
 }
 
-/* Highlighted barangay boundary */
-.barangay-highlight-line {
-    filter: drop-shadow(0 0 3px rgba(239, 68, 68, 0.5));
-}
-
 /* Custom map controls */
 .leaflet-control-zoom a {
     width: 36px !important;
@@ -594,21 +493,5 @@ setInterval(() => {
 
 .leaflet-control-zoom a:hover {
     background-color: #f3f4f6 !important;
-}
-
-/* Coordinates display */
-.leaflet-control-coordinates {
-    background: rgba(0, 0, 0, 0.8);
-    color: white;
-    font-family: monospace;
-    padding: 5px 10px;
-    border-radius: 4px;
-    font-size: 12px;
-}
-
-/* Barangay label */
-.barangay-label {
-    text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
-    font-size: 14px !important;
 }
 </style>

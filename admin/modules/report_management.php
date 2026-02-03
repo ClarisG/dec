@@ -1,15 +1,16 @@
 <?php
 // admin/modules/report_management.php - WITNESS AND COMMUNITY REPORT MANAGEMENT MODULE
 
-// Get raw citizen reports pending verification
+// Get raw citizen reports pending verification (FIXED: removed urgency_level reference)
 $reports_query = "SELECT r.*, u.first_name as reporter_first, u.last_name as reporter_last,
                          u.contact_number as reporter_contact,
                          rt.type_name as incident_type,
-                         r.needs_verification, r.routing_status
+                         r.needs_verification
                   FROM reports r
                   LEFT JOIN users u ON r.user_id = u.id
                   LEFT JOIN report_types rt ON r.report_type_id = rt.id
-                  WHERE r.needs_verification = 1 OR r.routing_status IN ('pending', 'assigned', 'needs_verification')
+                  WHERE r.needs_verification = 1 
+                  OR r.status IN ('pending', 'pending_field_verification')
                   ORDER BY r.priority DESC, r.created_at DESC";
 $reports_stmt = $conn->prepare($reports_query);
 $reports_stmt->execute();
@@ -35,6 +36,58 @@ $roles_query = "SELECT id, first_name, last_name, role FROM users
 $roles_stmt = $conn->prepare($roles_query);
 $roles_stmt->execute();
 $available_users = $roles_stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Get statistics for charts
+$chart_stats_query = "SELECT 
+    DATE(created_at) as report_date,
+    COUNT(*) as count,
+    rp.type_name,
+    rp.jurisdiction
+    FROM reports r
+    LEFT JOIN report_types rp ON r.report_type_id = rp.id
+    WHERE r.created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
+    GROUP BY DATE(r.created_at), rp.type_name, rp.jurisdiction
+    ORDER BY r.created_at DESC";
+$chart_stats_stmt = $conn->prepare($chart_stats_query);
+$chart_stats_stmt->execute();
+$chart_data = $chart_stats_stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Prepare data for charts
+$daily_data = [];
+$type_data = [];
+$jurisdiction_data = [];
+
+foreach ($chart_data as $row) {
+    $date = $row['report_date'];
+    $type = $row['type_name'] ?: 'Unknown';
+    $jurisdiction = $row['jurisdiction'] ?: 'Unknown';
+    
+    // Daily data
+    if (!isset($daily_data[$date])) {
+        $daily_data[$date] = 0;
+    }
+    $daily_data[$date] += $row['count'];
+    
+    // Type data
+    if (!isset($type_data[$type])) {
+        $type_data[$type] = 0;
+    }
+    $type_data[$type] += $row['count'];
+    
+    // Jurisdiction data
+    if (!isset($jurisdiction_data[$jurisdiction])) {
+        $jurisdiction_data[$jurisdiction] = 0;
+    }
+    $jurisdiction_data[$jurisdiction] += $row['count'];
+}
+
+// Sort data
+krsort($daily_data);
+arsort($type_data);
+arsort($jurisdiction_data);
+
+// Take top 10 types for readability
+$type_data = array_slice($type_data, 0, 10, true);
 ?>
 <div class="space-y-6">
     <!-- Report Queue Overview -->
@@ -76,34 +129,34 @@ $available_users = $roles_stmt->fetchAll(PDO::FETCH_ASSOC);
         <div class="stat-card rounded-xl p-6">
             <div class="flex items-center justify-between mb-4">
                 <div>
-                    <p class="text-sm font-medium text-gray-500">Routed to Tanod</p>
+                    <p class="text-sm font-medium text-gray-500">Total Reports</p>
                     <h3 class="text-3xl font-bold text-gray-800">
-                        <?php echo count(array_filter($raw_reports, fn($r) => $r['routing_status'] === 'routed_tanod')); ?>
+                        <?php echo count($raw_reports); ?>
                     </h3>
                 </div>
                 <div class="p-3 bg-blue-100 rounded-lg">
-                    <i class="fas fa-user-shield text-blue-600 text-xl"></i>
+                    <i class="fas fa-file-alt text-blue-600 text-xl"></i>
                 </div>
             </div>
             <div class="text-sm text-gray-600">
-                Field check required
+                All pending reports
             </div>
         </div>
         
         <div class="stat-card rounded-xl p-6">
             <div class="flex items-center justify-between mb-4">
                 <div>
-                    <p class="text-sm font-medium text-gray-500">Routed to Secretary</p>
+                    <p class="text-sm font-medium text-gray-500">Today's Reports</p>
                     <h3 class="text-3xl font-bold text-gray-800">
-                        <?php echo count(array_filter($raw_reports, fn($r) => $r['routing_status'] === 'routed_secretary')); ?>
+                        <?php echo count(array_filter($raw_reports, fn($r) => date('Y-m-d', strtotime($r['created_at'])) == date('Y-m-d'))); ?>
                     </h3>
                 </div>
-                <div class="p-3 bg-purple-100 rounded-lg">
-                    <i class="fas fa-user-tie text-purple-600 text-xl"></i>
+                <div class="p-3 bg-green-100 rounded-lg">
+                    <i class="fas fa-calendar-day text-green-600 text-xl"></i>
                 </div>
             </div>
             <div class="text-sm text-gray-600">
-                For administrative action
+                Submitted today
             </div>
         </div>
     </div>
@@ -125,7 +178,6 @@ $available_users = $roles_stmt->fetchAll(PDO::FETCH_ASSOC);
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Reporter</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Incident Type</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Priority</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Routing</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Submitted</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
@@ -158,16 +210,15 @@ $available_users = $roles_stmt->fetchAll(PDO::FETCH_ASSOC);
                                 <?php echo htmlspecialchars($report['incident_type'] ?? 'Unknown'); ?>
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap">
-                                <span class="status-badge <?php echo $report['priority'] === 'high' ? 'status-warning' : 
-                                                                 ($report['priority'] === 'critical' ? 'status-error' : 'status-success'); ?>">
+                                <span class="px-3 py-1 rounded-full text-xs font-medium 
+                                    <?php echo $report['priority'] === 'high' ? 'bg-yellow-100 text-yellow-800' : 
+                                           ($report['priority'] === 'critical' ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'); ?>">
                                     <?php echo ucfirst($report['priority']); ?>
                                 </span>
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 routing-status">
-                                <?php echo htmlspecialchars($report['routing_status'] ?? 'pending'); ?>
-                            </td>
                             <td class="px-6 py-4 whitespace-nowrap">
-                                <span class="status-badge <?php echo $report['needs_verification'] ? 'status-pending' : 'status-success'; ?>">
+                                <span class="px-3 py-1 rounded-full text-xs font-medium 
+                                    <?php echo $report['needs_verification'] ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800'; ?>">
                                     <?php echo $report['needs_verification'] ? 'Needs Verify' : 'Verified'; ?>
                                 </span>
                             </td>
@@ -176,18 +227,49 @@ $available_users = $roles_stmt->fetchAll(PDO::FETCH_ASSOC);
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                 <button onclick="viewReportDetails(<?php echo $report['id']; ?>)" 
-                                        class="text-purple-600 hover:text-purple-900 mr-3">
-                                    <i class="fas fa-eye"></i>
+                                        class="text-purple-600 hover:text-purple-900 mr-3 px-2 py-1 hover:bg-purple-50 rounded">
+                                    <i class="fas fa-eye"></i> View
                                 </button>
                                 <button onclick="routeReport(<?php echo $report['id']; ?>)" 
-                                        class="text-blue-600 hover:text-blue-900">
-                                    <i class="fas fa-route"></i>
+                                        class="text-blue-600 hover:text-blue-900 px-2 py-1 hover:bg-blue-50 rounded">
+                                    <i class="fas fa-route"></i> Route
                                 </button>
                             </td>
                         </tr>
                     <?php endforeach; ?>
                 </tbody>
             </table>
+        </div>
+    </div>
+    
+    <!-- Reports Analytics -->
+    <div class="bg-white rounded-xl p-6 shadow-sm">
+        <div class="flex items-center justify-between mb-6">
+            <h3 class="text-lg font-bold text-gray-800">Reports Analytics</h3>
+            <div class="space-x-2">
+                <select id="chartRange" class="p-2 border border-gray-300 rounded-lg text-sm">
+                    <option value="daily">Daily (Last 30 days)</option>
+                    <option value="weekly">Weekly</option>
+                    <option value="monthly">Monthly</option>
+                </select>
+                <button onclick="printReportCharts()" class="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm">
+                    <i class="fas fa-print mr-1"></i>Print Report
+                </button>
+            </div>
+        </div>
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div>
+                <h4 class="font-bold text-gray-700 mb-2">Daily Reports Trend</h4>
+                <canvas id="dailyReportsChart" height="200"></canvas>
+            </div>
+            <div>
+                <h4 class="font-bold text-gray-700 mb-2">Report Types Distribution</h4>
+                <canvas id="reportTypesChart" height="200"></canvas>
+            </div>
+        </div>
+        <div class="mt-6">
+            <h4 class="font-bold text-gray-700 mb-2">Jurisdiction Distribution</h4>
+            <canvas id="jurisdictionChart" height="150"></canvas>
         </div>
     </div>
     
@@ -217,7 +299,8 @@ $available_users = $roles_stmt->fetchAll(PDO::FETCH_ASSOC);
                                 <?php echo htmlspecialchars($log['to_user'] ?? 'Unknown'); ?>
                             </div>
                             <div>
-                                <span class="status-badge <?php echo $log['status'] === 'completed' ? 'status-success' : 'status-pending'; ?>">
+                                <span class="px-3 py-1 rounded-full text-xs font-medium 
+                                    <?php echo $log['status'] === 'completed' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'; ?>">
                                     <?php echo ucfirst($log['status']); ?>
                                 </span>
                             </div>
@@ -262,9 +345,10 @@ $available_users = $roles_stmt->fetchAll(PDO::FETCH_ASSOC);
         
         <form id="routingForm" onsubmit="submitRouting(event)">
             <input type="hidden" id="routingReportId" name="report_id">
+            <input type="hidden" name="route_report" value="1">
             
             <div class="mb-6">
-                <label class="block text-sm font-medium text-gray-700 mb-2">Route To</label>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Route To *</label>
                 <select id="routeTo" name="routed_to" required 
                         class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
                     <option value="">Select destination...</option>
@@ -296,16 +380,6 @@ $available_users = $roles_stmt->fetchAll(PDO::FETCH_ASSOC);
                           placeholder="Add instructions or notes..."></textarea>
             </div>
             
-            <div class="mb-6">
-                <label class="block text-sm font-medium text-gray-700 mb-2">Urgency Level</label>
-                <select name="urgency_level" 
-                        class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
-                    <option value="normal">Normal</option>
-                    <option value="urgent">Urgent</option>
-                    <option value="critical">Critical</option>
-                </select>
-            </div>
-            
             <div class="flex justify-end space-x-3">
                 <button type="button" onclick="closeRoutingModal()" 
                         class="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50">
@@ -318,88 +392,187 @@ $available_users = $roles_stmt->fetchAll(PDO::FETCH_ASSOC);
             </div>
         </form>
     </div>
-<!-- Reports Analytics -->
-    <div class="bg-white rounded-xl p-6 shadow-sm">
-        <div class="flex items-center justify-between mb-4">
-            <h3 class="text-lg font-bold text-gray-800">Reports Analytics</h3>
-            <div class="space-x-2">
-                <select id="chartRange" class="p-2 border border-gray-300 rounded-lg text-sm">
-                    <option value="daily">Daily</option>
-                    <option value="weekly">Weekly</option>
-                    <option value="monthly">Monthly</option>
-                    <option value="yearly">Yearly</option>
-                </select>
-                <button onclick="printReportCharts()" class="px-3 py-2 border border-gray-300 rounded-lg text-sm">
-                    <i class="fas fa-print mr-1"></i>Print
-                </button>
-            </div>
-        </div>
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <canvas id="reportsCountChart" height="160"></canvas>
-            <canvas id="classificationChart" height="160"></canvas>
-        </div>
-    </div>
-
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
 let currentReportId = null;
+let dailyChart, typeChart, jurisdictionChart;
 
-function printReportCharts(){
-    window.print();
+function printReportCharts() {
+    const printWindow = window.open('', '_blank');
+    printWindow.document.write(`
+        <html>
+        <head>
+            <title>Reports Analytics Report</title>
+            <style>
+                body { font-family: Arial, sans-serif; margin: 20px; }
+                h1 { color: #333; }
+                .chart-container { margin: 20px 0; page-break-inside: avoid; }
+                .stats-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; margin: 20px 0; }
+                .stat-box { border: 1px solid #ddd; padding: 15px; border-radius: 5px; }
+            </style>
+        </head>
+        <body>
+            <h1>Reports Analytics Report</h1>
+            <p>Generated on: ${new Date().toLocaleString()}</p>
+            <div class="stats-grid">
+                <div class="stat-box">
+                    <h3>Total Pending Reports</h3>
+                    <p>${document.querySelector('.stat-card:nth-child(1) h3').textContent}</p>
+                </div>
+                <div class="stat-box">
+                    <h3>High Priority Reports</h3>
+                    <p>${document.querySelector('.stat-card:nth-child(2) h3').textContent}</p>
+                </div>
+            </div>
+            <div class="chart-container">
+                <h3>Daily Reports Trend</h3>
+                <img src="${document.getElementById('dailyReportsChart').toDataURL()}" width="800" height="400">
+            </div>
+            <div class="chart-container">
+                <h3>Report Types Distribution</h3>
+                <img src="${document.getElementById('reportTypesChart').toDataURL()}" width="800" height="400">
+            </div>
+        </body>
+        </html>
+    `);
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => {
+        printWindow.print();
+        printWindow.close();
+    }, 500);
 }
 
-function buildCharts(range){
-    // Fetch aggregated data from existing ajax endpoints if available, else compute from $raw_reports embedded
-    const reports = <?php echo json_encode($raw_reports); ?>;
-    const byDate = {};
-    const byType = {};
-    reports.forEach(r=>{
-        const d = new Date(r.created_at);
-        let key = d.toISOString().slice(0,10);
-        if(range==='weekly'){
-            const onejan = new Date(d.getFullYear(),0,1);
-            const week = Math.ceil((((d - onejan) / 86400000) + onejan.getDay()+1)/7);
-            key = `${d.getFullYear()}-W${week}`;
-        }else if(range==='monthly'){
-            key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
-        }else if(range==='yearly'){
-            key = `${d.getFullYear()}`;
-        }
-        byDate[key] = (byDate[key]||0)+1;
-        const t = r.incident_type || 'Unknown';
-        byType[t] = (byType[t]||0)+1;
-    });
-    const dateLabels = Object.keys(byDate).sort();
-    const dateValues = dateLabels.map(k=>byDate[k]);
-    const typeLabels = Object.keys(byType).sort();
-    const typeValues = typeLabels.map(k=>byType[k]);
-
-    if(window._rChart){ window._rChart.destroy(); }
-    if(window._cChart){ window._cChart.destroy(); }
-
-    const ctx1 = document.getElementById('reportsCountChart').getContext('2d');
-    window._rChart = new Chart(ctx1, {
+function initializeCharts() {
+    const dailyCtx = document.getElementById('dailyReportsChart').getContext('2d');
+    const typeCtx = document.getElementById('reportTypesChart').getContext('2d');
+    const jurisdictionCtx = document.getElementById('jurisdictionChart').getContext('2d');
+    
+    // Destroy existing charts if they exist
+    if (dailyChart) dailyChart.destroy();
+    if (typeChart) typeChart.destroy();
+    if (jurisdictionChart) jurisdictionChart.destroy();
+    
+    // Daily Reports Chart
+    const dailyLabels = Object.keys(dailyData).slice(0, 15).reverse();
+    const dailyValues = dailyLabels.map(date => dailyData[date]);
+    
+    dailyChart = new Chart(dailyCtx, {
         type: 'bar',
-        data: { labels: dateLabels, datasets: [{ label: 'Reports', data: dateValues, backgroundColor: '#7c3aed' }]},
-        options: { responsive: true, plugins: { legend: { display: false } } }
+        data: {
+            labels: dailyLabels,
+            datasets: [{
+                label: 'Number of Reports',
+                data: dailyValues,
+                backgroundColor: '#7c3aed',
+                borderColor: '#6d28d9',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: {
+                    display: false
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: 'Number of Reports'
+                    }
+                },
+                x: {
+                    title: {
+                        display: true,
+                        text: 'Date'
+                    }
+                }
+            }
+        }
     });
-
-    const ctx2 = document.getElementById('classificationChart').getContext('2d');
-    window._cChart = new Chart(ctx2, {
+    
+    // Report Types Chart
+    const typeLabels = Object.keys(typeData);
+    const typeValues = Object.values(typeData);
+    
+    typeChart = new Chart(typeCtx, {
         type: 'pie',
-        data: { labels: typeLabels, datasets: [{ data: typeValues, backgroundColor: typeLabels.map(()=>`hsl(${Math.random()*360},70%,60%)`) }]},
-        options: { responsive: true }
+        data: {
+            labels: typeLabels,
+            datasets: [{
+                data: typeValues,
+                backgroundColor: [
+                    '#7c3aed', '#8b5cf6', '#a78bfa', '#c4b5fd', '#ddd6fe',
+                    '#ef4444', '#f97316', '#f59e0b', '#10b981', '#06b6d4'
+                ]
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: {
+                    position: 'right',
+                    labels: {
+                        boxWidth: 12
+                    }
+                }
+            }
+        }
+    });
+    
+    // Jurisdiction Chart
+    const jurisdictionLabels = Object.keys(jurisdictionData);
+    const jurisdictionValues = Object.values(jurisdictionData);
+    
+    jurisdictionChart = new Chart(jurisdictionCtx, {
+        type: 'doughnut',
+        data: {
+            labels: jurisdictionLabels,
+            datasets: [{
+                data: jurisdictionValues,
+                backgroundColor: ['#10b981', '#f59e0b', '#ef4444']
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: {
+                    position: 'bottom'
+                }
+            }
+        }
     });
 }
 
-document.getElementById('chartRange').addEventListener('change', (e)=>buildCharts(e.target.value));
-window.addEventListener('load', ()=>buildCharts('daily'));
+// Chart data from PHP
+const dailyData = <?php echo json_encode($daily_data); ?>;
+const typeData = <?php echo json_encode($type_data); ?>;
+const jurisdictionData = <?php echo json_encode($jurisdiction_data); ?>;
+
+// Initialize charts when page loads
+document.addEventListener('DOMContentLoaded', function() {
+    initializeCharts();
+    
+    // Handle chart range change
+    document.getElementById('chartRange').addEventListener('change', function(e) {
+        // In a real application, you would fetch new data based on the selected range
+        console.log('Selected range:', e.target.value);
+        // For now, just reinitialize with current data
+        initializeCharts();
+    });
+});
 
 function viewReportDetails(reportId) {
-    fetch(`handlers/get_report_details.php?id=${reportId}`)
-        .then(response => response.json())
+    fetch(`ajax/get_report_details.php?id=${reportId}`)
+        .then(response => {
+            if (!response.ok) throw new Error('Network response was not ok');
+            return response.json();
+        })
         .then(report => {
             document.getElementById('modalReportTitle').textContent = `Report: ${report.report_number}`;
             
@@ -433,20 +606,60 @@ function viewReportDetails(reportId) {
                 <div>
                     <h4 class="font-bold text-gray-800 mb-2">Current Status</h4>
                     <div class="flex space-x-4">
-                        <span class="status-badge ${report.needs_verification ? 'status-pending' : 'status-success'}">
+                        <span class="px-3 py-1 rounded-full text-xs font-medium ${report.needs_verification ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800'}">
                             ${report.needs_verification ? 'Needs Verification' : 'Verified'}
                         </span>
-                        <span class="status-badge ${report.routing_status === 'pending' ? 'status-warning' : 'status-success'}">
-                            ${report.routing_status || 'Not Routed'}
+                        <span class="px-3 py-1 rounded-full text-xs font-medium ${report.status === 'pending' ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800'}">
+                            ${report.status || 'Not Routed'}
                         </span>
                     </div>
+                </div>
+                
+                <div class="flex justify-end space-x-3 mt-6">
+                    <button onclick="verifyReport(${reportId})" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">
+                        <i class="fas fa-check mr-1"></i>Mark as Verified
+                    </button>
                 </div>
             `;
             
             document.getElementById('reportDetails').innerHTML = detailsHtml;
             document.getElementById('reportModal').classList.remove('hidden');
             document.getElementById('reportModal').classList.add('flex');
+        })
+        .catch(error => {
+            console.error('Error fetching report details:', error);
+            alert('Error loading report details. Please try again.');
         });
+}
+
+function verifyReport(reportId) {
+    if (confirm('Mark this report as verified?')) {
+        const formData = new FormData();
+        formData.append('report_id', reportId);
+        formData.append('verify_report', '1');
+        
+        fetch('handlers/verify_report.php', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => {
+            if (!response.ok) throw new Error('Network response was not ok');
+            return response.json();
+        })
+        .then(data => {
+            if (data.success) {
+                alert('Report verified successfully!');
+                closeReportModal();
+                location.reload();
+            } else {
+                alert('Error: ' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error verifying report:', error);
+            alert('Error verifying report. Please try again.');
+        });
+    }
 }
 
 function routeReport(reportId) {
@@ -466,7 +679,10 @@ function submitRouting(event) {
         method: 'POST',
         body: formData
     })
-    .then(response => response.json())
+    .then(response => {
+        if (!response.ok) throw new Error('Network response was not ok');
+        return response.json();
+    })
     .then(data => {
         if (data.success) {
             alert('Report routed successfully!');
@@ -474,11 +690,16 @@ function submitRouting(event) {
             // Update the row in the table
             const row = document.getElementById(`reportRow-${currentReportId}`);
             if (row) {
-                row.querySelector('.routing-status').textContent = data.new_status;
+                // You could update the status cell here if needed
             }
+            location.reload();
         } else {
             alert('Error: ' + data.message);
         }
+    })
+    .catch(error => {
+        console.error('Error routing report:', error);
+        alert('Error routing report. Please try again.');
     });
 }
 

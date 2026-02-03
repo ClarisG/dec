@@ -1,6 +1,37 @@
 <?php
 // admin/modules/evidence_tracking.php - EVIDENCE TRACKING MODULE
 
+// Handle evidence approval
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['approve_evidence'])) {
+    try {
+        $handover_id = $_POST['handover_id'];
+        $user_id = $_SESSION['user_id'] ?? null;
+        
+        $update_query = "UPDATE evidence_handovers 
+                        SET recipient_acknowledged = 1, 
+                            handover_date = NOW(),
+                            updated_at = NOW()
+                        WHERE id = :id";
+        $stmt = $conn->prepare($update_query);
+        $stmt->execute([':id' => $handover_id]);
+        
+        // Create activity log
+        $activity_query = "INSERT INTO activity_logs (user_id, action, description, ip_address)
+                          VALUES (:user_id, 'evidence_approved', 'Approved evidence handover #{$handover_id}', :ip)";
+        $activity_stmt = $conn->prepare($activity_query);
+        $activity_stmt->execute([
+            ':user_id' => $user_id,
+            ':ip' => $_SERVER['REMOTE_ADDR']
+        ]);
+        
+        $_SESSION['success'] = "Evidence approved successfully!";
+        header("Location: ?module=evidence_tracking");
+        exit();
+    } catch (PDOException $e) {
+        $_SESSION['error'] = "Error approving evidence: " . $e->getMessage();
+    }
+}
+
 // Get evidence statistics
 $evidence_stats_query = "SELECT 
     COUNT(*) as total_items,
@@ -12,11 +43,15 @@ $evidence_stats_stmt->execute();
 $evidence_stats = $evidence_stats_stmt->fetch(PDO::FETCH_ASSOC);
 
 // Get recent evidence handovers
-$handovers_query = "SELECT eh.*, u1.first_name as tanod_name, u2.first_name as recipient_name
+$handovers_query = "SELECT eh.*, u1.first_name as tanod_name, u1.last_name as tanod_last, 
+                           u2.first_name as recipient_name, u2.last_name as recipient_last,
+                           r.report_number, f.original_name, f.file_path
                    FROM evidence_handovers eh
                    LEFT JOIN users u1 ON eh.tanod_id = u1.id
                    LEFT JOIN users u2 ON eh.handover_to = u2.id
-                   ORDER BY eh.handover_date DESC 
+                   LEFT JOIN reports r ON eh.report_id = r.id
+                   LEFT JOIN file_encryption_logs f ON eh.file_id = f.id
+                   ORDER BY eh.created_at DESC 
                    LIMIT 10";
 $handovers_stmt = $conn->prepare($handovers_query);
 $handovers_stmt->execute();
@@ -98,11 +133,24 @@ $key_audits = $key_audit_stmt->fetchAll(PDO::FETCH_ASSOC);
             </button>
         </div>
         
+        <?php if (isset($_SESSION['success'])): ?>
+            <div class="mb-4 p-4 bg-green-100 text-green-700 rounded-lg">
+                <?php echo $_SESSION['success']; unset($_SESSION['success']); ?>
+            </div>
+        <?php endif; ?>
+        
+        <?php if (isset($_SESSION['error'])): ?>
+            <div class="mb-4 p-4 bg-red-100 text-red-700 rounded-lg">
+                <?php echo $_SESSION['error']; unset($_SESSION['error']); ?>
+            </div>
+        <?php endif; ?>
+        
         <div class="overflow-x-auto">
             <table class="min-w-full divide-y divide-gray-200">
                 <thead>
                     <tr>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Evidence ID</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Report #</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Item Description</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Handover From</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Handover To</th>
@@ -117,34 +165,41 @@ $key_audits = $key_audit_stmt->fetchAll(PDO::FETCH_ASSOC);
                             <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                                 EVD-<?php echo str_pad($handover['id'], 6, '0', STR_PAD_LEFT); ?>
                             </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                <?php echo htmlspecialchars($handover['report_number'] ?? 'N/A'); ?>
+                            </td>
                             <td class="px-6 py-4 text-sm text-gray-500">
-                                <?php echo htmlspecialchars(substr($handover['item_description'], 0, 50)); ?>
-                                <?php if (strlen($handover['item_description']) > 50): ?>...<?php endif; ?>
+                                <?php echo htmlspecialchars(substr($handover['item_description'] ?? 'No description', 0, 50)); ?>
+                                <?php if (strlen($handover['item_description'] ?? '') > 50): ?>...<?php endif; ?>
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                <?php echo htmlspecialchars($handover['tanod_name'] ?? 'Unknown'); ?>
+                                <?php echo htmlspecialchars(($handover['tanod_name'] ?? 'Unknown') . ' ' . ($handover['tanod_last'] ?? '')); ?>
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                <?php echo htmlspecialchars($handover['recipient_name'] ?? 'Not Assigned'); ?>
+                                <?php echo htmlspecialchars(($handover['recipient_name'] ?? 'Not Assigned') . ' ' . ($handover['recipient_last'] ?? '')); ?>
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                 <?php echo $handover['handover_date'] ? date('M d, H:i', strtotime($handover['handover_date'])) : 'Pending'; ?>
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap">
-                                <span class="status-badge <?php echo $handover['recipient_acknowledged'] ? 'status-success' : 'status-pending'; ?>">
+                                <span class="px-3 py-1 rounded-full text-xs font-medium 
+                                    <?php echo $handover['recipient_acknowledged'] ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'; ?>">
                                     <?php echo $handover['recipient_acknowledged'] ? 'Confirmed' : 'Pending'; ?>
                                 </span>
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                 <button onclick="viewEvidenceDetails(<?php echo $handover['id']; ?>)" 
-                                        class="text-purple-600 hover:text-purple-900 mr-3">
-                                    <i class="fas fa-eye"></i>
+                                        class="text-purple-600 hover:text-purple-900 mr-3 px-2 py-1 hover:bg-purple-50 rounded">
+                                    <i class="fas fa-eye"></i> View
                                 </button>
                                 <?php if (!$handover['recipient_acknowledged']): ?>
-                                    <button onclick="confirmHandover(<?php echo $handover['id']; ?>)" 
-                                            class="text-green-600 hover:text-green-900">
-                                        <i class="fas fa-check"></i>
-                                    </button>
+                                    <form method="POST" action="" class="inline-block">
+                                        <input type="hidden" name="handover_id" value="<?php echo $handover['id']; ?>">
+                                        <button type="submit" name="approve_evidence" 
+                                                class="text-green-600 hover:text-green-900 px-2 py-1 hover:bg-green-50 rounded">
+                                            <i class="fas fa-check"></i> Approve
+                                        </button>
+                                    </form>
                                 <?php endif; ?>
                             </td>
                         </tr>
@@ -207,71 +262,87 @@ $key_audits = $key_audit_stmt->fetchAll(PDO::FETCH_ASSOC);
 
 <script>
 function viewEvidenceDetails(id){
-    fetch(`ajax/get_evidence_details.php?id=${id}`)
-        .then(r=>r.json())
-        .then(ev=>{
+    // Simple AJAX call to fetch evidence details
+    fetch('../ajax/get_evidence_details.php?id=' + id)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
+            return response.json();
+        })
+        .then(evidence => {
             const title = `Evidence: EVD-${String(id).padStart(6,'0')}`;
             document.getElementById('evidenceModalTitle').textContent = title;
+            
             const html = `
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div class="bg-gray-50 p-4 rounded-lg">
-                        <p class="text-sm text-gray-600">Report #: <span class="font-medium">${ev.report_number || 'N/A'}</span></p>
-                        <p class="text-sm text-gray-600">Item: <span class="font-medium">${ev.item_description || 'N/A'}</span></p>
-                        <p class="text-sm text-gray-600">Type: <span class="font-medium">${ev.item_type || 'N/A'}</span></p>
+                <div class="space-y-4">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="bg-gray-50 p-4 rounded-lg">
+                            <p class="text-sm text-gray-600">Report #: <span class="font-medium">${evidence.report_number || 'N/A'}</span></p>
+                            <p class="text-sm text-gray-600">Evidence ID: <span class="font-medium">EVD-${String(id).padStart(6,'0')}</span></p>
+                            <p class="text-sm text-gray-600">Item Type: <span class="font-medium">${evidence.item_type || 'N/A'}</span></p>
+                        </div>
+                        <div class="bg-gray-50 p-4 rounded-lg">
+                            <p class="text-sm text-gray-600">Handover From: <span class="font-medium">${evidence.tanod_name || 'Unknown'} ${evidence.tanod_last || ''}</span></p>
+                            <p class="text-sm text-gray-600">Handover To: <span class="font-medium">${evidence.recipient_name || 'Not Assigned'} ${evidence.recipient_last || ''}</span></p>
+                            <p class="text-sm text-gray-600">Date: <span class="font-medium">${new Date(evidence.created_at).toLocaleString() || 'N/A'}</span></p>
+                        </div>
                     </div>
+                    
                     <div class="bg-gray-50 p-4 rounded-lg">
-                        <p class="text-sm text-gray-600">Uploaded By: <span class="font-medium">${ev.uploader_name || 'Unknown'}</span></p>
-                        <p class="text-sm text-gray-600">Uploaded: ${ev.created_at ? new Date(ev.created_at).toLocaleString() : 'N/A'}</p>
-                        <p class="text-sm text-gray-600">Status: <span class="font-medium">${ev.status || 'pending'}</span></p>
+                        <p class="text-sm font-medium text-gray-700 mb-2">Item Description:</p>
+                        <p class="text-sm text-gray-600">${evidence.item_description || 'No description available'}</p>
                     </div>
-                </div>
-                ${ev.preview_url ? `<div class='mt-4'><a class='text-blue-600 underline' href='${ev.preview_url}' target='_blank'><i class="fas fa-file"></i> View File</a></div>` : ''}
-                <div class="flex justify-end mt-4">
-                    ${ev.can_approve ? `<button onclick='approveEvidence(${id})' class='px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700'><i class="fas fa-check mr-1"></i>Approve</button>` : ''}
+                    
+                    ${evidence.original_name ? `
+                    <div class="bg-gray-50 p-4 rounded-lg">
+                        <p class="text-sm font-medium text-gray-700 mb-2">Attached File:</p>
+                        <p class="text-sm text-gray-600 mb-2">${evidence.original_name}</p>
+                        ${evidence.file_path ? `
+                            <a href="${evidence.file_path}" target="_blank" class="inline-flex items-center text-blue-600 hover:text-blue-800">
+                                <i class="fas fa-external-link-alt mr-2"></i>View File
+                            </a>
+                        ` : '<p class="text-sm text-red-500">File not available</p>'}
+                    </div>
+                    ` : ''}
+                    
+                    <div class="flex justify-between items-center p-4 bg-gray-50 rounded-lg">
+                        <div>
+                            <p class="text-sm text-gray-600">Status:</p>
+                            <span class="px-3 py-1 rounded-full text-xs font-medium ${evidence.recipient_acknowledged ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}">
+                                ${evidence.recipient_acknowledged ? 'Confirmed' : 'Pending'}
+                            </span>
+                        </div>
+                        ${!evidence.recipient_acknowledged ? `
+                        <form method="POST" action="">
+                            <input type="hidden" name="handover_id" value="${id}">
+                            <button type="submit" name="approve_evidence" 
+                                    class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm">
+                                <i class="fas fa-check mr-1"></i>Approve Handover
+                            </button>
+                        </form>
+                        ` : ''}
+                    </div>
                 </div>
             `;
+            
             document.getElementById('evidenceDetails').innerHTML = html;
             document.getElementById('evidenceModal').classList.remove('hidden');
             document.getElementById('evidenceModal').classList.add('flex');
         })
-        .catch(()=>alert('Unable to load evidence details'));
+        .catch(error => {
+            console.error('Error loading evidence details:', error);
+            alert('Unable to load evidence details. Please try again.');
+        });
 }
-function approveEvidence(id){
-    fetch('handlers/confirm_handover.php', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ handover_id: id })
-    }).then(r=>r.json()).then(data=>{
-        if(data.success){
-            alert('Evidence approved');
-            location.reload();
-        } else {
-            alert('Error: ' + (data.message || 'Approval failed'));
-        }
-    });
-}
+
 function closeEvidenceModal(){
     document.getElementById('evidenceModal').classList.add('hidden');
     document.getElementById('evidenceModal').classList.remove('flex');
 }
 
-function confirmHandover(handoverId) {
-    if (confirm('Confirm that this evidence has been received?')) {
-        fetch('handlers/confirm_handover.php', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ handover_id: handoverId })
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                location.reload();
-            } else {
-                alert('Error: ' + data.message);
-            }
-        });
-    }
+// Create AJAX endpoint if it doesn't exist
+function showAddEvidenceModal() {
+    alert('Add Evidence feature coming soon!');
 }
 </script>

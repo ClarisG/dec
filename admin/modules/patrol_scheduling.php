@@ -4,20 +4,92 @@
 // Handle new patrol schedule submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['assign_patrol'])) {
     try {
-        $insert = $conn->prepare("INSERT INTO tanod_schedules (user_id, schedule_date, shift_start, shift_end, patrol_route, notes, is_completed)
-            VALUES (:user_id, :schedule_date, :shift_start, :shift_end, :patrol_route, :notes, 0)");
+        $insert = $conn->prepare("INSERT INTO tanod_schedules (user_id, schedule_date, shift_start, shift_end, patrol_route, notes)
+            VALUES (:user_id, :schedule_date, :shift_start, :shift_end, :patrol_route, :notes)");
         $insert->execute([
             ':user_id' => $_POST['tanod_id'],
             ':schedule_date' => $_POST['schedule_date'],
             ':shift_start' => $_POST['shift_start'],
             ':shift_end' => $_POST['shift_end'],
-            ':patrol_route' => $_POST['patrol_route'] ?? null,
-            ':notes' => $_POST['schedule_notes'] ?? null,
+            ':patrol_route' => $_POST['patrol_route'] ?? '',
+            ':notes' => $_POST['schedule_notes'] ?? '',
         ]);
-        echo '<script>alert("Patrol scheduled successfully"); window.location.href = window.location.href;</script>';
-        exit;
+        $_SESSION['success'] = "Patrol scheduled successfully";
+        header("Location: ?module=patrol_scheduling");
+        exit();
     } catch (Exception $e) {
-        echo '<div class="p-3 bg-red-50 text-red-700 rounded">Error scheduling patrol: '.htmlspecialchars($e->getMessage()).'</div>';
+        $_SESSION['error'] = "Error scheduling patrol: " . $e->getMessage();
+    }
+}
+
+// Handle save patrol route
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_route'])) {
+    try {
+        $route_name = $_POST['route_name'];
+        $description = $_POST['route_description'];
+        $estimated_duration = $_POST['estimated_duration'];
+        $checkpoint_count = $_POST['checkpoint_count'];
+        $route_coordinates = $_POST['route_coordinates'];
+        $route_id = $_POST['route_id'] ?? null;
+        
+        if ($route_id) {
+            // Update existing route
+            $update_query = "UPDATE patrol_routes SET 
+                            route_name = :route_name,
+                            route_description = :description,
+                            estimated_duration = :duration,
+                            checkpoint_count = :checkpoints,
+                            route_coordinates = :coordinates,
+                            updated_at = NOW()
+                            WHERE id = :id";
+            $stmt = $conn->prepare($update_query);
+            $stmt->execute([
+                ':route_name' => $route_name,
+                ':description' => $description,
+                ':duration' => $estimated_duration,
+                ':checkpoints' => $checkpoint_count,
+                ':coordinates' => $route_coordinates,
+                ':id' => $route_id
+            ]);
+            
+            $_SESSION['success'] = "Route updated successfully!";
+        } else {
+            // Insert new route
+            $insert_query = "INSERT INTO patrol_routes 
+                            (route_name, route_description, estimated_duration, checkpoint_count, route_coordinates)
+                            VALUES (:route_name, :description, :duration, :checkpoints, :coordinates)";
+            $stmt = $conn->prepare($insert_query);
+            $stmt->execute([
+                ':route_name' => $route_name,
+                ':description' => $description,
+                ':duration' => $estimated_duration,
+                ':checkpoints' => $checkpoint_count,
+                ':coordinates' => $route_coordinates
+            ]);
+            
+            $_SESSION['success'] = "Route added successfully!";
+        }
+        
+        header("Location: ?module=patrol_scheduling");
+        exit();
+    } catch (PDOException $e) {
+        $_SESSION['error'] = "Error saving route: " . $e->getMessage();
+    }
+}
+
+// Handle delete route
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_route'])) {
+    try {
+        $route_id = $_POST['route_id'];
+        $delete_query = "DELETE FROM patrol_routes WHERE id = :id";
+        $stmt = $conn->prepare($delete_query);
+        $stmt->execute([':id' => $route_id]);
+        
+        $_SESSION['success'] = "Route deleted successfully!";
+        header("Location: ?module=patrol_scheduling");
+        exit();
+    } catch (PDOException $e) {
+        $_SESSION['error'] = "Error deleting route: " . $e->getMessage();
     }
 }
 
@@ -49,7 +121,7 @@ $schedules_stmt->execute([
 $schedules = $schedules_stmt->fetchAll(PDO::FETCH_ASSOC);
 
 // Get predefined patrol routes
-$routes_query = "SELECT * FROM patrol_routes WHERE is_active = 1 ORDER BY route_name";
+$routes_query = "SELECT * FROM patrol_routes ORDER BY route_name";
 $routes_stmt = $conn->prepare($routes_query);
 $routes_stmt->execute();
 $patrol_routes = $routes_stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -126,6 +198,18 @@ $patrol_routes = $routes_stmt->fetchAll(PDO::FETCH_ASSOC);
             </div>
         </div>
         
+        <?php if (isset($_SESSION['success'])): ?>
+            <div class="mb-4 p-4 bg-green-100 text-green-700 rounded-lg">
+                <?php echo $_SESSION['success']; unset($_SESSION['success']); ?>
+            </div>
+        <?php endif; ?>
+        
+        <?php if (isset($_SESSION['error'])): ?>
+            <div class="mb-4 p-4 bg-red-100 text-red-700 rounded-lg">
+                <?php echo $_SESSION['error']; unset($_SESSION['error']); ?>
+            </div>
+        <?php endif; ?>
+        
         <div class="overflow-x-auto">
             <table class="min-w-full divide-y divide-gray-200">
                 <thead>
@@ -166,21 +250,20 @@ $patrol_routes = $routes_stmt->fetchAll(PDO::FETCH_ASSOC);
                                 <?php echo htmlspecialchars($schedule['patrol_route']); ?>
                             </td>
                             <td class="px-4 py-4 whitespace-nowrap">
-                                <span class="status-badge <?php echo $schedule['is_completed'] ? 'status-success' : 
-                                                                 (strtotime($schedule['schedule_date']) < time() ? 'status-warning' : 'status-active'); ?>">
-                                    <?php echo $schedule['is_completed'] ? 'Completed' : 
-                                           (strtotime($schedule['schedule_date']) < time() ? 'Missed' : 'Scheduled'); ?>
+                                <span class="px-3 py-1 rounded-full text-xs font-medium 
+                                    <?php echo strtotime($schedule['schedule_date']) < time() ? 'bg-gray-100 text-gray-800' : 'bg-green-100 text-green-800'; ?>">
+                                    <?php echo strtotime($schedule['schedule_date']) < time() ? 'Past' : 'Upcoming'; ?>
                                 </span>
                             </td>
                             <td class="px-4 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                <button onclick="editSchedule(<?php echo $schedule['id']; ?>)" 
-                                        class="text-purple-600 hover:text-purple-900 mr-3">
-                                    <i class="fas fa-edit"></i>
-                                </button>
-                                <button onclick="deleteSchedule(<?php echo $schedule['id']; ?>)" 
-                                        class="text-red-600 hover:text-red-900">
-                                    <i class="fas fa-trash"></i>
-                                </button>
+                                <form method="POST" action="" style="display: inline;">
+                                    <input type="hidden" name="schedule_id" value="<?php echo $schedule['id']; ?>">
+                                    <input type="hidden" name="delete_schedule" value="1">
+                                    <button type="submit" onclick="return confirm('Delete this schedule?')" 
+                                            class="text-red-600 hover:text-red-900 px-2 py-1 hover:bg-red-50 rounded">
+                                        <i class="fas fa-trash"></i> Delete
+                                    </button>
+                                </form>
                             </td>
                         </tr>
                     <?php endforeach; ?>
@@ -195,9 +278,11 @@ $patrol_routes = $routes_stmt->fetchAll(PDO::FETCH_ASSOC);
             <h3 class="text-lg font-bold text-gray-800 mb-4">Schedule New Patrol</h3>
             
             <form method="POST" action="" class="space-y-4">
+                <input type="hidden" name="assign_patrol" value="1">
+                
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Select Tanod</label>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Select Tanod *</label>
                         <select name="tanod_id" required 
                                 class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
                             <option value="">Choose Tanod...</option>
@@ -212,7 +297,7 @@ $patrol_routes = $routes_stmt->fetchAll(PDO::FETCH_ASSOC);
                     </div>
                     
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Schedule Date</label>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Schedule Date *</label>
                         <input type="date" name="schedule_date" required 
                                min="<?php echo date('Y-m-d'); ?>"
                                class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
@@ -221,13 +306,13 @@ $patrol_routes = $routes_stmt->fetchAll(PDO::FETCH_ASSOC);
                 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Shift Start</label>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Shift Start *</label>
                         <input type="time" name="shift_start" required 
                                class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
                     </div>
                     
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Shift End</label>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Shift End *</label>
                         <input type="time" name="shift_end" required 
                                class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
                     </div>
@@ -254,7 +339,7 @@ $patrol_routes = $routes_stmt->fetchAll(PDO::FETCH_ASSOC);
                 </div>
                 
                 <div class="flex justify-end">
-                    <button type="submit" name="assign_patrol" 
+                    <button type="submit" 
                             class="px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700">
                         Schedule Patrol
                     </button>
@@ -291,13 +376,17 @@ $patrol_routes = $routes_stmt->fetchAll(PDO::FETCH_ASSOC);
                                 </div>
                                 <div class="space-x-2">
                                     <button onclick="editRoute(<?php echo $route['id']; ?>)" 
-                                            class="text-blue-600 hover:text-blue-800">
-                                        <i class="fas fa-edit"></i>
+                                            class="text-blue-600 hover:text-blue-800 px-2 py-1 hover:bg-blue-50 rounded">
+                                        <i class="fas fa-edit"></i> Edit
                                     </button>
-                                    <button onclick="deleteRoute(<?php echo $route['id']; ?>)" 
-                                            class="text-red-600 hover:text-red-800">
-                                        <i class="fas fa-trash"></i>
-                                    </button>
+                                    <form method="POST" action="" style="display: inline;">
+                                        <input type="hidden" name="route_id" value="<?php echo $route['id']; ?>">
+                                        <input type="hidden" name="delete_route" value="1">
+                                        <button type="submit" onclick="return confirm('Delete this route?')" 
+                                                class="text-red-600 hover:text-red-800 px-2 py-1 hover:bg-red-50 rounded">
+                                            <i class="fas fa-trash"></i> Delete
+                                        </button>
+                                    </form>
                                 </div>
                             </div>
                         </div>
@@ -323,44 +412,47 @@ $patrol_routes = $routes_stmt->fetchAll(PDO::FETCH_ASSOC);
             </button>
         </div>
         
-        <form id="routeForm" onsubmit="saveRoute(event)">
-            <input type="hidden" id="routeId" name="id">
+        <form id="routeForm" method="POST" action="">
+            <input type="hidden" id="routeId" name="route_id" value="">
+            <input type="hidden" name="save_route" value="1">
             
             <div class="space-y-4">
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">Route Name</label>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Route Name *</label>
                     <input type="text" name="route_name" required 
-                           class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
+                           class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                           placeholder="e.g., Main Street Patrol">
                 </div>
                 
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-2">Description</label>
                     <textarea name="route_description" rows="2" 
-                              class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"></textarea>
+                              class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                              placeholder="Brief description of the route..."></textarea>
                 </div>
                 
                 <div class="grid grid-cols-2 gap-4">
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Estimated Duration</label>
-                        <input type="number" name="estimated_duration" min="15" max="480" step="15" 
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Estimated Duration *</label>
+                        <input type="number" name="estimated_duration" min="15" max="480" step="15" required
                                class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
                                placeholder="Minutes">
                     </div>
                     
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Checkpoint Count</label>
-                        <input type="number" name="checkpoint_count" min="1" max="20" 
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Checkpoint Count *</label>
+                        <input type="number" name="checkpoint_count" min="1" max="20" required
                                class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
                                placeholder="Number of stops">
                     </div>
                 </div>
                 
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">Route Coordinates</label>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Route Coordinates (JSON)</label>
                     <textarea name="route_coordinates" rows="3" 
                               class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
-                              placeholder="JSON coordinates or instructions..."></textarea>
-                    <p class="text-xs text-gray-500 mt-1">Format: {"lat": 14.5995, "lng": 120.9842}, ...</p>
+                              placeholder='[{"lat": 14.5995, "lng": 120.9842}, ...]'></textarea>
+                    <p class="text-xs text-gray-500 mt-1">Optional: JSON array of coordinates</p>
                 </div>
             </div>
             
@@ -388,6 +480,7 @@ function prevWeek(){
     url.searchParams.set('week', ymd);
     window.location.href = url.toString();
 }
+
 function nextWeek(){
     const d = new Date('<?php echo $start_of_week; ?>');
     d.setDate(d.getDate() + 7);
@@ -407,87 +500,27 @@ function showRouteModal() {
 }
 
 function editRoute(routeId) {
-    fetch(`handlers/get_route_details.php?id=${routeId}`)
-        .then(response => response.json())
+    fetch(`ajax/get_route_details.php?id=${routeId}`)
+        .then(response => {
+            if (!response.ok) throw new Error('Network response was not ok');
+            return response.json();
+        })
         .then(route => {
             document.getElementById('modalRouteTitle').textContent = 'Edit Patrol Route';
             document.getElementById('routeId').value = route.id;
-            document.getElementById('routeForm').route_name.value = route.route_name;
-            document.getElementById('routeForm').route_description.value = route.route_description;
-            document.getElementById('routeForm').estimated_duration.value = route.estimated_duration;
-            document.getElementById('routeForm').checkpoint_count.value = route.checkpoint_count;
-            document.getElementById('routeForm').route_coordinates.value = route.route_coordinates;
+            document.querySelector('[name="route_name"]').value = route.route_name || '';
+            document.querySelector('[name="route_description"]').value = route.route_description || '';
+            document.querySelector('[name="estimated_duration"]').value = route.estimated_duration || '';
+            document.querySelector('[name="checkpoint_count"]').value = route.checkpoint_count || '';
+            document.querySelector('[name="route_coordinates"]').value = route.route_coordinates || '';
             
             document.getElementById('routeModal').classList.remove('hidden');
             document.getElementById('routeModal').classList.add('flex');
-        });
-}
-
-function saveRoute(event) {
-    event.preventDefault();
-    
-    const formData = new FormData(event.target);
-    
-    fetch('handlers/save_patrol_route.php', {
-        method: 'POST',
-        body: formData
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            alert('Route saved successfully!');
-            closeRouteModal();
-            location.reload();
-        } else {
-            alert('Error: ' + data.message);
-        }
-    });
-}
-
-function deleteRoute(routeId) {
-    if (confirm('Are you sure you want to delete this patrol route?')) {
-        fetch('handlers/delete_patrol_route.php', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ id: routeId })
         })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                location.reload();
-            } else {
-                alert('Error: ' + data.message);
-            }
+        .catch(error => {
+            console.error('Error fetching route:', error);
+            alert('Error loading route details. Please try again.');
         });
-    }
-}
-
-function editSchedule(scheduleId) {
-    // Load and populate edit form
-    console.log('Edit schedule:', scheduleId);
-    // Similar implementation as editRoute
-}
-
-function deleteSchedule(scheduleId) {
-    if (confirm('Are you sure you want to delete this patrol schedule?')) {
-        fetch('handlers/delete_patrol_schedule.php', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ id: scheduleId })
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                location.reload();
-            } else {
-                alert('Error: ' + data.message);
-            }
-        });
-    }
 }
 
 function closeRouteModal() {
@@ -501,4 +534,15 @@ window.onclick = function(event) {
         closeRouteModal();
     }
 }
+
+// Handle form submission for delete schedule
+document.querySelectorAll('form[action=""]').forEach(form => {
+    form.addEventListener('submit', function(e) {
+        if (this.querySelector('[name="delete_schedule"]') || this.querySelector('[name="delete_route"]')) {
+            if (!confirm('Are you sure you want to delete this item?')) {
+                e.preventDefault();
+            }
+        }
+    });
+});
 </script>
