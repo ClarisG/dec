@@ -494,11 +494,33 @@ document.addEventListener('click', function(event) {
     }
 });
 
-// Prevent form submission from interfering with search
-document.getElementById('searchForm')?.addEventListener('submit', function(e) {
-    // Allow normal form submission
+// Handle rule form submission
+document.getElementById('ruleForm')?.addEventListener('submit', function(e) {
+    // Prevent default form submission
+    e.preventDefault();
+    
+    // Perform form submission
+    const formData = new FormData(this);
+    const url = '?module=classification&action=updateRule';
+    
+    // Send form data to server
+    fetch(url, {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        // Handle response from server
+        console.log(data);
+        
+        // Reload the page to show the updated results
+        location.reload();
+    })
+    .catch(error => {
+        // Handle error
+        console.error(error);
+    });
 });
-
 // Handle rule form submission - preserve search parameters
 document.getElementById('ruleForm')?.addEventListener('submit', function(e) {
     // Add current search parameters to form
