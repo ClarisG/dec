@@ -1,9 +1,33 @@
 <?php
 // admin/modules/classification.php - INCIDENT CLASSIFICATION MODULE
 
-// Get classification rules
-$classification_query = "SELECT * FROM report_types ORDER BY category, type_name";
-$classification_stmt = $conn->prepare($classification_query);
+// Pagination and search
+$per_page = 10;
+$page = max(1, (int)($_GET['page'] ?? 1));
+$offset = ($page - 1) * $per_page;
+$q = trim($_GET['q'] ?? '');
+
+$where = '';
+$params = [];
+if ($q !== '') {
+    $where = "WHERE type_name LIKE :q OR category LIKE :q";
+    $params[':q'] = "%$q%";
+}
+
+// Count total
+$count_sql = "SELECT COUNT(*) FROM report_types $where";
+$count_stmt = $conn->prepare($count_sql);
+$count_stmt->execute($params);
+$total_records = (int)$count_stmt->fetchColumn();
+$total_pages = max(1, (int)ceil($total_records / $per_page));
+if ($page > $total_pages) { $page = $total_pages; $offset = ($page - 1) * $per_page; }
+
+// Get paginated rules
+$classification_sql = "SELECT * FROM report_types $where ORDER BY category, type_name LIMIT :limit OFFSET :offset";
+$classification_stmt = $conn->prepare($classification_sql);
+foreach ($params as $k => $v) { $classification_stmt->bindValue($k, $v, PDO::PARAM_STR); }
+$classification_stmt->bindValue(':limit', $per_page, PDO::PARAM_INT);
+$classification_stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
 $classification_stmt->execute();
 $classification_rules = $classification_stmt->fetchAll(PDO::FETCH_ASSOC);
 
@@ -14,7 +38,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_rule'])) {
         $category = $_POST['category'];
         $keywords = $_POST['keywords'];
         $jurisdiction = $_POST['jurisdiction'];
-        $severity_level = $_POST['severity_level'];
         $rule_id = $_POST['rule_id'] ?? null;
         
         if ($rule_id) {
@@ -23,8 +46,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_rule'])) {
                             type_name = :type_name,
                             category = :category,
                             keywords = :keywords,
-                            jurisdiction = :jurisdiction,
-                            severity_level = :severity_level
+                            jurisdiction = :jurisdiction
                             WHERE id = :id";
             $stmt = $conn->prepare($update_query);
             $stmt->execute([
@@ -32,7 +54,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_rule'])) {
                 ':category' => $category,
                 ':keywords' => $keywords,
                 ':jurisdiction' => $jurisdiction,
-                ':severity_level' => $severity_level,
                 ':id' => $rule_id
             ]);
             
@@ -40,15 +61,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_rule'])) {
         } else {
             // Insert new rule
             $insert_query = "INSERT INTO report_types 
-                            (type_name, category, keywords, jurisdiction, severity_level)
-                            VALUES (:type_name, :category, :keywords, :jurisdiction, :severity_level)";
+                            (type_name, category, keywords, jurisdiction)
+                            VALUES (:type_name, :category, :keywords, :jurisdiction)";
             $stmt = $conn->prepare($insert_query);
             $stmt->execute([
                 ':type_name' => $type_name,
                 ':category' => $category,
                 ':keywords' => $keywords,
-                ':jurisdiction' => $jurisdiction,
-                ':severity_level' => $severity_level
+                ':jurisdiction' => $jurisdiction
             ]);
             
             $_SESSION['success'] = "Rule added successfully!";
@@ -86,10 +106,24 @@ $threshold = $threshold_stmt->fetchColumn() ?: 0.7;
 <div class="space-y-6">
     <!-- Incident Type Rules -->
     <div class="bg-white rounded-xl p-6 shadow-sm">
-        <div class="flex items-center justify-between mb-6">
-            <button onclick="showAddRuleModal()" class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-sm">
-                <i class="fas fa-plus mr-2"></i>Add Rule
-            </button>
+        <div class="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-3">
+            <div>
+                <h2 class="text-2xl font-bold text-gray-900">Incident Type Classification</h2>
+                <p class="text-sm text-gray-500">Manage incident categories, keywords and jurisdiction</p>
+            </div>
+            <div class="flex items-center gap-2">
+                <form method="GET" action="" class="flex items-center">
+                    <input type="hidden" name="module" value="classification">
+                    <div class="relative">
+                        <input type="text" name="q" value="<?php echo htmlspecialchars($q ?? ''); ?>" placeholder="Search type or category..." class="pl-9 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"/>
+                        <span class="absolute left-2 top-2.5 text-gray-400"><i class="fas fa-search"></i></span>
+                    </div>
+                    <button class="ml-2 px-3 py-2 border border-gray-300 rounded-lg text-sm">Search</button>
+                </form>
+                <button onclick="showAddRuleModal()" class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-sm">
+                    <i class="fas fa-plus mr-2"></i>Add Rule
+                </button>
+            </div>
         </div>
         
         <?php if (isset($_SESSION['success'])): ?>
@@ -112,7 +146,6 @@ $threshold = $threshold_stmt->fetchColumn() ?: 0.7;
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Keywords</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Jurisdiction</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Severity</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                     </tr>
                 </thead>
@@ -149,9 +182,6 @@ $threshold = $threshold_stmt->fetchColumn() ?: 0.7;
                                     <?php echo htmlspecialchars(ucfirst($rule['jurisdiction'])); ?>
                                 </span>
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap">
-                                <span class="text-sm text-gray-500 capitalize"><?php echo $rule['severity_level']; ?></span>
-                            </td>
                             <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                 <button onclick="editRule(<?php echo $rule['id']; ?>)" 
                                         class="text-purple-600 hover:text-purple-900 mr-3 px-2 py-1 hover:bg-purple-50 rounded">
@@ -166,6 +196,27 @@ $threshold = $threshold_stmt->fetchColumn() ?: 0.7;
                     <?php endforeach; ?>
                 </tbody>
             </table>
+        </div>
+        <div class="flex items-center justify-between mt-4">
+            <div class="text-sm text-gray-600">
+                Showing <?php echo $total_records ? (min($per_page, $total_records - $offset)) : 0; ?> of <?php echo $total_records; ?> entries
+            </div>
+            <div class="flex items-center gap-1">
+                <?php 
+                $base = '?module=classification'.(($q??'')!==''?'&q='.urlencode($q):'');
+                $mk = function($p) use ($base){ return $base.'&page='.$p; };
+                ?>
+                <a class="px-2 py-1 border rounded <?php echo $page<=1?'opacity-50 pointer-events-none':''; ?>" href="<?php echo $mk(1); ?>">First</a>
+                <a class="px-2 py-1 border rounded <?php echo $page<=1?'opacity-50 pointer-events-none':''; ?>" href="<?php echo $mk(max(1,$page-1)); ?>">Prev</a>
+                <?php 
+                    $start = max(1, $page-2); $end = min($total_pages, $page+2);
+                    for($p=$start;$p<=$end;$p++):
+                ?>
+                    <a class="px-3 py-1 border rounded <?php echo $p==$page?'bg-purple-600 text-white border-purple-600':'bg-white'; ?>" href="<?php echo $mk($p); ?>"><?php echo $p; ?></a>
+                <?php endfor; ?>
+                <a class="px-2 py-1 border rounded <?php echo $page>=$total_pages?'opacity-50 pointer-events-none':''; ?>" href="<?php echo $mk(min($total_pages,$page+1)); ?>">Next</a>
+                <a class="px-2 py-1 border rounded <?php echo $page>=$total_pages?'opacity-50 pointer-events-none':''; ?>" href="<?php echo $mk($total_pages); ?>">Last</a>
+            </div>
         </div>
     </div>
     
@@ -278,18 +329,7 @@ $threshold = $threshold_stmt->fetchColumn() ?: 0.7;
                     </select>
                 </div>
                 
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">Severity Level *</label>
-                    <select name="severity_level" required
-                            class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
-                        <option value="">Select Severity</option>
-                        <option value="low">Low</option>
-                        <option value="medium">Medium</option>
-                        <option value="high">High</option>
-                        <option value="critical">Critical</option>
-                    </select>
                 </div>
-            </div>
             
             <div class="flex justify-end space-x-3">
                 <button type="button" onclick="closeRuleModal()" 
@@ -314,8 +354,7 @@ function showAddRuleModal() {
     document.getElementById('ruleForm').category.value = '';
     document.getElementById('ruleForm').keywords.value = '';
     document.getElementById('ruleForm').jurisdiction.value = '';
-    document.getElementById('ruleForm').severity_level.value = '';
-    document.getElementById('ruleModal').classList.remove('hidden');
+        document.getElementById('ruleModal').classList.remove('hidden');
     document.getElementById('ruleModal').classList.add('flex');
 }
 
@@ -332,8 +371,6 @@ function editRule(ruleId) {
             document.querySelector('[name="category"]').value = rule.category || '';
             document.querySelector('[name="keywords"]').value = rule.keywords || '';
             document.querySelector('[name="jurisdiction"]').value = rule.jurisdiction || '';
-            document.querySelector('[name="severity_level"]').value = rule.severity_level || '';
-            
             document.getElementById('ruleModal').classList.remove('hidden');
             document.getElementById('ruleModal').classList.add('flex');
         })
