@@ -1,11 +1,10 @@
 <?php
 // admin/modules/tanod_tracker.php - TANOD ASSIGNMENT TRACKER MODULE
 
-// Get active Tanods with their status
+// Get active Tanods with their status - REMOVED current_address as it doesn't exist in the table
 $tanods_query = "SELECT u.id, u.first_name, u.last_name, u.contact_number,
                         ts.status as duty_status, ts.last_updated,
-                        td.clock_in, td.clock_out, td.location_lat, td.location_lng,
-                        td.current_address
+                        td.clock_in, td.clock_out, td.location_lat, td.location_lng
                  FROM users u
                  LEFT JOIN tanod_status ts ON u.id = ts.user_id
                  LEFT JOIN tanod_duty_logs td ON u.id = td.user_id AND DATE(td.clock_in) = CURDATE()
@@ -157,11 +156,7 @@ $key_locations = [
                                     <?php echo htmlspecialchars($tanod['first_name'] . ' ' . $tanod['last_name']); ?>
                                 </p>
                                 <p class="text-sm text-gray-500"><?php echo htmlspecialchars($tanod['contact_number']); ?></p>
-                                <?php if ($tanod['current_address']): ?>
-                                    <p class="text-xs text-gray-400 truncate" title="<?php echo htmlspecialchars($tanod['current_address']); ?>">
-                                        <i class="fas fa-map-marker-alt mr-1"></i><?php echo htmlspecialchars(substr($tanod['current_address'], 0, 40)) . '...'; ?>
-                                    </p>
-                                <?php endif; ?>
+                                <!-- Removed current_address section since column doesn't exist -->
                             </div>
                         </div>
                         <div class="text-right">
@@ -392,12 +387,6 @@ function initTanodMap() {
                                 <?php echo $tanod['duty_status']; ?>
                             </span>
                         </p>
-                        <?php if ($tanod['current_address']): ?>
-                            <p class="text-sm">
-                                <span class="font-medium">Location:</span> 
-                                <span class="text-gray-600"><?php echo addslashes($tanod['current_address']); ?></span>
-                            </p>
-                        <?php endif; ?>
                         <?php if ($tanod['clock_in']): ?>
                             <p class="text-sm">
                                 <span class="font-medium">On Duty Since:</span> 
