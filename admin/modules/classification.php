@@ -138,7 +138,7 @@ $threshold = $threshold_stmt->fetchColumn() ?: 0.7;
                     <input type="text" name="q" value="<?php echo htmlspecialchars($q ?? ''); ?>" placeholder="Search type or category..." class="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"/>
                     <span class="absolute left-2 top-2.5 text-gray-400"><i class="fas fa-search"></i></span>
                 </div>
-                <button type="submit" class="ml-2 px-3 py-2 border border-gray-300 rounded-lg text-sm">Search</button>
+                <button type="submit" class="ml-2 px-3 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-sm">Search</button>
                 <?php if (!empty($q)): ?>
                     <a href="?module=classification" class="ml-2 px-3 py-2 border border-gray-300 rounded-lg text-sm text-red-600 hover:bg-red-50">Clear</a>
                 <?php endif; ?>
@@ -451,33 +451,46 @@ function fetchAjaxRuleData(ruleId) {
 
 function deleteRule(ruleId) {
     if (confirm('Are you sure you want to delete this classification rule?')) {
-        const formData = new FormData();
-        formData.append('delete_rule', '1');
-        formData.append('rule_id', ruleId);
+        // Create a form and submit it instead of using fetch
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = '';
         
-        // Preserve search parameters in delete request
+        const deleteRuleInput = document.createElement('input');
+        deleteRuleInput.type = 'hidden';
+        deleteRuleInput.name = 'delete_rule';
+        deleteRuleInput.value = '1';
+        form.appendChild(deleteRuleInput);
+        
+        const ruleIdInput = document.createElement('input');
+        ruleIdInput.type = 'hidden';
+        ruleIdInput.name = 'rule_id';
+        ruleIdInput.value = ruleId;
+        form.appendChild(ruleIdInput);
+        
+        // Preserve search parameters
         const searchParams = new URLSearchParams(window.location.search);
         const q = searchParams.get('q') || '';
         const page = searchParams.get('page') || '1';
         
-        if (q) formData.append('q', q);
-        if (page !== '1') formData.append('page', page);
+        if (q) {
+            const qInput = document.createElement('input');
+            qInput.type = 'hidden';
+            qInput.name = 'q';
+            qInput.value = q;
+            form.appendChild(qInput);
+        }
         
-        fetch('', {
-            method: 'POST',
-            body: formData
-        })
-        .then(response => {
-            if (response.ok) {
-                location.reload();
-            } else {
-                throw new Error('Network response was not ok');
-            }
-        })
-        .catch(error => {
-            console.error('Error deleting rule:', error);
-            alert('Error deleting rule. Please try again.');
-        });
+        if (page !== '1') {
+            const pageInput = document.createElement('input');
+            pageInput.type = 'hidden';
+            pageInput.name = 'page';
+            pageInput.value = page;
+            form.appendChild(pageInput);
+        }
+        
+        document.body.appendChild(form);
+        form.submit();
     }
 }
 
@@ -495,33 +508,6 @@ document.addEventListener('click', function(event) {
 });
 
 // Handle rule form submission
-document.getElementById('ruleForm')?.addEventListener('submit', function(e) {
-    // Prevent default form submission
-    e.preventDefault();
-    
-    // Perform form submission
-    const formData = new FormData(this);
-    const url = '?module=classification&action=updateRule';
-    
-    // Send form data to server
-    fetch(url, {
-        method: 'POST',
-        body: formData
-    })
-    .then(response => response.json())
-    .then(data => {
-        // Handle response from server
-        console.log(data);
-        
-        // Reload the page to show the updated results
-        location.reload();
-    })
-    .catch(error => {
-        // Handle error
-        console.error(error);
-    });
-});
-// Handle rule form submission - preserve search parameters
 document.getElementById('ruleForm')?.addEventListener('submit', function(e) {
     // Add current search parameters to form
     const searchParams = new URLSearchParams(window.location.search);
@@ -543,5 +529,7 @@ document.getElementById('ruleForm')?.addEventListener('submit', function(e) {
         input.value = page;
         this.appendChild(input);
     }
+    
+    // The form will submit normally to the PHP handler
 });
 </script>
