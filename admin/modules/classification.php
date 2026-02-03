@@ -10,25 +10,29 @@ $q = trim($_GET['q'] ?? '');
 $where = '';
 $params = [];
 if ($q !== '') {
-    $where = "WHERE type_name LIKE :q OR category LIKE :q";
+    $where = "WHERE type_name LIKE :q OR category LIKE :q2";
     $params[':q'] = "%$q%";
+    $params[':q2'] = "%$q%";
 }
 
 // Count total
 $count_sql = "SELECT COUNT(*) FROM report_types $where";
 $count_stmt = $conn->prepare($count_sql);
-$count_stmt->execute($params);
+foreach ($params as $key => $value) {
+    $count_stmt->bindValue($key, $value, PDO::PARAM_STR);
+}
+$count_stmt->execute();
 $total_records = (int)$count_stmt->fetchColumn();
 $total_pages = max(1, (int)ceil($total_records / $per_page));
 if ($page > $total_pages) { $page = $total_pages; $offset = ($page - 1) * $per_page; }
 
-// Get paginated rules (inline limit/offset to avoid HY093 on some PDO setups)
+// Get paginated rules
 $limit = (int)$per_page;
 $off = (int)$offset;
 $classification_sql = "SELECT * FROM report_types $where ORDER BY category, type_name LIMIT $limit OFFSET $off";
 $classification_stmt = $conn->prepare($classification_sql);
-if ($q !== '') {
-    $classification_stmt->bindValue(':q', "%$q%", PDO::PARAM_STR);
+foreach ($params as $key => $value) {
+    $classification_stmt->bindValue($key, $value, PDO::PARAM_STR);
 }
 $classification_stmt->execute();
 $classification_rules = $classification_stmt->fetchAll(PDO::FETCH_ASSOC);
