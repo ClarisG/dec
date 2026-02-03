@@ -135,7 +135,7 @@ $threshold = $threshold_stmt->fetchColumn() ?: 0.7;
             <form method="GET" action="" class="flex items-center flex-1 max-w-lg" id="searchForm">
                 <input type="hidden" name="module" value="classification">
                 <div class="relative flex-1">
-                    <input type="text" name="q" value="<?php echo htmlspecialchars($q ?? ''); ?>" placeholder="Search type or category..." class="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"/>
+                    <input type="text" name="q" id="searchInput" value="<?php echo htmlspecialchars($q ?? ''); ?>" placeholder="Search type or category..." class="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"/>
                     <span class="absolute left-2 top-2.5 text-gray-400"><i class="fas fa-search"></i></span>
                 </div>
                 <button type="submit" class="ml-2 px-3 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-sm">Search</button>
@@ -380,156 +380,134 @@ $threshold = $threshold_stmt->fetchColumn() ?: 0.7;
 </div>
 
 <script>
-// Store rule data in JavaScript object for quick access
-const ruleData = {};
-<?php foreach($classification_rules as $rule): ?>
-ruleData[<?php echo $rule['id']; ?>] = {
-    type_name: "<?php echo addslashes($rule['type_name']); ?>",
-    category: "<?php echo addslashes($rule['category']); ?>",
-    keywords: "<?php echo addslashes($rule['keywords']); ?>",
-    jurisdiction: "<?php echo addslashes($rule['jurisdiction']); ?>"
-};
-<?php endforeach; ?>
+document.addEventListener('DOMContentLoaded', function() {
+    // Store rule data in JavaScript object for quick access
+    const ruleData = {};
+    <?php foreach($classification_rules as $rule): ?>
+    ruleData[<?php echo $rule['id']; ?>] = {
+        type_name: <?php echo json_encode($rule['type_name']); ?>,
+        category: <?php echo json_encode($rule['category']); ?>,
+        keywords: <?php echo json_encode($rule['keywords']); ?>,
+        jurisdiction: <?php echo json_encode($rule['jurisdiction']); ?>
+    };
+    <?php endforeach; ?>
 
-function showAddRuleModal() {
-    document.getElementById('modalTitle').textContent = 'Add Classification Rule';
-    document.getElementById('ruleId').value = '';
-    document.getElementById('type_name').value = '';
-    document.getElementById('category').value = '';
-    document.getElementById('keywords').value = '';
-    document.getElementById('jurisdiction').value = '';
-    document.getElementById('ruleModal').classList.remove('hidden');
-    document.getElementById('ruleModal').classList.add('flex');
-}
-
-function editRule(ruleId) {
-    if (ruleData[ruleId]) {
-        const rule = ruleData[ruleId];
-        document.getElementById('modalTitle').textContent = 'Edit Classification Rule';
-        document.getElementById('ruleId').value = ruleId;
-        document.getElementById('type_name').value = rule.type_name || '';
-        document.getElementById('category').value = rule.category || '';
-        document.getElementById('keywords').value = rule.keywords || '';
-        document.getElementById('jurisdiction').value = rule.jurisdiction || '';
+    window.showAddRuleModal = function() {
+        document.getElementById('modalTitle').textContent = 'Add Classification Rule';
+        document.getElementById('ruleForm').reset();
+        document.getElementById('ruleId').value = '';
         document.getElementById('ruleModal').classList.remove('hidden');
         document.getElementById('ruleModal').classList.add('flex');
-    } else {
-        // Fallback to AJAX if data not in ruleData object
-        fetchAjaxRuleData(ruleId);
     }
-}
 
-function fetchAjaxRuleData(ruleId) {
-    // Try relative path first
-    fetch(`../ajax/get_classification_rule.php?id=${ruleId}`)
-        .then(response => {
-            if (!response.ok) {
-                // Try absolute path if relative fails
-                return fetch(`/admin/ajax/get_classification_rule.php?id=${ruleId}`);
-            }
-            return response;
-        })
-        .then(response => {
-            if (!response.ok) throw new Error('Network response was not ok');
-            return response.json();
-        })
-        .then(rule => {
+    window.editRule = function(ruleId) {
+        if (ruleData[ruleId]) {
+            const rule = ruleData[ruleId];
             document.getElementById('modalTitle').textContent = 'Edit Classification Rule';
-            document.getElementById('ruleId').value = rule.id;
+            document.getElementById('ruleId').value = ruleId;
             document.getElementById('type_name').value = rule.type_name || '';
             document.getElementById('category').value = rule.category || '';
             document.getElementById('keywords').value = rule.keywords || '';
             document.getElementById('jurisdiction').value = rule.jurisdiction || '';
             document.getElementById('ruleModal').classList.remove('hidden');
             document.getElementById('ruleModal').classList.add('flex');
-        })
-        .catch(error => {
-            console.error('Error fetching rule:', error);
-            alert('Error loading rule details. Please try again.');
+        } else {
+            fetchAjaxRuleData(ruleId);
+        }
+    }
+
+    function fetchAjaxRuleData(ruleId) {
+        fetch(`../handlers/get_classification_rule.php?id=${ruleId}`)
+            .then(response => {
+                if (!response.ok) throw new Error('Network response was not ok');
+                return response.json();
+            })
+            .then(rule => {
+                if (rule.error) throw new Error(rule.error);
+                ruleData[rule.id] = rule;
+                editRule(rule.id);
+            })
+            .catch(error => {
+                console.error('Error fetching rule:', error);
+                alert('Error loading rule details. Please try again.');
+            });
+    }
+
+    window.deleteRule = function(ruleId) {
+        if (confirm('Are you sure you want to delete this classification rule?')) {
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = `?module=classification&q=<?php echo urlencode($q); ?>&page=<?php echo $page; ?>`;
+
+            const deleteInput = document.createElement('input');
+            deleteInput.type = 'hidden';
+            deleteInput.name = 'delete_rule';
+            deleteInput.value = '1';
+            form.appendChild(deleteInput);
+
+            const idInput = document.createElement('input');
+            idInput.type = 'hidden';
+            idInput.name = 'rule_id';
+            idInput.value = ruleId;
+            form.appendChild(idInput);
+
+            document.body.appendChild(form);
+            form.submit();
+        }
+    }
+
+    window.closeRuleModal = function() {
+        document.getElementById('ruleModal').classList.add('hidden');
+        document.getElementById('ruleModal').classList.remove('flex');
+    }
+
+    // Close modal when clicking outside
+    document.getElementById('ruleModal').addEventListener('click', function(event) {
+        if (event.target === this) {
+            closeRuleModal();
+        }
+    });
+
+    // Handle search form submission
+    const searchForm = document.getElementById('searchForm');
+    if(searchForm) {
+        searchForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            const searchVal = document.getElementById('searchInput').value;
+            // Go to page 1 for new search
+            window.location.href = `?module=classification&q=${encodeURIComponent(searchVal)}`;
         });
-}
-
-function deleteRule(ruleId) {
-    if (confirm('Are you sure you want to delete this classification rule?')) {
-        // Create a form and submit it instead of using fetch
-        const form = document.createElement('form');
-        form.method = 'POST';
-        form.action = '';
-        
-        const deleteRuleInput = document.createElement('input');
-        deleteRuleInput.type = 'hidden';
-        deleteRuleInput.name = 'delete_rule';
-        deleteRuleInput.value = '1';
-        form.appendChild(deleteRuleInput);
-        
-        const ruleIdInput = document.createElement('input');
-        ruleIdInput.type = 'hidden';
-        ruleIdInput.name = 'rule_id';
-        ruleIdInput.value = ruleId;
-        form.appendChild(ruleIdInput);
-        
-        // Preserve search parameters
-        const searchParams = new URLSearchParams(window.location.search);
-        const q = searchParams.get('q') || '';
-        const page = searchParams.get('page') || '1';
-        
-        if (q) {
-            const qInput = document.createElement('input');
-            qInput.type = 'hidden';
-            qInput.name = 'q';
-            qInput.value = q;
-            form.appendChild(qInput);
-        }
-        
-        if (page !== '1') {
-            const pageInput = document.createElement('input');
-            pageInput.type = 'hidden';
-            pageInput.name = 'page';
-            pageInput.value = page;
-            form.appendChild(pageInput);
-        }
-        
-        document.body.appendChild(form);
-        form.submit();
     }
-}
 
-function closeRuleModal() {
-    document.getElementById('ruleModal').classList.add('hidden');
-    document.getElementById('ruleModal').classList.remove('flex');
-}
+    // Preserve search/page state in form submissions
+    const ruleForm = document.getElementById('ruleForm');
+    if(ruleForm) {
+        ruleForm.addEventListener('submit', function(e) {
+            const searchParams = new URLSearchParams(window.location.search);
+            const q = searchParams.get('q');
+            const page = searchParams.get('page');
 
-// Close modal when clicking outside
-document.addEventListener('click', function(event) {
-    const modal = document.getElementById('ruleModal');
-    if (event.target === modal) {
-        closeRuleModal();
+            if (q) {
+                let input = document.querySelector('input[name="q"]');
+                if(!input) {
+                   input = document.createElement('input');
+                   input.type = 'hidden';
+                   input.name = 'q';
+                   this.appendChild(input);
+                }
+                input.value = q;
+            }
+            if (page) {
+                let input = document.querySelector('input[name="page"]');
+                if(!input) {
+                   input = document.createElement('input');
+                   input.type = 'hidden';
+                   input.name = 'page';
+                   this.appendChild(input);
+                }
+                input.value = page;
+            }
+        });
     }
-});
-
-// Handle rule form submission
-document.getElementById('ruleForm')?.addEventListener('submit', function(e) {
-    // Add current search parameters to form
-    const searchParams = new URLSearchParams(window.location.search);
-    const q = searchParams.get('q') || '';
-    const page = searchParams.get('page') || '1';
-    
-    if (q) {
-        const input = document.createElement('input');
-        input.type = 'hidden';
-        input.name = 'q';
-        input.value = q;
-        this.appendChild(input);
-    }
-    
-    if (page !== '1') {
-        const input = document.createElement('input');
-        input.type = 'hidden';
-        input.name = 'page';
-        input.value = page;
-        this.appendChild(input);
-    }
-    
-    // The form will submit normally to the PHP handler
 });
 </script>
