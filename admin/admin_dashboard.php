@@ -171,7 +171,7 @@ function getModuleTitle($module) {
 function getModuleSubtitle($module) {
     $subtitles = [
         'dashboard' => 'System Controller and Master Auditor Dashboard',
-        'classification' => 'Configure incident types, keywords',
+        'classification' => 'Configure incident types and keywords',
         'case_dashboard' => 'Unified case view with advanced audit filters',
         'tanod_tracker' => 'Real-time GPS tracking and assignment management',
         'patrol_scheduling' => 'Schedule and deploy Tanod patrol routes',

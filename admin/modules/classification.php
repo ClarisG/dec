@@ -87,7 +87,6 @@ $threshold = $threshold_stmt->fetchColumn() ?: 0.7;
     <!-- Incident Type Rules -->
     <div class="bg-white rounded-xl p-6 shadow-sm">
         <div class="flex items-center justify-between mb-6">
-            <h2 class="text-xl font-bold text-gray-800">Incident Type Classification Rules</h2>
             <button onclick="showAddRuleModal()" class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-sm">
                 <i class="fas fa-plus mr-2"></i>Add Rule
             </button>
