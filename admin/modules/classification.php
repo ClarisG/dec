@@ -80,7 +80,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_rule'])) {
             $_SESSION['success'] = "Rule added successfully!";
         }
         
-        header("Location: ?module=classification");
+        // Preserve search query in redirect
+        $redirect_url = "?module=classification";
+        if (!empty($q)) {
+            $redirect_url .= "&q=" . urlencode($q);
+        }
+        if ($page > 1) {
+            $redirect_url .= "&page=" . $page;
+        }
+        
+        header("Location: $redirect_url");
         exit();
     } catch (PDOException $e) {
         $_SESSION['error'] = "Error saving rule: " . $e->getMessage();
@@ -96,7 +105,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_rule'])) {
         $stmt->execute([':id' => $rule_id]);
         
         $_SESSION['success'] = "Rule deleted successfully!";
-        header("Location: ?module=classification");
+        
+        // Preserve search query in redirect
+        $redirect_url = "?module=classification";
+        if (!empty($q)) {
+            $redirect_url .= "&q=" . urlencode($q);
+        }
+        if ($page > 1) {
+            $redirect_url .= "&page=" . $page;
+        }
+        
+        header("Location: $redirect_url");
         exit();
     } catch (PDOException $e) {
         $_SESSION['error'] = "Error deleting rule: " . $e->getMessage();
@@ -113,13 +132,16 @@ $threshold = $threshold_stmt->fetchColumn() ?: 0.7;
     <!-- Incident Type Rules -->
     <div class="bg-white rounded-xl p-6 shadow-sm">
         <div class="flex items-center justify-between mb-4 gap-3">
-            <form method="GET" action="" class="flex items-center flex-1 max-w-lg">
+            <form method="GET" action="" class="flex items-center flex-1 max-w-lg" id="searchForm">
                 <input type="hidden" name="module" value="classification">
                 <div class="relative flex-1">
                     <input type="text" name="q" value="<?php echo htmlspecialchars($q ?? ''); ?>" placeholder="Search type or category..." class="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"/>
                     <span class="absolute left-2 top-2.5 text-gray-400"><i class="fas fa-search"></i></span>
                 </div>
                 <button type="submit" class="ml-2 px-3 py-2 border border-gray-300 rounded-lg text-sm">Search</button>
+                <?php if (!empty($q)): ?>
+                    <a href="?module=classification" class="ml-2 px-3 py-2 border border-gray-300 rounded-lg text-sm text-red-600 hover:bg-red-50">Clear</a>
+                <?php endif; ?>
             </form>
             <button onclick="showAddRuleModal()" class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-sm whitespace-nowrap">
                 <i class="fas fa-plus mr-2"></i>Add Rule
@@ -150,50 +172,63 @@ $threshold = $threshold_stmt->fetchColumn() ?: 0.7;
                     </tr>
                 </thead>
                 <tbody id="rulesTableBody" class="bg-white divide-y divide-gray-200">
-                    <?php foreach($classification_rules as $rule): ?>
-                        <tr class="hover:bg-gray-50">
-                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                                <?php echo htmlspecialchars($rule['type_name']); ?>
-                            </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                <span class="capitalize"><?php echo htmlspecialchars($rule['category']); ?></span>
-                            </td>
-                            <td class="px-4 py-4 text-sm text-gray-500">
-                                <?php if ($rule['keywords']): ?>
-                                    <?php 
-                                    $keywords = explode(',', $rule['keywords']);
-                                    foreach(array_slice($keywords, 0, 3) as $keyword): ?>
-                                        <span class="inline-block bg-gray-100 text-gray-800 px-2 py-1 rounded text-xs mr-1 mb-1">
-                                            <?php echo trim($keyword); ?>
-                                        </span>
-                                    <?php endforeach; ?>
-                                    <?php if (count($keywords) > 3): ?>
-                                        <span class="inline-block bg-gray-200 text-gray-600 px-2 py-1 rounded text-xs">
-                                            +<?php echo count($keywords) - 3; ?> more
-                                        </span>
-                                    <?php endif; ?>
-                                <?php else: ?>
-                                    <span class="text-gray-400 italic">No keywords</span>
+                    <?php if (empty($classification_rules)): ?>
+                        <tr>
+                            <td colspan="5" class="px-6 py-8 text-center text-gray-500">
+                                <i class="fas fa-search text-3xl mb-2"></i>
+                                <p>No classification rules found<?php echo !empty($q) ? ' for "' . htmlspecialchars($q) . '"' : ''; ?></p>
+                                <?php if (!empty($q)): ?>
+                                    <a href="?module=classification" class="mt-2 inline-block text-purple-600 hover:text-purple-800">Clear search</a>
                                 <?php endif; ?>
                             </td>
-                            <td class="px-4 py-4 whitespace-nowrap">
-                                <span class="px-3 py-1 rounded-full text-xs font-medium 
-                                    <?php echo $rule['jurisdiction'] === 'police' ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800'; ?>">
-                                    <?php echo htmlspecialchars(ucfirst($rule['jurisdiction'])); ?>
-                                </span>
-                            </td>
-                            <td class="px-4 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                <button onclick="editRule(<?php echo $rule['id']; ?>)" 
-                                        class="text-purple-600 hover:text-purple-900 mr-3 px-2 py-1 hover:bg-purple-50 rounded">
-                                    <i class="fas fa-edit"></i> Edit
-                                </button>
-                                <button onclick="deleteRule(<?php echo $rule['id']; ?>)" 
-                                        class="text-red-600 hover:text-red-900 px-2 py-1 hover:bg-red-50 rounded">
-                                    <i class="fas fa-trash"></i> Delete
-                                </button>
-                            </td>
                         </tr>
-                    <?php endforeach; ?>
+                    <?php else: ?>
+                        <?php foreach($classification_rules as $rule): ?>
+                            <tr class="hover:bg-gray-50" data-rule-id="<?php echo $rule['id']; ?>">
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                    <?php echo htmlspecialchars($rule['type_name']); ?>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                    <span class="capitalize"><?php echo htmlspecialchars($rule['category']); ?></span>
+                                </td>
+                                <td class="px-4 py-4 text-sm text-gray-500">
+                                    <?php if ($rule['keywords']): ?>
+                                        <?php 
+                                        $keywords = explode(',', $rule['keywords']);
+                                        foreach(array_slice($keywords, 0, 3) as $keyword): ?>
+                                            <span class="inline-block bg-gray-100 text-gray-800 px-2 py-1 rounded text-xs mr-1 mb-1">
+                                                <?php echo trim($keyword); ?>
+                                            </span>
+                                        <?php endforeach; ?>
+                                        <?php if (count($keywords) > 3): ?>
+                                            <span class="inline-block bg-gray-200 text-gray-600 px-2 py-1 rounded text-xs">
+                                                +<?php echo count($keywords) - 3; ?> more
+                                            </span>
+                                        <?php endif; ?>
+                                    <?php else: ?>
+                                        <span class="text-gray-400 italic">No keywords</span>
+                                    <?php endif; ?>
+                                </td>
+                                <td class="px-4 py-4 whitespace-nowrap">
+                                    <span class="px-3 py-1 rounded-full text-xs font-medium 
+                                        <?php echo $rule['jurisdiction'] === 'police' ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800'; ?>">
+                                        <?php echo htmlspecialchars(ucfirst($rule['jurisdiction'])); ?>
+                                    </span>
+                                </td>
+                                <td class="px-4 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                    <button onclick="editRule(<?php echo $rule['id']; ?>)" 
+                                            class="text-purple-600 hover:text-purple-900 mr-3 px-2 py-1 hover:bg-purple-50 rounded edit-rule-btn"
+                                            data-rule-id="<?php echo $rule['id']; ?>">
+                                        <i class="fas fa-edit"></i> Edit
+                                    </button>
+                                    <button onclick="deleteRule(<?php echo $rule['id']; ?>)" 
+                                            class="text-red-600 hover:text-red-900 px-2 py-1 hover:bg-red-50 rounded">
+                                        <i class="fas fa-trash"></i> Delete
+                                    </button>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
                 </tbody>
             </table>
         </div>
@@ -293,14 +328,14 @@ $threshold = $threshold_stmt->fetchColumn() ?: 0.7;
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-2">Incident Type Name *</label>
-                    <input type="text" name="type_name" required 
+                    <input type="text" name="type_name" id="type_name" required 
                            class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
                            placeholder="e.g., Theft, Assault, etc.">
                 </div>
                 
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-2">Category *</label>
-                    <select name="category" required 
+                    <select name="category" id="category" required 
                             class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
                         <option value="">Select Category</option>
                         <option value="incident">Incident</option>
@@ -312,7 +347,7 @@ $threshold = $threshold_stmt->fetchColumn() ?: 0.7;
             
             <div class="mb-6">
                 <label class="block text-sm font-medium text-gray-700 mb-2">Keywords (comma-separated)</label>
-                <textarea name="keywords" rows="3" 
+                <textarea name="keywords" id="keywords" rows="3" 
                           class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
                           placeholder="theft, rob, nakaw, steal..."></textarea>
                 <p class="text-sm text-gray-500 mt-1">These keywords will be used by the AI model for classification</p>
@@ -321,15 +356,14 @@ $threshold = $threshold_stmt->fetchColumn() ?: 0.7;
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-2">Jurisdiction *</label>
-                    <select name="jurisdiction" required 
+                    <select name="jurisdiction" id="jurisdiction" required 
                             class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
                         <option value="">Select Jurisdiction</option>
                         <option value="barangay">Barangay</option>
                         <option value="police">Police</option>
                     </select>
                 </div>
-                
-                </div>
+            </div>
             
             <div class="flex justify-end space-x-3">
                 <button type="button" onclick="closeRuleModal()" 
@@ -346,20 +380,55 @@ $threshold = $threshold_stmt->fetchColumn() ?: 0.7;
 </div>
 
 <script>
+// Store rule data in JavaScript object for quick access
+const ruleData = {};
+<?php foreach($classification_rules as $rule): ?>
+ruleData[<?php echo $rule['id']; ?>] = {
+    type_name: "<?php echo addslashes($rule['type_name']); ?>",
+    category: "<?php echo addslashes($rule['category']); ?>",
+    keywords: "<?php echo addslashes($rule['keywords']); ?>",
+    jurisdiction: "<?php echo addslashes($rule['jurisdiction']); ?>"
+};
+<?php endforeach; ?>
+
 function showAddRuleModal() {
     document.getElementById('modalTitle').textContent = 'Add Classification Rule';
     document.getElementById('ruleId').value = '';
-    document.getElementById('ruleForm').reset();
-    document.getElementById('ruleForm').type_name.value = '';
-    document.getElementById('ruleForm').category.value = '';
-    document.getElementById('ruleForm').keywords.value = '';
-    document.getElementById('ruleForm').jurisdiction.value = '';
-        document.getElementById('ruleModal').classList.remove('hidden');
+    document.getElementById('type_name').value = '';
+    document.getElementById('category').value = '';
+    document.getElementById('keywords').value = '';
+    document.getElementById('jurisdiction').value = '';
+    document.getElementById('ruleModal').classList.remove('hidden');
     document.getElementById('ruleModal').classList.add('flex');
 }
 
 function editRule(ruleId) {
-    fetch(`ajax/get_classification_rule.php?id=${ruleId}`)
+    if (ruleData[ruleId]) {
+        const rule = ruleData[ruleId];
+        document.getElementById('modalTitle').textContent = 'Edit Classification Rule';
+        document.getElementById('ruleId').value = ruleId;
+        document.getElementById('type_name').value = rule.type_name || '';
+        document.getElementById('category').value = rule.category || '';
+        document.getElementById('keywords').value = rule.keywords || '';
+        document.getElementById('jurisdiction').value = rule.jurisdiction || '';
+        document.getElementById('ruleModal').classList.remove('hidden');
+        document.getElementById('ruleModal').classList.add('flex');
+    } else {
+        // Fallback to AJAX if data not in ruleData object
+        fetchAjaxRuleData(ruleId);
+    }
+}
+
+function fetchAjaxRuleData(ruleId) {
+    // Try relative path first
+    fetch(`../ajax/get_classification_rule.php?id=${ruleId}`)
+        .then(response => {
+            if (!response.ok) {
+                // Try absolute path if relative fails
+                return fetch(`/admin/ajax/get_classification_rule.php?id=${ruleId}`);
+            }
+            return response;
+        })
         .then(response => {
             if (!response.ok) throw new Error('Network response was not ok');
             return response.json();
@@ -367,10 +436,10 @@ function editRule(ruleId) {
         .then(rule => {
             document.getElementById('modalTitle').textContent = 'Edit Classification Rule';
             document.getElementById('ruleId').value = rule.id;
-            document.querySelector('[name="type_name"]').value = rule.type_name || '';
-            document.querySelector('[name="category"]').value = rule.category || '';
-            document.querySelector('[name="keywords"]').value = rule.keywords || '';
-            document.querySelector('[name="jurisdiction"]').value = rule.jurisdiction || '';
+            document.getElementById('type_name').value = rule.type_name || '';
+            document.getElementById('category').value = rule.category || '';
+            document.getElementById('keywords').value = rule.keywords || '';
+            document.getElementById('jurisdiction').value = rule.jurisdiction || '';
             document.getElementById('ruleModal').classList.remove('hidden');
             document.getElementById('ruleModal').classList.add('flex');
         })
@@ -385,6 +454,14 @@ function deleteRule(ruleId) {
         const formData = new FormData();
         formData.append('delete_rule', '1');
         formData.append('rule_id', ruleId);
+        
+        // Preserve search parameters in delete request
+        const searchParams = new URLSearchParams(window.location.search);
+        const q = searchParams.get('q') || '';
+        const page = searchParams.get('page') || '1';
+        
+        if (q) formData.append('q', q);
+        if (page !== '1') formData.append('page', page);
         
         fetch('', {
             method: 'POST',
@@ -410,15 +487,39 @@ function closeRuleModal() {
 }
 
 // Close modal when clicking outside
-window.onclick = function(event) {
+document.addEventListener('click', function(event) {
     const modal = document.getElementById('ruleModal');
-    if (event.target == modal) {
+    if (event.target === modal) {
         closeRuleModal();
     }
-}
+});
 
-// Handle form submission
-document.getElementById('ruleForm').addEventListener('submit', function(e) {
-    // Validation is already handled by required attributes
+// Prevent form submission from interfering with search
+document.getElementById('searchForm')?.addEventListener('submit', function(e) {
+    // Allow normal form submission
+});
+
+// Handle rule form submission - preserve search parameters
+document.getElementById('ruleForm')?.addEventListener('submit', function(e) {
+    // Add current search parameters to form
+    const searchParams = new URLSearchParams(window.location.search);
+    const q = searchParams.get('q') || '';
+    const page = searchParams.get('page') || '1';
+    
+    if (q) {
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = 'q';
+        input.value = q;
+        this.appendChild(input);
+    }
+    
+    if (page !== '1') {
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = 'page';
+        input.value = page;
+        this.appendChild(input);
+    }
 });
 </script>
