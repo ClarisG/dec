@@ -120,6 +120,42 @@ arsort($jurisdiction_data);
 // Take top 10 types for readability
 $type_data = array_slice($type_data, 0, 10, true);
 ?>
+<!-- Add CSS for responsive table -->
+<style>
+    @media (max-width: 1024px) {
+        .responsive-table-container {
+            position: relative;
+        }
+        .responsive-table {
+            display: block;
+            overflow-x: auto;
+            white-space: nowrap;
+            -webkit-overflow-scrolling: touch;
+        }
+        .responsive-table thead {
+            display: table-header-group;
+        }
+        .responsive-table tbody {
+            display: table-row-group;
+        }
+        .responsive-table tr {
+            display: table-row;
+        }
+        .responsive-table th,
+        .responsive-table td {
+            display: table-cell;
+            min-width: 120px;
+        }
+        /* Ensure actions column stays visible */
+        .responsive-table td:last-child {
+            position: sticky;
+            right: 0;
+            background: white;
+            min-width: 150px;
+        }
+    }
+</style>
+
 <div class="space-y-6">
     <!-- Report Queue Overview -->
     <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
@@ -193,7 +229,7 @@ $type_data = array_slice($type_data, 0, 10, true);
     </div>
     
     <!-- Raw Report Queue -->
-    <div class="bg-white rounded-xl p-6 shadow-sm">
+    <div class="bg-white rounded-xl p-6 shadow-sm responsive-table-container">
         <div class="flex items-center justify-between mb-6">
             <h2 class="text-xl font-bold text-gray-800">Raw Citizen Report Queue</h2>
             <div class="text-sm text-gray-500">
@@ -202,69 +238,76 @@ $type_data = array_slice($type_data, 0, 10, true);
         </div>
         
         <div class="overflow-x-auto">
-            <table class="min-w-full divide-y divide-gray-200">
+            <table class="min-w-full divide-y divide-gray-200 responsive-table">
                 <thead>
                     <tr>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Report #</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Reporter</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Incident Type</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Priority</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Submitted</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[100px]">Report #</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[150px]">Reporter</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[120px]">Incident Type</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[100px]">Priority</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[120px]">Status</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[120px]">Submitted</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[150px]">Actions</th>
                     </tr>
                 </thead>
                 <tbody class="bg-white divide-y divide-gray-200">
                     <?php foreach($raw_reports as $report): ?>
                         <tr class="hover:bg-gray-50" id="reportRow-<?php echo $report['id']; ?>">
-                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                                <?php echo htmlspecialchars($report['report_number']); ?>
+                            <td class="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
+                                <span class="font-mono text-xs"><?php echo htmlspecialchars($report['report_number']); ?></span>
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
                                 <div class="flex items-center">
                                     <div class="flex-shrink-0 h-8 w-8 bg-gray-100 rounded-full flex items-center justify-center">
                                         <span class="text-gray-600 font-medium text-xs">
                                             <?php echo strtoupper(substr($report['reporter_first'] ?? 'C', 0, 1)); ?>
                                         </span>
                                     </div>
-                                    <div class="ml-3">
-                                        <div class="text-sm font-medium text-gray-900">
+                                    <div class="ml-2">
+                                        <div class="text-sm font-medium text-gray-900 truncate max-w-[120px]">
                                             <?php echo htmlspecialchars($report['reporter_first'] . ' ' . $report['reporter_last']); ?>
                                         </div>
-                                        <div class="text-xs text-gray-500">
+                                        <div class="text-xs text-gray-500 truncate max-w-[120px]">
                                             <?php echo htmlspecialchars($report['reporter_contact'] ?? 'N/A'); ?>
                                         </div>
                                     </div>
                                 </div>
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500 truncate max-w-[120px]">
                                 <?php echo htmlspecialchars($report['incident_type'] ?? 'Unknown'); ?>
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap">
-                                <span class="px-3 py-1 rounded-full text-xs font-medium 
+                            <td class="px-4 py-3 whitespace-nowrap">
+                                <span class="px-2 py-1 rounded-full text-xs font-medium 
                                     <?php echo $report['priority'] === 'high' ? 'bg-yellow-100 text-yellow-800' : 
                                            ($report['priority'] === 'critical' ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'); ?>">
                                     <?php echo ucfirst($report['priority']); ?>
                                 </span>
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap">
-                                <span class="px-3 py-1 rounded-full text-xs font-medium 
+                            <td class="px-4 py-3 whitespace-nowrap">
+                                <span class="px-2 py-1 rounded-full text-xs font-medium 
                                     <?php echo $report['needs_verification'] ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800'; ?>">
                                     <?php echo $report['needs_verification'] ? 'Needs Verify' : 'Verified'; ?>
                                 </span>
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                <?php echo date('M d, H:i', strtotime($report['created_at'])); ?>
+                            <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                                <div class="text-xs">
+                                    <?php echo date('M d', strtotime($report['created_at'])); ?>
+                                </div>
+                                <div class="text-xs text-gray-400">
+                                    <?php echo date('H:i', strtotime($report['created_at'])); ?>
+                                </div>
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                <button onclick="viewReportDetails(<?php echo $report['id']; ?>)" 
-                                        class="text-purple-600 hover:text-purple-900 mr-3 px-2 py-1 hover:bg-purple-50 rounded">
-                                    <i class="fas fa-eye"></i> View
-                                </button>
-                                <button onclick="routeReport(<?php echo $report['id']; ?>)" 
-                                        class="text-blue-600 hover:text-blue-900 px-2 py-1 hover:bg-blue-50 rounded">
-                                    <i class="fas fa-route"></i> Route
-                                </button>
+                            <td class="px-4 py-3 whitespace-nowrap text-right text-sm font-medium">
+                                <div class="flex space-x-1">
+                                    <button onclick="viewReportDetails(<?php echo $report['id']; ?>)" 
+                                            class="text-purple-600 hover:text-purple-900 px-2 py-1 hover:bg-purple-50 rounded text-xs">
+                                        <i class="fas fa-eye"></i> View
+                                    </button>
+                                    <button onclick="routeReport(<?php echo $report['id']; ?>)" 
+                                            class="text-blue-600 hover:text-blue-900 px-2 py-1 hover:bg-blue-50 rounded text-xs">
+                                        <i class="fas fa-route"></i> Route
+                                    </button>
+                                </div>
                             </td>
                         </tr>
                     <?php endforeach; ?>
@@ -277,7 +320,7 @@ $type_data = array_slice($type_data, 0, 10, true);
     <div class="bg-white rounded-xl p-6 shadow-sm">
         <div class="flex items-center justify-between mb-6">
             <h3 class="text-lg font-bold text-gray-800">Reports Analytics</h3>
-            <div class="space-x-2">
+            <div class="flex flex-wrap gap-2">
                 <select id="chartRange" class="p-2 border border-gray-300 rounded-lg text-sm">
                     <option value="daily">Daily (Last 30 days)</option>
                     <option value="weekly">Weekly</option>
@@ -291,16 +334,22 @@ $type_data = array_slice($type_data, 0, 10, true);
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div>
                 <h4 class="font-bold text-gray-700 mb-2">Daily Reports Trend</h4>
-                <canvas id="dailyReportsChart" height="200"></canvas>
+                <div class="chart-container">
+                    <canvas id="dailyReportsChart" height="200"></canvas>
+                </div>
             </div>
             <div>
                 <h4 class="font-bold text-gray-700 mb-2">Report Types Distribution</h4>
-                <canvas id="reportTypesChart" height="200"></canvas>
+                <div class="chart-container">
+                    <canvas id="reportTypesChart" height="200"></canvas>
+                </div>
             </div>
         </div>
         <div class="mt-6">
             <h4 class="font-bold text-gray-700 mb-2">Jurisdiction Distribution</h4>
-            <canvas id="jurisdictionChart" height="150"></canvas>
+            <div class="chart-container max-w-md mx-auto">
+                <canvas id="jurisdictionChart" height="200"></canvas>
+            </div>
         </div>
     </div>
     
@@ -465,6 +514,10 @@ function printReportCharts() {
                 <h3>Report Types Distribution</h3>
                 <img src="${document.getElementById('reportTypesChart').toDataURL()}" width="800" height="400">
             </div>
+            <div class="chart-container">
+                <h3>Jurisdiction Distribution</h3>
+                <img src="${document.getElementById('jurisdictionChart').toDataURL()}" width="600" height="300">
+            </div>
         </body>
         </html>
     `);
@@ -504,6 +557,7 @@ function initializeCharts() {
         },
         options: {
             responsive: true,
+            maintainAspectRatio: false,
             plugins: {
                 legend: {
                     display: false
@@ -545,35 +599,46 @@ function initializeCharts() {
         },
         options: {
             responsive: true,
+            maintainAspectRatio: false,
             plugins: {
                 legend: {
                     position: 'right',
                     labels: {
-                        boxWidth: 12
+                        boxWidth: 12,
+                        font: {
+                            size: 11
+                        }
                     }
                 }
             }
         }
     });
     
-    // Jurisdiction Chart
+    // Jurisdiction Chart - Made consistent with other charts
     const jurisdictionLabels = Object.keys(jurisdictionData);
     const jurisdictionValues = Object.values(jurisdictionData);
     
     jurisdictionChart = new Chart(jurisdictionCtx, {
-        type: 'doughnut',
+        type: 'pie',
         data: {
             labels: jurisdictionLabels,
             datasets: [{
                 data: jurisdictionValues,
-                backgroundColor: ['#10b981', '#f59e0b', '#ef4444']
+                backgroundColor: ['#10b981', '#f59e0b', '#ef4444', '#3b82f6', '#8b5cf6']
             }]
         },
         options: {
             responsive: true,
+            maintainAspectRatio: false,
             plugins: {
                 legend: {
-                    position: 'bottom'
+                    position: 'bottom',
+                    labels: {
+                        boxWidth: 12,
+                        font: {
+                            size: 11
+                        }
+                    }
                 }
             }
         }
@@ -595,6 +660,11 @@ document.addEventListener('DOMContentLoaded', function() {
         console.log('Selected range:', e.target.value);
         // For now, just reinitialize with current data
         initializeCharts();
+    });
+    
+    // Add responsive behavior to table on window resize
+    window.addEventListener('resize', function() {
+        // Charts will automatically resize due to Chart.js responsive option
     });
 });
 
