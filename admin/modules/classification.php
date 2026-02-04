@@ -132,7 +132,7 @@ $threshold = $threshold_stmt->fetchColumn() ?: 0.7;
     <!-- Incident Type Rules -->
     <div class="bg-white rounded-xl p-6 shadow-sm">
         <div class="flex items-center justify-between mb-4 gap-3">
-            <form method="GET" action="" class="flex items-center flex-1 max-w-lg" id="searchForm">
+            <form method="GET" action="" class="flex items-center flex-1 max-w-lg">
                 <input type="hidden" name="module" value="classification">
                 <div class="relative flex-1">
                     <input type="text" name="q" id="searchInput" value="<?php echo htmlspecialchars($q ?? ''); ?>" placeholder="Search type or category..." class="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"/>
@@ -400,103 +400,120 @@ document.addEventListener('DOMContentLoaded', function() {
     };
     <?php endforeach; ?>
 
+    // Store current page and search query for form preservation
+    const currentPage = <?php echo $page; ?>;
+    const currentQuery = <?php echo json_encode($q); ?>;
+
     window.showAddRuleModal = function() {
         document.getElementById('modalTitle').textContent = 'Add Classification Rule';
         document.getElementById('ruleForm').reset();
         document.getElementById('ruleId').value = '';
-        document.getElementById('category').selectedIndex = 0;
-        document.getElementById('jurisdiction').selectedIndex = 0;
+        
+        // Reset selects to default state
+        const categorySelect = document.getElementById('category');
+        const jurisdictionSelect = document.getElementById('jurisdiction');
+        if (categorySelect) categorySelect.selectedIndex = 0;
+        if (jurisdictionSelect) jurisdictionSelect.selectedIndex = 0;
+        
         document.getElementById('ruleModal').classList.remove('hidden');
         document.getElementById('ruleModal').classList.add('flex');
+        document.body.style.overflow = 'hidden'; // Prevent background scrolling
     }
 
     window.editRule = function(ruleId) {
-        console.log('Editing rule:', ruleId);
-        console.log('Rule data available:', ruleData[ruleId]);
-        
         if (ruleData[ruleId]) {
             const rule = ruleData[ruleId];
             document.getElementById('modalTitle').textContent = 'Edit Classification Rule';
             document.getElementById('ruleId').value = ruleId;
             document.getElementById('type_name').value = rule.type_name || '';
-            document.getElementById('category').value = rule.category || '';
             document.getElementById('keywords').value = rule.keywords || '';
-            document.getElementById('jurisdiction').value = rule.jurisdiction || '';
+            
+            // Set category select
+            const categorySelect = document.getElementById('category');
+            if (categorySelect) {
+                for (let i = 0; i < categorySelect.options.length; i++) {
+                    if (categorySelect.options[i].value === rule.category) {
+                        categorySelect.selectedIndex = i;
+                        break;
+                    }
+                }
+            }
+            
+            // Set jurisdiction select
+            const jurisdictionSelect = document.getElementById('jurisdiction');
+            if (jurisdictionSelect) {
+                for (let i = 0; i < jurisdictionSelect.options.length; i++) {
+                    if (jurisdictionSelect.options[i].value === rule.jurisdiction) {
+                        jurisdictionSelect.selectedIndex = i;
+                        break;
+                    }
+                }
+            }
+            
             document.getElementById('ruleModal').classList.remove('hidden');
             document.getElementById('ruleModal').classList.add('flex');
+            document.body.style.overflow = 'hidden'; // Prevent background scrolling
         } else {
             console.warn('Rule data not found for ID:', ruleId);
-            // Try to fetch via AJAX as fallback
-            fetchAjaxRuleData(ruleId);
+            alert('Error loading rule data. Please refresh the page and try again.');
         }
-    }
-
-    function fetchAjaxRuleData(ruleId) {
-        fetch(`../handlers/get_classification_rule.php?id=${ruleId}`)
-            .then(response => {
-                if (!response.ok) throw new Error('Network response was not ok');
-                return response.json();
-            })
-            .then(rule => {
-                if (rule.error) throw new Error(rule.error);
-                // Update the local cache
-                ruleData[rule.id] = rule;
-                // Open the modal with the fetched data
-                editRule(rule.id);
-            })
-            .catch(error => {
-                console.error('Error fetching rule:', error);
-                alert('Error loading rule details. Please try again.');
-            });
     }
 
     window.deleteRule = function(ruleId) {
         if (confirm('Are you sure you want to delete this classification rule?')) {
-            const form = document.createElement('form');
-            form.method = 'POST';
-            form.action = '?module=classification';
-
+            // Create a form to submit the delete request
+            const deleteForm = document.createElement('form');
+            deleteForm.method = 'POST';
+            deleteForm.action = '';
+            
+            // Add CSRF token if exists
+            const csrfToken = document.querySelector('meta[name="csrf-token"]');
+            if (csrfToken) {
+                const csrfInput = document.createElement('input');
+                csrfInput.type = 'hidden';
+                csrfInput.name = '_token';
+                csrfInput.value = csrfToken.getAttribute('content');
+                deleteForm.appendChild(csrfInput);
+            }
+            
             const deleteInput = document.createElement('input');
             deleteInput.type = 'hidden';
             deleteInput.name = 'delete_rule';
             deleteInput.value = '1';
-            form.appendChild(deleteInput);
+            deleteForm.appendChild(deleteInput);
 
             const idInput = document.createElement('input');
             idInput.type = 'hidden';
             idInput.name = 'rule_id';
             idInput.value = ruleId;
-            form.appendChild(idInput);
+            deleteForm.appendChild(idInput);
 
             // Preserve search and pagination
-            const searchParams = new URLSearchParams(window.location.search);
-            const q = searchParams.get('q');
-            const page = searchParams.get('page');
-            
-            if (q) {
+            if (currentQuery) {
                 const qInput = document.createElement('input');
                 qInput.type = 'hidden';
                 qInput.name = 'q';
-                qInput.value = q;
-                form.appendChild(qInput);
+                qInput.value = currentQuery;
+                deleteForm.appendChild(qInput);
             }
             
-            if (page) {
+            if (currentPage > 1) {
                 const pageInput = document.createElement('input');
                 pageInput.type = 'hidden';
                 pageInput.name = 'page';
-                pageInput.value = page;
-                form.appendChild(pageInput);
+                pageInput.value = currentPage;
+                deleteForm.appendChild(pageInput);
             }
 
-            document.body.appendChild(form);
-            form.submit();
+            document.body.appendChild(deleteForm);
+            deleteForm.submit();
         }
     }
 
     window.closeRuleModal = function() {
         document.getElementById('ruleModal').classList.add('hidden');
         document.getElementById('ruleModal').classList.remove('flex');
+        document.body.style.overflow = 'auto'; // Re-enable scrolling
     }
 
     // Close modal when clicking outside
@@ -506,22 +523,18 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // Remove the search form submit handler that was causing issues
-    // Let the form submit naturally
-    const searchForm = document.getElementById('searchForm');
-    if(searchForm) {
-        // No JavaScript interference - let the form submit normally
-        console.log('Search form ready for normal submission');
-    }
+    // Close modal with Escape key
+    document.addEventListener('keydown', function(event) {
+        if (event.key === 'Escape' && !document.getElementById('ruleModal').classList.contains('hidden')) {
+            closeRuleModal();
+        }
+    });
 
     // Fix form submission to preserve search parameters
     const ruleForm = document.getElementById('ruleForm');
-    if(ruleForm) {
-        ruleForm.addEventListener('submit', function(e) {
-            // The hidden inputs already handle preserving q and page
-            // Let the form submit normally
-            console.log('Rule form submitting...');
-        });
+    if (ruleForm) {
+        // The hidden inputs already handle preserving q and page
+        // Let the form submit normally
     }
 });
 </script>
