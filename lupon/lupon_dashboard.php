@@ -112,7 +112,7 @@ if ($module == 'dashboard') {
                       AND mediation_date >= CURDATE() 
                       AND status = 'scheduled'";
     $upcoming_stmt = $conn->prepare($upcoming_query);
-    $upcoming_stmt->execute([':lupon_id' => $user_id]);
+$upcoming_stmt->execute([':lupon_id' => $user_id]);
     $stats['upcoming_sessions'] = $upcoming_stmt->fetchColumn();
     
     // Mediation success rate
@@ -456,6 +456,46 @@ function getModuleSubtitle($module) {
         .status-ongoing { background: #fef3c7; color: #92400e; }
         .status-completed { background: #d1fae5; color: #065f46; }
         .status-cancelled { background: #fee2e2; color: #991b1b; }
+        
+        /* Scrollable sidebar - FIXED VERSION (same as citizen/admin) */
+        .sidebar-scroll {
+            height: calc(100vh - 220px);
+            overflow-y: auto;
+            flex: 1;
+        }
+        
+        .sidebar-scroll::-webkit-scrollbar {
+            width: 6px;
+        }
+        
+        .sidebar-scroll::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+        }
+        
+        .sidebar-scroll::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 10px;
+        }
+        
+        .sidebar-scroll::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.5);
+        }
+        
+        /* Improved sidebar layout */
+        .sidebar-container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+        
+        .sidebar-top {
+            flex-shrink: 0;
+        }
+        
+        .sidebar-bottom {
+            flex-shrink: 0;
+        }
     </style>
 </head>
 <body class="min-h-screen">
@@ -464,105 +504,115 @@ function getModuleSubtitle($module) {
     
     <!-- Desktop Sidebar -->
     <div class="sidebar w-64 min-h-screen fixed left-0 top-0 z-40 hidden md:block">
-        <div class="p-6">
-            <!-- LEIR Logo -->
-            <div class="flex items-center space-x-3 mb-8 pb-4 border-b border-green-400/30">
-                <div class="w-10 h-10 flex items-center justify-center">
-                    <img src="../images/10213.png" alt="Logo" class="w-19 h-22 object-contain">
-                </div>
-                <div>
-                    <h1 class="text-xl font-bold text-white">LEIR</h1>
-                    <p class="text-green-200 text-sm">Lupon Mediation System</p>
-                </div>
-            </div>
-            
-            <!-- User Profile -->
-            <div class="mb-8">
-                <div class="flex items-center space-x-3 p-3 bg-white/10 rounded-lg">
-                    <div class="relative">
-                        <?php 
-                        $profile_pic_path = "../uploads/profile_pictures/" . ($profile_picture ?? '');
-                        if (!empty($profile_picture) && file_exists($profile_pic_path)): 
-                        ?>
-                            <img src="<?php echo $profile_pic_path; ?>" 
-                                 alt="Profile" class="w-10 h-10 rounded-full object-cover border-2 border-white shadow-sm">
-                        <?php else: ?>
-                            <div class="w-10 h-10 rounded-full bg-gradient-to-r from-green-600 to-green-500 flex items-center justify-center text-white font-bold">
-                                <?php echo strtoupper(substr($_SESSION['first_name'], 0, 1)); ?>
-                            </div>
-                        <?php endif; ?>
-                        <div class="absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-white <?php echo $is_active ? 'bg-green-500' : 'bg-red-500'; ?>"></div>
-                    </div>
-                    <div>
-                        <p class="text-white font-medium truncate"><?php echo htmlspecialchars($user_name); ?></p>
-                        <p class="text-green-200 text-sm"><?php echo htmlspecialchars($position_name); ?></p>
-                    </div>
-                </div>
-                <div class="mt-3 ml-3">
-                    <p class="text-sm text-green-200 flex items-center">
-                        <i class="fas fa-map-marker-alt mr-2 text-xs"></i>
-                        <span class="truncate"><?php echo htmlspecialchars($user_address ?? 'Barangay Office'); ?></span>
-                    </p>
-                </div>
-            </div>
-            
-            <nav class="space-y-2">
-                <a href="?module=dashboard" class="sidebar-link block p-3 text-white rounded-lg <?php echo $module == 'dashboard' ? 'active' : ''; ?>">
-                    <i class="fas fa-tachometer-alt mr-3"></i>
-                    Mediation Dashboard
-                </a>
-                <a href="?module=case_mediation" class="sidebar-link block p-3 text-white rounded-lg <?php echo $module == 'case_mediation' ? 'active' : ''; ?>">
-                    <i class="fas fa-handshake mr-3"></i>
-                    Case Mediation Desk
-                    <?php if (isset($stats['assigned_cases']) && $stats['assigned_cases'] > 0): ?>
-                        <span class="float-right bg-red-500 text-white text-xs rounded-full w-6 h-6 flex items-center justify-center">
-                            <?php echo min($stats['assigned_cases'], 9); ?>
-                        </span>
-                    <?php endif; ?>
-                </a>
-                <a href="?module=mediation_scheduling" class="sidebar-link block p-3 text-white rounded-lg <?php echo $module == 'mediation_scheduling' ? 'active' : ''; ?>">
-                    <i class="fas fa-calendar-alt mr-3"></i>
-                    Mediation Scheduling
-                </a>
-                <a href="?module=settlement_document" class="sidebar-link block p-3 text-white rounded-lg <?php echo $module == 'settlement_document' ? 'active' : ''; ?>">
-                    <i class="fas fa-file-signature mr-3"></i>
-                    Settlement Documents
-                </a>
-                <a href="?module=progress_tracker" class="sidebar-link block p-3 text-white rounded-lg <?php echo $module == 'progress_tracker' ? 'active' : ''; ?>">
-                    <i class="fas fa-chart-line mr-3"></i>
-                    Mediation Progress
-                </a>
-            </nav>
-            
-            <!-- Status & Stats -->
-            <div class="mt-8 pt-8 border-t border-green-400/30">
-                <div class="mb-4">
-                    <div class="flex items-center p-3 rounded-lg bg-green-500/20 text-green-300">
-                        <i class="fas fa-chart-pie mr-3"></i>
-                        <div class="flex-1">
-                            <div class="text-xs">Success Rate</div>
-                            <div class="font-bold text-lg"><?php echo $stats['success_rate'] ?? 0; ?>%</div>
+        <div class="sidebar-container">
+            <div class="sidebar-top">
+                <!-- LEIR Logo -->
+                <div class="p-6 border-b border-green-400/30">
+                    <div class="flex items-center space-x-3">
+                        <div class="w-10 h-10 flex items-center justify-center">
+                            <img src="../images/10213.png" alt="Logo" class="w-19 h-22 object-contain">
+                        </div>
+                        <div>
+                            <h1 class="text-xl font-bold text-white">LEIR</h1>
+                            <p class="text-green-200 text-sm">Lupon Mediation System</p>
                         </div>
                     </div>
                 </div>
                 
-                <div class="space-y-3">
-                    <div class="flex justify-between text-sm">
-                        <span class="text-green-200">Active Cases</span>
-                        <span class="text-white font-bold"><?php echo $stats['assigned_cases'] ?? 0; ?></span>
+                <!-- User Profile -->
+                <div class="p-6 border-b border-green-400/30">
+                    <div class="flex items-center space-x-3 p-3 bg-white/10 rounded-lg">
+                        <div class="relative">
+                            <?php 
+                            $profile_pic_path = "../uploads/profile_pictures/" . ($profile_picture ?? '');
+                            if (!empty($profile_picture) && file_exists($profile_pic_path)): 
+                            ?>
+                                <img src="<?php echo $profile_pic_path; ?>" 
+                                     alt="Profile" class="w-10 h-10 rounded-full object-cover border-2 border-white shadow-sm">
+                            <?php else: ?>
+                                <div class="w-10 h-10 rounded-full bg-gradient-to-r from-green-600 to-green-500 flex items-center justify-center text-white font-bold">
+                                    <?php echo strtoupper(substr($_SESSION['first_name'], 0, 1)); ?>
+                                </div>
+                            <?php endif; ?>
+                            <div class="absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-white <?php echo $is_active ? 'bg-green-500' : 'bg-red-500'; ?>"></div>
+                        </div>
+                        <div>
+                            <p class="text-white font-medium truncate"><?php echo htmlspecialchars($user_name); ?></p>
+                            <p class="text-green-200 text-sm"><?php echo htmlspecialchars($position_name); ?></p>
+                        </div>
                     </div>
-                    <div class="flex justify-between text-sm">
-                        <span class="text-green-200">Successful (30d)</span>
-                        <span class="text-white font-bold"><?php echo $stats['successful_mediations'] ?? 0; ?></span>
-                    </div>
-                    <div class="flex justify-between text-sm">
-                        <span class="text-green-200">Upcoming</span>
-                        <span class="text-white font-bold"><?php echo $stats['upcoming_sessions'] ?? 0; ?></span>
+                    <div class="mt-3 ml-3">
+                        <p class="text-sm text-green-200 flex items-center">
+                            <i class="fas fa-map-marker-alt mr-2 text-xs"></i>
+                            <span class="truncate"><?php echo htmlspecialchars($user_address ?? 'Barangay Office'); ?></span>
+                        </p>
                     </div>
                 </div>
+            </div>
+            
+            <!-- Scrollable Navigation Area -->
+            <div class="sidebar-scroll px-4 py-2">
+                <nav class="space-y-2 mb-6">
+                    <a href="?module=dashboard" class="sidebar-link block p-3 text-white rounded-lg <?php echo $module == 'dashboard' ? 'active' : ''; ?>">
+                        <i class="fas fa-tachometer-alt mr-3"></i>
+                        Mediation Dashboard
+                    </a>
+                    <a href="?module=case_mediation" class="sidebar-link block p-3 text-white rounded-lg <?php echo $module == 'case_mediation' ? 'active' : ''; ?>">
+                        <i class="fas fa-handshake mr-3"></i>
+                        Case Mediation Desk
+                        <?php if (isset($stats['assigned_cases']) && $stats['assigned_cases'] > 0): ?>
+                            <span class="float-right bg-red-500 text-white text-xs rounded-full w-6 h-6 flex items-center justify-center">
+                                <?php echo min($stats['assigned_cases'], 9); ?>
+                            </span>
+                        <?php endif; ?>
+                    </a>
+                    <a href="?module=mediation_scheduling" class="sidebar-link block p-3 text-white rounded-lg <?php echo $module == 'mediation_scheduling' ? 'active' : ''; ?>">
+                        <i class="fas fa-calendar-alt mr-3"></i>
+                        Mediation Scheduling
+                    </a>
+                    <a href="?module=settlement_document" class="sidebar-link block p-3 text-white rounded-lg <?php echo $module == 'settlement_document' ? 'active' : ''; ?>">
+                        <i class="fas fa-file-signature mr-3"></i>
+                        Settlement Documents
+                    </a>
+                    <a href="?module=progress_tracker" class="sidebar-link block p-3 text-white rounded-lg <?php echo $module == 'progress_tracker' ? 'active' : ''; ?>">
+                        <i class="fas fa-chart-line mr-3"></i>
+                        Mediation Progress
+                    </a>
+                </nav>
                 
-                <div class="mt-6">
-                    <a href="?module=profile" class="flex items-center p-3 text-green-200 hover:text-white hover:bg-white/10 rounded-lg transition mb-2">
+                <!-- Status & Stats -->
+                <div class="mt-6 pt-6 border-t border-green-400/30 px-3">
+                    <div class="mb-4">
+                        <div class="flex items-center p-3 rounded-lg bg-green-500/20 text-green-300">
+                            <i class="fas fa-chart-pie mr-3"></i>
+                            <div class="flex-1">
+                                <div class="text-xs">Success Rate</div>
+                                <div class="font-bold text-lg"><?php echo $stats['success_rate'] ?? 0; ?>%</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="space-y-3 mb-6">
+                        <div class="flex justify-between text-sm">
+                            <span class="text-green-200">Active Cases</span>
+                            <span class="text-white font-bold"><?php echo $stats['assigned_cases'] ?? 0; ?></span>
+                        </div>
+                        <div class="flex justify-between text-sm">
+                            <span class="text-green-200">Successful (30d)</span>
+                            <span class="text-white font-bold"><?php echo $stats['successful_mediations'] ?? 0; ?></span>
+                        </div>
+                        <div class="flex justify-between text-sm">
+                            <span class="text-green-200">Upcoming</span>
+                            <span class="text-white font-bold"><?php echo $stats['upcoming_sessions'] ?? 0; ?></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Footer -->
+            <div class="sidebar-bottom p-6 border-t border-green-400/30">
+                <div class="space-y-2">
+                    <a href="?module=profile" class="flex items-center p-3 text-green-200 hover:text-white hover:bg-white/10 rounded-lg transition">
                         <i class="fas fa-user mr-3"></i>
                         Profile & Performance
                     </a>
@@ -598,8 +648,19 @@ function getModuleSubtitle($module) {
                     
                     <!-- Right: Notifications and User -->
                     <div class="flex items-center space-x-4">
-                        <!-- Notifications Component -->
-                        <?php include '../components/notification_button.php'; ?>
+                        <!-- System Status -->
+                        <div class="hidden md:flex items-center space-x-2 px-3 py-1 bg-green-50 text-green-700 rounded-full">
+                            <i class="fas fa-gavel text-sm"></i>
+                            <span class="text-sm font-medium">Mediation Active</span>
+                        </div>
+                        
+                        <!-- Notifications -->
+                        <div class="relative">
+                            <button onclick="toggleNotifications()" class="relative">
+                                <i class="fas fa-bell text-gray-600 text-xl cursor-pointer hover:text-green-600"></i>
+                                <span class="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full animate-pulse"></span>
+                            </button>
+                        </div>
                         
                         <!-- User Dropdown -->
                         <div class="relative">
@@ -706,7 +767,9 @@ function getModuleSubtitle($module) {
                 <i class="fas fa-handshake text-xl"></i>
                 <span class="text-xs mt-1">Mediate</span>
                 <?php if (isset($stats['assigned_cases']) && $stats['assigned_cases'] > 0): ?>
-                    <span class="mobile-nav-badge"><?php echo min($stats['assigned_cases'], 9); ?></span>
+                    <span class="absolute -top-1 right-2 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                        <?php echo min($stats['assigned_cases'], 9); ?>
+                    </span>
                 <?php endif; ?>
             </a>
             
@@ -727,53 +790,58 @@ function getModuleSubtitle($module) {
         </div>
     </div>
 
-    <!-- Notifications Modal -->
-    <div id="notificationsModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50 p-4">
-        <div class="bg-white rounded-2xl max-w-md w-full max-h-[80vh] overflow-hidden">
-            <div class="flex justify-between items-center p-6 border-b">
-                <h3 class="text-xl font-bold text-gray-800">Notifications</h3>
-                <button onclick="closeNotifications()" class="text-gray-400 hover:text-gray-600">
+    <!-- Notifications Panel -->
+    <div id="notificationsPanel" class="hidden fixed right-4 top-20 w-80 bg-white rounded-lg shadow-xl border z-50">
+        <div class="p-4 border-b">
+            <div class="flex justify-between items-center">
+                <h3 class="font-bold text-gray-800">Mediation Notifications</h3>
+                <button onclick="toggleNotifications()" class="text-gray-400 hover:text-gray-600">
                     <i class="fas fa-times"></i>
                 </button>
             </div>
-            <div class="p-4 overflow-y-auto max-h-[60vh]">
-                <div class="space-y-4">
-                    <?php
-                    // Fetch notifications
-                    $notif_query = "SELECT * FROM notifications 
-                                   WHERE user_id = :user_id 
-                                   ORDER BY created_at DESC 
-                                   LIMIT 10";
-                    $notif_stmt = $conn->prepare($notif_query);
-                    $notif_stmt->execute([':user_id' => $user_id]);
-                    $notifications = $notif_stmt->fetchAll(PDO::FETCH_ASSOC);
-                    
-                    if (empty($notifications)): ?>
-                        <div class="text-center py-8 text-gray-500">
-                            <i class="fas fa-bell-slash text-3xl mb-3"></i>
-                            <p>No notifications</p>
-                        </div>
-                    <?php else: 
-                        foreach ($notifications as $notif): ?>
-                        <div class="p-4 bg-gray-50 rounded-lg border border-gray-200">
-                            <div class="flex justify-between items-start mb-2">
-                                <h4 class="font-medium text-gray-800"><?php echo htmlspecialchars($notif['title']); ?></h4>
-                                <span class="text-xs text-gray-500"><?php echo date('M d, h:i A', strtotime($notif['created_at'])); ?></span>
-                            </div>
-                            <p class="text-sm text-gray-600 mb-2"><?php echo htmlspecialchars($notif['message']); ?></p>
-                            <?php if (!empty($notif['related_type'])): ?>
-                                <span class="text-xs px-2 py-1 bg-blue-100 text-blue-800 rounded"><?php echo htmlspecialchars($notif['related_type']); ?></span>
-                            <?php endif; ?>
-                        </div>
-                    <?php endforeach;
-                    endif; ?>
+        </div>
+        <div class="max-h-96 overflow-y-auto">
+            <div class="p-4 border-b hover:bg-gray-50 cursor-pointer">
+                <div class="flex items-start">
+                    <div class="bg-green-100 p-2 rounded-lg mr-3">
+                        <i class="fas fa-handshake text-green-600"></i>
+                    </div>
+                    <div class="flex-1">
+                        <p class="text-sm font-medium text-gray-800">New Mediation Case Assigned</p>
+                        <p class="text-xs text-gray-600">Case #BRG-2023-0012 has been assigned to you</p>
+                        <p class="text-xs text-gray-500 mt-1">2 hours ago</p>
+                    </div>
                 </div>
             </div>
-            <div class="p-4 border-t">
-                <button onclick="markAllAsRead()" class="w-full py-2 text-sm text-blue-600 hover:bg-blue-50 rounded-lg">
-                    Mark all as read
-                </button>
+            <div class="p-4 border-b hover:bg-gray-50 cursor-pointer">
+                <div class="flex items-start">
+                    <div class="bg-blue-100 p-2 rounded-lg mr-3">
+                        <i class="fas fa-calendar-check text-blue-600"></i>
+                    </div>
+                    <div class="flex-1">
+                        <p class="text-sm font-medium text-gray-800">Mediation Session Scheduled</p>
+                        <p class="text-xs text-gray-600">Case #BRG-2023-0010 scheduled for tomorrow</p>
+                        <p class="text-xs text-gray-500 mt-1">1 day ago</p>
+                    </div>
+                </div>
             </div>
+            <div class="p-4 border-b hover:bg-gray-50 cursor-pointer">
+                <div class="flex items-start">
+                    <div class="bg-yellow-100 p-2 rounded-lg mr-3">
+                        <i class="fas fa-clock text-yellow-600"></i>
+                    </div>
+                    <div class="flex-1">
+                        <p class="text-sm font-medium text-gray-800">Upcoming Mediation Reminder</p>
+                        <p class="text-xs text-gray-600">Case #BRG-2023-0009 mediation in 3 days</p>
+                        <p class="text-xs text-gray-500 mt-1">3 days ago</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="p-4 text-center border-t">
+            <a href="?module=case_mediation" class="text-sm text-green-600 hover:text-green-800 font-medium">
+                View All Cases
+            </a>
         </div>
     </div>
 
@@ -807,39 +875,17 @@ function getModuleSubtitle($module) {
         // Close dropdown when clicking outside
         document.addEventListener('click', function() {
             if (userDropdown) userDropdown.classList.add('hidden');
+            if (document.getElementById('notificationsPanel')) {
+                document.getElementById('notificationsPanel').classList.add('hidden');
+            }
         });
 
-        // Notifications modal
-        function showNotifications() {
-            document.getElementById('notificationsModal').classList.remove('hidden');
-            document.getElementById('notificationsModal').classList.add('flex');
+        // Notifications panel
+        function toggleNotifications() {
+            const panel = document.getElementById('notificationsPanel');
+            panel.classList.toggle('hidden');
         }
-        
-        function closeNotifications() {
-            document.getElementById('notificationsModal').classList.add('hidden');
-            document.getElementById('notificationsModal').classList.remove('flex');
-        }
-        
-        function markAllAsRead() {
-            fetch('../ajax/mark_notifications_read.php', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                },
-                body: 'user_id=<?php echo $user_id; ?>'
-            }).then(() => {
-                location.reload();
-            });
-        }
-        
-        // Close modals when clicking outside
-        window.onclick = function(event) {
-            const notifModal = document.getElementById('notificationsModal');
-            if (event.target == notifModal) {
-                closeNotifications();
-            }
-        }
-        
+
         // Auto-hide success/error messages after 5 seconds
         setTimeout(function() {
             const alerts = document.querySelectorAll('.bg-green-50, .bg-red-50');
