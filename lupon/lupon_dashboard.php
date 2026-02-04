@@ -187,15 +187,19 @@ function getModuleSubtitle($module) {
         }
         
         :root {
-            --primary-green: #e8f5e9;
-            --secondary-green: #c8e6c9;
-            --accent-green: #4caf50;
-            --dark-green: #2e7d32;
-            --light-green: #f9fff9;
+            --primary-blue: #e3f2fd;
+            --secondary-blue: #bbdefb;
+            --accent-blue: #2196f3;
+            --dark-blue: #0d47a1;
+            --light-blue: #f5fbff;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --info: #3b82f6;
         }
         
         body {
-            background: linear-gradient(135deg, #f9fff9 0%, #e8f5e9 100%);
+            background: linear-gradient(135deg, #f5fbff 0%, #e3f2fd 100%);
             min-height: 100vh;
         }
         
@@ -207,18 +211,18 @@ function getModuleSubtitle($module) {
         
         .module-card {
             transition: all 0.3s ease;
-            border-left: 4px solid var(--accent-green);
+            border-left: 4px solid var(--accent-blue);
         }
         
         .module-card:hover {
             transform: translateY(-5px);
-            box-shadow: 0 10px 25px rgba(76, 175, 80, 0.1);
-            border-left-color: var(--dark-green);
+            box-shadow: 0 10px 25px rgba(33, 150, 243, 0.1);
+            border-left-color: var(--dark-blue);
         }
         
         .stat-card {
-            background: linear-gradient(135deg, #ffffff 0%, #f0fff4 100%);
-            border: 1px solid #dcfce7;
+            background: linear-gradient(135deg, #ffffff 0%, #f0f9ff 100%);
+            border: 1px solid #e0f2fe;
         }
         
         .urgent {
@@ -237,7 +241,7 @@ function getModuleSubtitle($module) {
         }
         
         .sidebar {
-            background: linear-gradient(180deg, #1b5e20 0%, #2e7d32 100%);
+            background: linear-gradient(180deg, #1e3a8a 0%, #0d47a1 100%);
             box-shadow: 4px 0 15px rgba(0, 0, 0, 0.1);
         }
         
@@ -248,12 +252,12 @@ function getModuleSubtitle($module) {
         
         .sidebar-link:hover {
             background: rgba(255, 255, 255, 0.1);
-            border-left-color: #68d391;
+            border-left-color: #60a5fa;
         }
         
         .sidebar-link.active {
             background: rgba(255, 255, 255, 0.15);
-            border-left-color: #48bb78;
+            border-left-color: #3b82f6;
         }
         
         .case-table tr {
@@ -359,7 +363,7 @@ function getModuleSubtitle($module) {
             }
             
             .mobile-nav-active {
-                color: #4caf50;
+                color: #2196f3;
                 position: relative;
             }
             
@@ -371,7 +375,7 @@ function getModuleSubtitle($module) {
                 transform: translateX(-50%);
                 width: 6px;
                 height: 6px;
-                background: #4caf50;
+                background: #2196f3;
                 border-radius: 50%;
             }
             
@@ -416,7 +420,7 @@ function getModuleSubtitle($module) {
         
         .module-1 { background: linear-gradient(135deg, #667eea, #764ba2); color: white; }
         .module-2 { background: linear-gradient(135deg, #4299e1, #3182ce); color: white; }
-        .module-3 { background: linear-gradient(135deg, #38a169, #2f855a); color: white; }
+        .module-3 { background: linear-gradient(135deg, #2196f3, #0d47a1); color: white; }
         .module-4 { background: linear-gradient(135deg, #d69e2e, #b7791f); color: white; }
         
         /* Active status animation */
@@ -507,20 +511,20 @@ function getModuleSubtitle($module) {
         <div class="sidebar-container">
             <div class="sidebar-top">
                 <!-- LEIR Logo -->
-                <div class="p-6 border-b border-green-400/30">
+                <div class="p-6 border-b border-blue-400/30">
                     <div class="flex items-center space-x-3">
                         <div class="w-10 h-10 flex items-center justify-center">
                             <img src="../images/10213.png" alt="Logo" class="w-19 h-22 object-contain">
                         </div>
                         <div>
                             <h1 class="text-xl font-bold text-white">LEIR</h1>
-                            <p class="text-green-200 text-sm">Lupon Mediation System</p>
+                            <p class="text-blue-200 text-sm">Lupon Mediation System</p>
                         </div>
                     </div>
                 </div>
                 
                 <!-- User Profile -->
-                <div class="p-6 border-b border-green-400/30">
+                <div class="p-6 border-b border-blue-400/30">
                     <div class="flex items-center space-x-3 p-3 bg-white/10 rounded-lg">
                         <div class="relative">
                             <?php 
@@ -530,7 +534,7 @@ function getModuleSubtitle($module) {
                                 <img src="<?php echo $profile_pic_path; ?>" 
                                      alt="Profile" class="w-10 h-10 rounded-full object-cover border-2 border-white shadow-sm">
                             <?php else: ?>
-                                <div class="w-10 h-10 rounded-full bg-gradient-to-r from-green-600 to-green-500 flex items-center justify-center text-white font-bold">
+                                <div class="w-10 h-10 rounded-full bg-gradient-to-r from-blue-600 to-blue-500 flex items-center justify-center text-white font-bold">
                                     <?php echo strtoupper(substr($_SESSION['first_name'], 0, 1)); ?>
                                 </div>
                             <?php endif; ?>
@@ -538,11 +542,11 @@ function getModuleSubtitle($module) {
                         </div>
                         <div>
                             <p class="text-white font-medium truncate"><?php echo htmlspecialchars($user_name); ?></p>
-                            <p class="text-green-200 text-sm"><?php echo htmlspecialchars($position_name); ?></p>
+                            <p class="text-blue-200 text-sm"><?php echo htmlspecialchars($position_name); ?></p>
                         </div>
                     </div>
                     <div class="mt-3 ml-3">
-                        <p class="text-sm text-green-200 flex items-center">
+                        <p class="text-sm text-blue-200 flex items-center">
                             <i class="fas fa-map-marker-alt mr-2 text-xs"></i>
                             <span class="truncate"><?php echo htmlspecialchars($user_address ?? 'Barangay Office'); ?></span>
                         </p>
@@ -581,9 +585,9 @@ function getModuleSubtitle($module) {
                 </nav>
                 
                 <!-- Status & Stats -->
-                <div class="mt-6 pt-6 border-t border-green-400/30 px-3">
+                <div class="mt-6 pt-6 border-t border-blue-400/30 px-3">
                     <div class="mb-4">
-                        <div class="flex items-center p-3 rounded-lg bg-green-500/20 text-green-300">
+                        <div class="flex items-center p-3 rounded-lg bg-blue-500/20 text-blue-300">
                             <i class="fas fa-chart-pie mr-3"></i>
                             <div class="flex-1">
                                 <div class="text-xs">Success Rate</div>
@@ -594,33 +598,28 @@ function getModuleSubtitle($module) {
                     
                     <div class="space-y-3 mb-6">
                         <div class="flex justify-between text-sm">
-                            <span class="text-green-200">Active Cases</span>
+                            <span class="text-blue-200">Active Cases</span>
                             <span class="text-white font-bold"><?php echo $stats['assigned_cases'] ?? 0; ?></span>
                         </div>
                         <div class="flex justify-between text-sm">
-                            <span class="text-green-200">Successful (30d)</span>
+                            <span class="text-blue-200">Successful (30d)</span>
                             <span class="text-white font-bold"><?php echo $stats['successful_mediations'] ?? 0; ?></span>
                         </div>
                         <div class="flex justify-between text-sm">
-                            <span class="text-green-200">Upcoming</span>
+                            <span class="text-blue-200">Upcoming</span>
                             <span class="text-white font-bold"><?php echo $stats['upcoming_sessions'] ?? 0; ?></span>
                         </div>
                     </div>
                 </div>
             </div>
             
-            <!-- Footer -->
-            <div class="sidebar-bottom p-6 border-t border-green-400/30">
-                <div class="space-y-2">
-                    <a href="?module=profile" class="flex items-center p-3 text-green-200 hover:text-white hover:bg-white/10 rounded-lg transition">
-                        <i class="fas fa-user mr-3"></i>
-                        Profile & Performance
-                    </a>
-                    <a href="../logout.php" class="flex items-center p-3 text-green-200 hover:text-white hover:bg-white/10 rounded-lg transition">
-                        <i class="fas fa-sign-out-alt mr-3"></i>
-                        Logout
-                    </a>
-                </div>
+            <!-- Footer - Removed redundant Profile & Performance and Logout links -->
+            <div class="sidebar-bottom p-4 border-t border-blue-400/30 text-center">
+                <p class="text-xs text-blue-300">
+                    <i class="fas fa-gavel mr-1"></i>
+                    Mediation System
+                </p>
+                <p class="text-xs text-blue-400 mt-1">v1.0.0</p>
             </div>
         </div>
     </div>
@@ -649,7 +648,7 @@ function getModuleSubtitle($module) {
                     <!-- Right: Notifications and User -->
                     <div class="flex items-center space-x-4">
                         <!-- System Status -->
-                        <div class="hidden md:flex items-center space-x-2 px-3 py-1 bg-green-50 text-green-700 rounded-full">
+                        <div class="hidden md:flex items-center space-x-2 px-3 py-1 bg-blue-50 text-blue-700 rounded-full">
                             <i class="fas fa-gavel text-sm"></i>
                             <span class="text-sm font-medium">Mediation Active</span>
                         </div>
@@ -657,7 +656,7 @@ function getModuleSubtitle($module) {
                         <!-- Notifications -->
                         <div class="relative">
                             <button onclick="toggleNotifications()" class="relative">
-                                <i class="fas fa-bell text-gray-600 text-xl cursor-pointer hover:text-green-600"></i>
+                                <i class="fas fa-bell text-gray-600 text-xl cursor-pointer hover:text-blue-600"></i>
                                 <span class="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full animate-pulse"></span>
                             </button>
                         </div>
@@ -672,7 +671,7 @@ function getModuleSubtitle($module) {
                                     <img src="<?php echo $profile_pic_path; ?>" 
                                          alt="Profile" class="w-10 h-10 rounded-full object-cover border-2 border-white shadow-sm">
                                 <?php else: ?>
-                                    <div class="w-10 h-10 rounded-full bg-gradient-to-r from-green-600 to-green-500 flex items-center justify-center text-white font-semibold">
+                                    <div class="w-10 h-10 rounded-full bg-gradient-to-r from-blue-600 to-blue-500 flex items-center justify-center text-white font-semibold">
                                         <?php echo strtoupper(substr($_SESSION['first_name'], 0, 1)); ?>
                                     </div>
                                 <?php endif; ?>
@@ -691,7 +690,7 @@ function getModuleSubtitle($module) {
                                             <img src="<?php echo $profile_pic_path; ?>" 
                                                  alt="Profile" class="w-10 h-10 rounded-full object-cover">
                                         <?php else: ?>
-                                            <div class="w-10 h-10 rounded-full bg-gradient-to-r from-green-600 to-green-500 flex items-center justify-center text-white font-bold">
+                                            <div class="w-10 h-10 rounded-full bg-gradient-to-r from-blue-600 to-blue-500 flex items-center justify-center text-white font-bold">
                                                 <?php echo strtoupper(substr($user_name, 0, 1)); ?>
                                             </div>
                                         <?php endif; ?>
@@ -803,8 +802,8 @@ function getModuleSubtitle($module) {
         <div class="max-h-96 overflow-y-auto">
             <div class="p-4 border-b hover:bg-gray-50 cursor-pointer">
                 <div class="flex items-start">
-                    <div class="bg-green-100 p-2 rounded-lg mr-3">
-                        <i class="fas fa-handshake text-green-600"></i>
+                    <div class="bg-blue-100 p-2 rounded-lg mr-3">
+                        <i class="fas fa-handshake text-blue-600"></i>
                     </div>
                     <div class="flex-1">
                         <p class="text-sm font-medium text-gray-800">New Mediation Case Assigned</p>
@@ -839,7 +838,7 @@ function getModuleSubtitle($module) {
             </div>
         </div>
         <div class="p-4 text-center border-t">
-            <a href="?module=case_mediation" class="text-sm text-green-600 hover:text-green-800 font-medium">
+            <a href="?module=case_mediation" class="text-sm text-blue-600 hover:text-blue-800 font-medium">
                 View All Cases
             </a>
         </div>
