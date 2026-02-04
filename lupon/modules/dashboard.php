@@ -1,245 +1,292 @@
-<?php
-// lupon/modules/dashboard.php
-?>
-<div class="space-y-6">
-    <!-- Welcome Header -->
-    <div class="bg-gradient-to-r from-green-500 to-green-600 rounded-2xl p-6 text-white shadow-lg">
+<!-- Dashboard Overview -->
+<div class="space-y-8">
+    <!-- Welcome Banner -->
+    <div class="bg-gradient-to-r from-blue-600 to-blue-800 rounded-xl p-6 text-white mb-8">
         <div class="flex flex-col md:flex-row md:items-center justify-between">
             <div>
-                <h2 class="text-2xl font-bold mb-2">Welcome, <?php echo htmlspecialchars($_SESSION['first_name']); ?>!</h2>
-                <p class="opacity-90"><?php echo $position_name; ?> • Barangay Justice System</p>
-                <p class="text-sm opacity-80 mt-2">Your mediation expertise helps maintain peace and harmony in the community.</p>
+                <h1 class="text-2xl font-bold mb-2">Welcome, <?php echo htmlspecialchars($_SESSION['first_name']); ?>!</h1>
+                <p class="opacity-90">Your central hub for managing barangay cases, documents, and referrals.</p>
             </div>
             <div class="mt-4 md:mt-0">
-                <div class="flex items-center space-x-4">
-                    <div class="text-center">
-                        <div class="text-3xl font-bold"><?php echo $stats['success_rate'] ?? 0; ?>%</div>
-                        <div class="text-xs opacity-80">Success Rate</div>
+                <div class="flex items-center space-x-2 bg-white bg-opacity-20 backdrop-blur-sm rounded-lg p-3">
+                    <div class="w-10 h-10 rounded-full bg-white bg-opacity-30 flex items-center justify-center">
+                        <i class="fas fa-landmark"></i>
                     </div>
-                    <div class="text-center">
-                        <div class="text-3xl font-bold"><?php echo $stats['assigned_cases'] ?? 0; ?></div>
-                        <div class="text-xs opacity-80">Active Cases</div>
+                    <div>
+                        <p class="text-sm opacity-90">Secretary Office</p>
+                        <p class="font-semibold"><?php echo htmlspecialchars($user_address ?? 'Barangay Hall'); ?></p>
                     </div>
                 </div>
             </div>
         </div>
     </div>
-
-    <!-- Quick Stats -->
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div class="stat-card rounded-xl p-6">
-            <div class="flex items-center justify-between">
-                <div>
-                    <p class="text-sm text-gray-500">Assigned Cases</p>
-                    <p class="text-2xl font-bold text-gray-800"><?php echo $stats['assigned_cases'] ?? 0; ?></p>
-                </div>
-                <div class="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center">
-                    <i class="fas fa-gavel text-blue-600 text-xl"></i>
-                </div>
-            </div>
-            <div class="mt-4">
-                <div class="flex justify-between text-sm">
-                    <span class="text-gray-600">Require mediation</span>
-                    <span class="font-medium text-blue-600">View All →</span>
-                </div>
-            </div>
-        </div>
-
-        <div class="stat-card rounded-xl p-6">
-            <div class="flex items-center justify-between">
-                <div>
-                    <p class="text-sm text-gray-500">Successful (30d)</p>
-                    <p class="text-2xl font-bold text-gray-800"><?php echo $stats['successful_mediations'] ?? 0; ?></p>
-                </div>
-                <div class="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center">
-                    <i class="fas fa-handshake text-green-600 text-xl"></i>
-                </div>
-            </div>
-            <div class="mt-4">
-                <div class="flex justify-between text-sm">
-                    <span class="text-gray-600">Amicable settlements</span>
-                    <span class="font-medium text-green-600"><?php echo $stats['success_rate'] ?? 0; ?>% rate</span>
-                </div>
-            </div>
-        </div>
-
-        <div class="stat-card rounded-xl p-6">
-            <div class="flex items-center justify-between">
-                <div>
-                    <p class="text-sm text-gray-500">Upcoming Sessions</p>
-                    <p class="text-2xl font-bold text-gray-800"><?php echo $stats['upcoming_sessions'] ?? 0; ?></p>
-                </div>
-                <div class="w-12 h-12 rounded-full bg-yellow-100 flex items-center justify-center">
-                    <i class="fas fa-calendar-alt text-yellow-600 text-xl"></i>
-                </div>
-            </div>
-            <div class="mt-4">
-                <div class="flex justify-between text-sm">
-                    <span class="text-gray-600">Scheduled hearings</span>
-                    <a href="?module=mediation_scheduling" class="font-medium text-yellow-600">View Calendar →</a>
-                </div>
-            </div>
-        </div>
-
-        <div class="stat-card rounded-xl p-6">
-            <div class="flex items-center justify-between">
-                <div>
-                    <p class="text-sm text-gray-500">Avg. Resolution Time</p>
-                    <p class="text-2xl font-bold text-gray-800">7 days</p>
-                </div>
-                <div class="w-12 h-12 rounded-full bg-purple-100 flex items-center justify-center">
-                    <i class="fas fa-clock text-purple-600 text-xl"></i>
+    
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <!-- Left Column -->
+        <div class="space-y-8">
+            <!-- Quick Stats -->
+            <div class="glass-card rounded-xl p-6">
+                <h2 class="text-xl font-bold text-gray-800 mb-6 flex items-center">
+                    <i class="fas fa-chart-bar mr-3 text-blue-600"></i>
+                    Quick Statistics
+                </h2>
+                
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="stat-card rounded-lg p-4">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-sm text-gray-600">Pending Cases</p>
+                                <p class="text-2xl font-bold text-gray-800"><?php echo $stats['pending_cases'] ?? 0; ?></p>
+                            </div>
+                            <div class="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-clock text-blue-600 text-xl"></i>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="stat-card rounded-lg p-4">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-sm text-gray-600">Approaching Deadline</p>
+                                <p class="text-2xl font-bold text-gray-800"><?php echo $stats['approaching_deadline'] ?? 0; ?></p>
+                            </div>
+                            <div class="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-exclamation-triangle text-red-600 text-xl"></i>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="stat-card rounded-lg p-4">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-sm text-gray-600">Total Reports</p>
+                                <p class="text-2xl font-bold text-gray-800"><?php echo $stats['total_reports'] ?? 0; ?></p>
+                            </div>
+                            <div class="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-file-alt text-green-600 text-xl"></i>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="stat-card rounded-lg p-4">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-sm text-gray-600">External Referrals</p>
+                                <p class="text-2xl font-bold text-gray-800">8</p>
+                            </div>
+                            <div class="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-exchange-alt text-purple-600 text-xl"></i>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
-            <div class="mt-4">
-                <div class="flex justify-between text-sm">
-                    <span class="text-gray-600">Faster than average</span>
-                    <span class="font-medium text-purple-600">Good work!</span>
+            
+            <!-- Quick Actions -->
+            <div class="glass-card rounded-xl p-6">
+                <h2 class="text-xl font-bold text-gray-800 mb-6 flex items-center">
+                    <i class="fas fa-bolt mr-3 text-blue-600"></i>
+                    Quick Actions
+                </h2>
+                
+                <div class="grid grid-cols-2 gap-4">
+                    <a href="?module=case" class="module-card bg-white rounded-lg p-4 shadow-sm hover:shadow-md">
+                        <div class="flex items-center">
+                            <div class="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center mr-3">
+                                <i class="fas fa-gavel text-blue-600"></i>
+                            </div>
+                            <div>
+                                <p class="font-medium text-gray-800">Assign Case</p>
+                                <p class="text-sm text-gray-600">New blotter assignment</p>
+                            </div>
+                        </div>
+                    </a>
+                    
+                    <a href="?module=documents" class="module-card bg-white rounded-lg p-4 shadow-sm hover:shadow-md">
+                        <div class="flex items-center">
+                            <div class="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center mr-3">
+                                <i class="fas fa-file-contract text-green-600"></i>
+                            </div>
+                            <div>
+                                <p class="font-medium text-gray-800">Generate Document</p>
+                                <p class="text-sm text-gray-600">Legal paperwork</p>
+                            </div>
+                        </div>
+                    </a>
+                    
+                    <a href="?module=classification_review" class="module-card bg-white rounded-lg p-4 shadow-sm hover:shadow-md">
+                        <div class="flex items-center">
+                            <div class="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center mr-3">
+                                <i class="fas fa-robot text-purple-600"></i>
+                            </div>
+                            <div>
+                                <p class="font-medium text-gray-800">Classification Review</p>
+                                <p class="text-sm text-gray-600">AI verification & referral</p>
+                            </div>
+                        </div>
+                    </a>
+                    
+                    <a href="?module=compliance" class="module-card bg-white rounded-lg p-4 shadow-sm hover:shadow-md">
+                        <div class="flex items-center">
+                            <div class="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center mr-3">
+                                <i class="fas fa-clock text-orange-600"></i>
+                            </div>
+                            <div>
+                                <p class="font-medium text-gray-800">Check Deadlines</p>
+                                <p class="text-sm text-gray-600">RA 7160 compliance</p>
+                            </div>
+                        </div>
+                    </a>
                 </div>
             </div>
-        </div>
-    </div>
-
-    <!-- Recent Cases & Quick Actions -->
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <!-- Recent Assigned Cases -->
-        <div class="lg:col-span-2">
-            <div class="bg-white rounded-xl shadow-sm p-6">
-                <div class="flex justify-between items-center mb-6">
-                    <h3 class="text-lg font-bold text-gray-800">Recent Assigned Cases</h3>
-                    <a href="?module=case_mediation" class="text-sm text-blue-600 hover:text-blue-800 font-medium">View All →</a>
-                </div>
+            
+            <!-- Recent Reports -->
+            <?php if (isset($recent_reports) && count($recent_reports) > 0): ?>
+            <div class="glass-card rounded-xl p-6">
+                <h2 class="text-xl font-bold text-gray-800 mb-6 flex items-center">
+                    <i class="fas fa-file-alt mr-3 text-blue-600"></i>
+                    Recent Reports
+                </h2>
                 
                 <div class="space-y-4">
-                    <?php if (!empty($recent_cases)): ?>
-                        <?php foreach ($recent_cases as $case): ?>
-                            <div class="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50">
-                                <div class="flex items-center space-x-3">
-                                    <div class="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center">
-                                        <i class="fas fa-scale-balanced text-blue-600"></i>
-                                    </div>
-                                    <div>
-                                        <p class="font-medium text-gray-800">Case #<?php echo $case['report_number']; ?></p>
-                                        <p class="text-sm text-gray-500"><?php echo $case['type_name']; ?></p>
-                                        <p class="text-xs text-gray-400">Filed by <?php echo $case['complainant_fname'] . ' ' . $case['complainant_lname']; ?></p>
-                                    </div>
-                                </div>
-                                <div class="text-right">
-                                    <span class="status-badge status-pending">Pending</span>
-                                    <p class="text-xs text-gray-500 mt-1"><?php echo date('M d, Y', strtotime($case['case_date'])); ?></p>
-                                </div>
-                            </div>
-                        <?php endforeach; ?>
-                    <?php else: ?>
-                        <div class="text-center py-8 text-gray-500">
-                            <i class="fas fa-inbox text-3xl mb-3"></i>
-                            <p>No cases assigned yet</p>
+                    <?php foreach ($recent_reports as $report): ?>
+                    <div class="bg-white rounded-lg p-4 border border-gray-200 hover:border-blue-300 transition-colors">
+                        <div class="flex justify-between items-start mb-2">
+                            <h4 class="font-medium text-gray-800 truncate"><?php echo htmlspecialchars($report['title']); ?></h4>
+                            <span class="status-badge status-<?php echo str_replace('_', '-', $report['status']); ?>">
+                                <?php echo ucwords($report['status']); ?>
+                            </span>
                         </div>
-                    <?php endif; ?>
+                        <p class="text-sm text-gray-600 mb-2">By: <?php echo htmlspecialchars($report['first_name'] . ' ' . $report['last_name']); ?></p>
+                        <div class="flex justify-between items-center text-xs text-gray-500">
+                            <span><?php echo date('M d, Y', strtotime($report['created_at'])); ?></span>
+                            <a href="?module=case" class="text-blue-600 hover:text-blue-800">View Details →</a>
+                        </div>
+                    </div>
+                    <?php endforeach; ?>
                 </div>
             </div>
+            <?php endif; ?>
         </div>
-
-        <!-- Quick Actions -->
-        <div class="space-y-6">
-            <!-- Start New Mediation -->
-            <div class="bg-white rounded-xl shadow-sm p-6">
-                <h3 class="text-lg font-bold text-gray-800 mb-4">Quick Actions</h3>
-                <div class="space-y-3">
-                    <a href="?module=case_mediation" class="flex items-center p-3 bg-green-50 text-green-700 rounded-lg hover:bg-green-100">
-                        <i class="fas fa-handshake mr-3"></i>
-                        <span>Start New Mediation</span>
-                    </a>
-                    <a href="?module=mediation_scheduling" class="flex items-center p-3 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100">
-                        <i class="fas fa-calendar-plus mr-3"></i>
-                        <span>Schedule Hearing</span>
-                    </a>
-                    <a href="?module=settlement_document" class="flex items-center p-3 bg-purple-50 text-purple-700 rounded-lg hover:bg-purple-100">
-                        <i class="fas fa-file-contract mr-3"></i>
-                        <span>Generate Settlement</span>
-                    </a>
-                </div>
-            </div>
-
-            <!-- Performance Snapshot -->
-            <div class="bg-white rounded-xl shadow-sm p-6">
-                <h3 class="text-lg font-bold text-gray-800 mb-4">Performance Snapshot</h3>
+        
+        <!-- Right Column -->
+        <div class="space-y-8">
+            <!-- Modules Overview -->
+            <div class="glass-card rounded-xl p-6">
+                <h2 class="text-xl font-bold text-gray-800 mb-6 flex items-center">
+                    <i class="fas fa-cogs mr-3 text-blue-600"></i>
+                    Secretary Functions
+                </h2>
+                
                 <div class="space-y-4">
-                    <div>
-                        <div class="flex justify-between text-sm mb-1">
-                            <span class="text-gray-600">Mediation Success Rate</span>
-                            <span class="font-medium"><?php echo $stats['success_rate'] ?? 0; ?>%</span>
-                        </div>
-                        <div class="progress-bar">
-                            <div class="progress-fill bg-green-500" style="width: <?php echo $stats['success_rate'] ?? 0; ?>%"></div>
+                    <div class="module-card bg-white rounded-lg p-5">
+                        <div class="flex items-start">
+                            <div class="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mr-4">
+                                <i class="fas fa-gavel text-blue-600 text-lg"></i>
+                            </div>
+                            <div class="flex-1">
+                                <h3 class="font-bold text-gray-800 mb-1">Case-Blotter Management</h3>
+                                <p class="text-gray-600 text-sm mb-2">Issues formal blotter numbers, assigns cases to Lupon members, handles internal barangay matters</p>
+                                <div class="flex flex-wrap gap-2">
+                                    <span class="badge badge-pending">Official Blotter Numbers</span>
+                                    <span class="badge badge-processing">Assigned Lupon Members</span>
+                                    <span class="badge badge-resolved">Case Notes</span>
+                                </div>
+                            </div>
+                            <a href="?module=case" class="text-blue-600 hover:text-blue-800">
+                                <i class="fas fa-arrow-right"></i>
+                            </a>
                         </div>
                     </div>
-                    <div>
-                        <div class="flex justify-between text-sm mb-1">
-                            <span class="text-gray-600">Case Resolution Time</span>
-                            <span class="font-medium">7 days avg</span>
-                        </div>
-                        <div class="progress-bar">
-                            <div class="progress-fill bg-blue-500" style="width: 70%"></div>
+                    
+                    <div class="module-card bg-white rounded-lg p-5">
+                        <div class="flex items-start">
+                            <div class="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center mr-4">
+                                <i class="fas fa-clock text-orange-600 text-lg"></i>
+                            </div>
+                            <div class="flex-1">
+                                <h3 class="font-bold text-gray-800 mb-1">Compliance Monitoring</h3>
+                                <p class="text-gray-600 text-sm mb-2">Color-coded alerts for 3-day filing and 15-day resolution deadlines (RA 7160)</p>
+                                <div class="flex flex-wrap gap-2">
+                                    <span class="px-3 py-1 bg-red-100 text-red-800 rounded-full text-xs font-medium">Urgent: ≤1 day</span>
+                                    <span class="px-3 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs font-medium">Warning: 2-3 days</span>
+                                    <span class="px-3 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium">On Track: >3 days</span>
+                                </div>
+                            </div>
+                            <a href="?module=compliance" class="text-blue-600 hover:text-blue-800">
+                                <i class="fas fa-arrow-right"></i>
+                            </a>
                         </div>
                     </div>
-                    <div>
-                        <div class="flex justify-between text-sm mb-1">
-                            <span class="text-gray-600">Party Satisfaction</span>
-                            <span class="font-medium">92%</span>
+                    
+                    <div class="module-card bg-white rounded-lg p-5">
+                        <div class="flex items-start">
+                            <div class="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center mr-4">
+                                <i class="fas fa-file-pdf text-green-600 text-lg"></i>
+                            </div>
+                            <div class="flex-1">
+                                <h3 class="font-bold text-gray-800 mb-1">Document Generation</h3>
+                                <p class="text-gray-600 text-sm mb-2">Automated creation of legal paperwork with secure PDF export</p>
+                                <div class="flex flex-wrap gap-2">
+                                    <span class="badge badge-pending">Subpoena</span>
+                                    <span class="badge badge-processing">Hearing Notices</span>
+                                    <span class="badge badge-resolved">Certificates</span>
+                                    <span class="badge badge-referred">Resolutions</span>
+                                </div>
+                            </div>
+                            <a href="?module=documents" class="text-blue-600 hover:text-blue-800">
+                                <i class="fas fa-arrow-right"></i>
+                            </a>
                         </div>
-                        <div class="progress-bar">
-                            <div class="progress-fill bg-yellow-500" style="width: 92%"></div>
+                    </div>
+                    
+                    <div class="module-card bg-white rounded-lg p-5 urgent">
+                        <div class="flex items-start">
+                            <div class="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center mr-4">
+                                <i class="fas fa-shield-alt text-red-600 text-lg"></i>
+                            </div>
+                            <div class="flex-1">
+                                <h3 class="font-bold text-gray-800 mb-1">External Referral Desk</h3>
+                                <p class="text-gray-600 text-sm mb-2">Confidential protocols for VAWC/minor cases, digital handover to PNP/City Hall</p>
+                                <div class="flex flex-wrap gap-2">
+                                    <span class="badge badge-vawc">VAWC Protocol</span>
+                                    <span class="badge badge-minor">Minor Cases</span>
+                                    <span class="badge badge-referred">Digital Handover</span>
+                                </div>
+                            </div>
+                            <a href="?module=referral" class="text-blue-600 hover:text-blue-800">
+                                <i class="fas fa-arrow-right"></i>
+                            </a>
                         </div>
                     </div>
                 </div>
             </div>
-        </div>
-    </div>
-
-    <!-- Announcements -->
-    <div class="bg-white rounded-xl shadow-sm p-6">
-        <div class="flex justify-between items-center mb-6">
-            <h3 class="text-lg font-bold text-gray-800">Barangay Announcements</h3>
-            <span class="text-sm text-gray-500">Latest updates</span>
-        </div>
-        
-        <?php
-        $announce_query = "SELECT * FROM announcements 
-                          WHERE (target_role = 'lupon' OR target_role = 'all')
-                          AND is_active = 1
-                          ORDER BY created_at DESC 
-                          LIMIT 3";
-        $announce_stmt = $conn->prepare($announce_query);
-        $announce_stmt->execute();
-        $announcements = $announce_stmt->fetchAll(PDO::FETCH_ASSOC);
-        ?>
-        
-        <div class="space-y-4">
-            <?php if (!empty($announcements)): ?>
-                <?php foreach ($announcements as $announce): ?>
-                    <div class="flex items-start p-4 border border-gray-200 rounded-lg">
-                        <div class="mr-4">
-                            <div class="w-10 h-10 rounded-lg bg-<?php echo $announce['priority'] == 'high' ? 'red' : ($announce['priority'] == 'medium' ? 'yellow' : 'blue'); ?>-100 flex items-center justify-center">
-                                <i class="fas fa-<?php echo $announce['is_emergency'] ? 'exclamation-triangle' : 'bullhorn'; ?> text-<?php echo $announce['priority'] == 'high' ? 'red' : ($announce['priority'] == 'medium' ? 'yellow' : 'blue'); ?>-600"></i>
-                            </div>
-                        </div>
-                        <div class="flex-1">
-                            <h4 class="font-medium text-gray-800"><?php echo htmlspecialchars($announce['title']); ?></h4>
-                            <p class="text-sm text-gray-600 mt-1"><?php echo htmlspecialchars(substr($announce['content'], 0, 120)) . '...'; ?></p>
-                            <div class="flex items-center mt-2 text-xs text-gray-500">
-                                <span>Posted by <?php echo htmlspecialchars($announce['posted_by']); ?></span>
-                                <span class="mx-2">•</span>
-                                <span><?php echo date('M d, Y', strtotime($announce['created_at'])); ?></span>
-                            </div>
+            
+            <!-- Recent Announcements -->
+            <?php if (isset($announcements) && count($announcements) > 0): ?>
+            <div class="glass-card rounded-xl p-6">
+                <h2 class="text-xl font-bold text-gray-800 mb-6 flex items-center">
+                    <i class="fas fa-bullhorn mr-3 text-blue-600"></i>
+                    Recent Announcements
+                </h2>
+                
+                <div class="space-y-4">
+                    <?php foreach ($announcements as $announcement): ?>
+                    <div class="bg-white rounded-lg p-4 border border-gray-200 hover:bg-gray-50 transition-colors">
+                        <h4 class="font-medium text-gray-800 mb-2"><?php echo htmlspecialchars($announcement['title']); ?></h4>
+                        <p class="text-sm text-gray-600 mb-2 line-clamp-2"><?php echo htmlspecialchars(substr($announcement['content'], 0, 100)); ?>...</p>
+                        <div class="flex items-center justify-between text-xs text-gray-500">
+                            <span><?php echo date('M d, Y', strtotime($announcement['created_at'])); ?></span>
+                            <?php if ($announcement['priority'] == 'high'): ?>
+                            <span class="px-2 py-1 bg-red-100 text-red-600 rounded-full text-xs font-medium">
+                                <i class="fas fa-exclamation-triangle mr-1"></i> Important
+                            </span>
+                            <?php endif; ?>
                         </div>
                     </div>
-                <?php endforeach; ?>
-            <?php else: ?>
-                <div class="text-center py-8 text-gray-500">
-                    <i class="fas fa-bullhorn text-3xl mb-3"></i>
-                    <p>No announcements</p>
+                    <?php endforeach; ?>
                 </div>
+            </div>
             <?php endif; ?>
         </div>
     </div>
