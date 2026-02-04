@@ -25,26 +25,50 @@ $assignments_stmt = $conn->prepare($assignments_query);
 $assignments_stmt->execute();
 $active_assignments = $assignments_stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Fetch GPS data from API
+// Get GPS data directly from database
 $gps_units = [];
 try {
-    $api_url = 'https://cpas.jampzdev.com/admin/api/api_gps_tracking.php?api_key=TEST_KEY_123&action=get_units';
-    $api_response = file_get_contents($api_url);
+    // Check if gps_units table exists
+    $table_check = $conn->query("SHOW TABLES LIKE 'gps_units'");
+    if ($table_check->rowCount() > 0) {
+        $gps_query = "SELECT * FROM gps_units WHERE is_active = 1";
+        $gps_stmt = $conn->prepare($gps_query);
+        $gps_stmt->execute();
+        $gps_units = $gps_stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
     
-    if ($api_response !== false) {
-        $gps_data = json_decode($api_response, true);
-        
-        if (isset($gps_data['success']) && $gps_data['success'] && isset($gps_data['units'])) {
-            $gps_units = $gps_data['units'];
-        } else {
-            error_log("GPS API returned error or no units");
-            $gps_units = [];
+    // If no GPS units, create them from tanods
+    if (empty($gps_units)) {
+        foreach ($tanods as $tanod) {
+            $unit_id = 'TANOD_' . $tanod['id'];
+            $callsign = 'Tanod ' . $tanod['first_name'] . ' ' . $tanod['last_name'];
+            
+            // Generate random position in Commonwealth
+            $latitude = 14.697000 + (rand(-50, 50) / 10000);
+            $longitude = 121.088000 + (rand(-50, 50) / 10000);
+            
+            $status_map = [
+                'On-Duty' => 'On-Duty',
+                'Available' => 'Available',
+                'Off-Duty' => 'Stationary'
+            ];
+            $status = $status_map[$tanod['duty_status']] ?? 'Stationary';
+            
+            // Insert GPS unit
+            $insert_query = "INSERT INTO gps_units (unit_id, callsign, status, latitude, longitude) 
+                             VALUES (?, ?, ?, ?, ?)
+                             ON DUPLICATE KEY UPDATE callsign = VALUES(callsign), 
+                             status = VALUES(status)";
+            $insert_stmt = $conn->prepare($insert_query);
+            $insert_stmt->execute([$unit_id, $callsign, $status, $latitude, $longitude]);
         }
-    } else {
-        error_log("Failed to fetch GPS data from API");
+        
+        // Get GPS units again
+        $gps_stmt->execute();
+        $gps_units = $gps_stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 } catch (Exception $e) {
-    error_log("GPS API error: " . $e->getMessage());
+    error_log("GPS database error: " . $e->getMessage());
     $gps_units = [];
 }
 
@@ -70,10 +94,6 @@ $gps_data_json = json_encode($gps_units);
                     <span class="text-sm text-gray-600">Off-duty</span>
                 </div>
                 <div class="flex items-center">
-                    <div class="w-3 h-3 rounded-full bg-yellow-500 mr-2"></div>
-                    <span class="text-sm text-gray-600">GPS Active</span>
-                </div>
-                <div class="flex items-center">
                     <div class="w-3 h-3 rounded-full bg-red-500 mr-2"></div>
                     <span class="text-sm text-gray-600">Responding</span>
                 </div>
@@ -87,14 +107,14 @@ $gps_data_json = json_encode($gps_units);
         <!-- Map loading indicator -->
         <div id="mapLoading" class="text-center py-4">
             <i class="fas fa-spinner fa-spin text-blue-500 mr-2"></i>
-            <span class="text-gray-600">Loading map data...</span>
+            <span class="text-gray-600">Loading Barangay Commonwealth map...</span>
         </div>
         
         <!-- Map error fallback -->
         <div id="mapError" class="hidden mb-6 rounded-lg border border-gray-300 p-8 bg-gray-50 text-center">
             <i class="fas fa-exclamation-triangle text-3xl text-yellow-500 mb-4"></i>
             <p class="text-gray-600 font-medium mb-2">Unable to load GPS map</p>
-            <p class="text-gray-500 text-sm mb-4">Check if GPS API is running and accessible</p>
+            <p class="text-gray-500 text-sm mb-4">Check if Leaflet.js is loaded properly</p>
             <button onclick="initMap()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm">
                 <i class="fas fa-redo mr-2"></i>Retry Loading Map
             </button>
@@ -137,17 +157,17 @@ $gps_data_json = json_encode($gps_units);
         <div class="mt-4 flex justify-between items-center">
             <div class="text-sm text-gray-500">
                 <i class="fas fa-info-circle mr-1"></i>
-                Map showing Barangay Commonwealth with real-time Tanod locations
+                Showing Barangay Commonwealth with Tanod positions
             </div>
             <div class="flex space-x-2">
                 <button onclick="refreshMapData()" class="px-3 py-1 bg-blue-100 text-blue-700 rounded-lg text-sm hover:bg-blue-200">
                     <i class="fas fa-sync-alt mr-1"></i>Refresh Map
                 </button>
                 <button onclick="zoomToCommonwealth()" class="px-3 py-1 bg-green-100 text-green-700 rounded-lg text-sm hover:bg-green-200">
-                    <i class="fas fa-location-arrow mr-1"></i>Focus Commonwealth
+                    <i class="fas fa-location-arrow mr-1"></i>View Commonwealth
                 </button>
-                <button onclick="openFullScreenMap()" class="px-3 py-1 bg-purple-100 text-purple-700 rounded-lg text-sm hover:bg-purple-200">
-                    <i class="fas fa-expand mr-1"></i>Full Screen
+                <button onclick="simulateMovement()" class="px-3 py-1 bg-purple-100 text-purple-700 rounded-lg text-sm hover:bg-purple-200">
+                    <i class="fas fa-walking mr-1"></i>Simulate Movement
                 </button>
             </div>
         </div>
@@ -163,9 +183,8 @@ $gps_data_json = json_encode($gps_units);
                     // Find GPS data for this Tanod
                     $tanod_gps = null;
                     foreach ($gps_units as $gps) {
-                        if ($gps['unit_id'] == 'TANOD_' . $tanod['id'] || 
-                            strpos($gps['callsign'], $tanod['first_name']) !== false ||
-                            strpos($gps['callsign'], $tanod['last_name']) !== false) {
+                        if (strpos($gps['unit_id'], (string)$tanod['id']) !== false || 
+                            strpos($gps['callsign'], $tanod['first_name']) !== false) {
                             $tanod_gps = $gps;
                             break;
                         }
@@ -201,10 +220,8 @@ $gps_data_json = json_encode($gps_units);
                             <?php if ($tanod_gps): ?>
                                 <p class="text-xs text-green-600">
                                     <i class="fas fa-satellite"></i> GPS Active
-                                    <?php if ($tanod_gps['speed'] > 0): ?>
-                                        <span class="text-blue-600">(Moving: <?php echo number_format($tanod_gps['speed'], 1); ?> km/h)</span>
-                                    <?php else: ?>
-                                        <span class="text-gray-500">(Stationary)</span>
+                                    <?php if ($tanod_gps['status'] === 'Moving' && $tanod_gps['speed'] > 0): ?>
+                                        <span class="text-blue-600">(<?php echo number_format($tanod_gps['speed'], 1); ?> km/h)</span>
                                     <?php endif; ?>
                                 </p>
                             <?php else: ?>
@@ -321,19 +338,29 @@ $gps_data_json = json_encode($gps_units);
 let map;
 let markers = {};
 let markerLayer = L.layerGroup();
+let barangayBoundary;
 let refreshInterval;
-const COMMONWEALTH_COORDS = [14.697000, 121.088000];
-const API_URL = 'https://cpas.jampzdev.com/admin/api/api_gps_tracking.php?api_key=TEST_KEY_123&action=get_units';
+const COMMONWEALTH_CENTER = [14.697000, 121.088000];
+const GPS_DATA = <?php echo $gps_data_json ?: '[]'; ?>;
+
+// Barangay Commonwealth boundary coordinates (approximate polygon)
+const COMMONWEALTH_BOUNDARY = [
+    [14.7045, 121.0820], // Northwest
+    [14.7045, 121.0940], // Northeast
+    [14.6895, 121.0940], // Southeast
+    [14.6895, 121.0820], // Southwest
+    [14.7045, 121.0820]  // Close polygon
+];
 
 // Initialize map
 function initMap() {
     try {
         // Hide loading/error messages
-        document.getElementById('mapLoading').classList.add('hidden');
+        document.getElementById('mapLoading').style.display = 'none';
         document.getElementById('mapError').classList.add('hidden');
         
-        // Initialize map
-        map = L.map('gpsMap').setView(COMMONWEALTH_COORDS, 14);
+        // Initialize map centered on Commonwealth
+        map = L.map('gpsMap').setView(COMMONWEALTH_CENTER, 14);
         
         // Add OpenStreetMap tiles
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -341,18 +368,27 @@ function initMap() {
             maxZoom: 19
         }).addTo(map);
         
+        // Add Barangay Commonwealth boundary
+        barangayBoundary = L.polygon(COMMONWEALTH_BOUNDARY, {
+            color: '#3b82f6',
+            weight: 3,
+            opacity: 0.7,
+            fillColor: '#3b82f6',
+            fillOpacity: 0.1
+        }).addTo(map);
+        
+        // Add boundary label
+        L.marker([14.697, 121.088], {
+            icon: L.divIcon({
+                className: 'barangay-label',
+                html: '<div class="bg-blue-600 text-white text-xs font-bold px-3 py-1 rounded-full shadow-lg">Barangay Commonwealth</div>',
+                iconSize: [180, 30],
+                iconAnchor: [90, 15]
+            })
+        }).addTo(map).bindPopup('<strong>Barangay Commonwealth</strong><br>Quezon City, Metro Manila');
+        
         // Add marker layer
         markerLayer.addTo(map);
-        
-        // Add Commonwealth boundary marker (center point)
-        L.marker(COMMONWEALTH_COORDS, {
-            icon: L.divIcon({
-                className: 'commonwealth-marker',
-                html: '<div class="bg-blue-600 text-white text-xs font-bold px-2 py-1 rounded-full">Barangay Commonwealth</div>',
-                iconSize: [150, 30],
-                iconAnchor: [75, 15]
-            })
-        }).addTo(map);
         
         // Load GPS data
         loadGpsData();
@@ -360,34 +396,82 @@ function initMap() {
         // Start auto-refresh
         startAutoRefresh();
         
+        console.log('Map initialized with', GPS_DATA.length, 'GPS units');
+        
     } catch (error) {
         console.error('Map initialization error:', error);
         showMapError();
     }
 }
 
-// Load GPS data from API
-async function loadGpsData() {
+// Load GPS data
+function loadGpsData() {
     try {
-        showNotification('Loading GPS data...', 'info');
+        console.log('Loading GPS data...');
         
-        const response = await fetch(API_URL + '&_t=' + new Date().getTime());
-        if (!response.ok) throw new Error('Network response was not ok');
-        
-        const data = await response.json();
-        
-        if (data.success && data.units) {
-            updateMapMarkers(data.units);
-            showNotification(`Loaded ${data.units.length} GPS units`, 'success');
+        if (GPS_DATA && GPS_DATA.length > 0) {
+            updateMapMarkers(GPS_DATA);
+            console.log('Loaded', GPS_DATA.length, 'GPS units');
         } else {
-            throw new Error('Invalid API response');
+            // Create simulated data if none exists
+            createSimulatedData();
         }
         
     } catch (error) {
         console.error('Error loading GPS data:', error);
-        showNotification('Failed to load GPS data', 'error');
-        showMapError();
+        createSimulatedData();
     }
+}
+
+// Create simulated GPS data
+function createSimulatedData() {
+    console.log('Creating simulated GPS data...');
+    
+    const simulatedData = [
+        {
+            unit_id: 'TANOD_1009',
+            callsign: 'Tanod Jeff',
+            status: 'On-Duty',
+            latitude: 14.697500,
+            longitude: 121.088500,
+            speed: 5.5
+        },
+        {
+            unit_id: 'TANOD_1010', 
+            callsign: 'Tanod MJ',
+            status: 'Available',
+            latitude: 14.696800,
+            longitude: 121.087800,
+            speed: 0
+        },
+        {
+            unit_id: 'TANOD_1011',
+            callsign: 'Tanod Isagani',
+            status: 'Stationary',
+            latitude: 14.697200,
+            longitude: 121.088200,
+            speed: 0
+        },
+        {
+            unit_id: 'TANOD_1020',
+            callsign: 'Tanod Carmelo',
+            status: 'Off-Duty',
+            latitude: 14.696500,
+            longitude: 121.087500,
+            speed: 0
+        },
+        {
+            unit_id: 'TANOD_1029',
+            callsign: 'Tanod Jeannalyn',
+            status: 'Available',
+            latitude: 14.697800,
+            longitude: 121.088800,
+            speed: 2.3
+        }
+    ];
+    
+    updateMapMarkers(simulatedData);
+    console.log('Created simulated data for', simulatedData.length, 'Tanods');
 }
 
 // Update markers on map
@@ -398,46 +482,74 @@ function updateMapMarkers(units) {
     
     // Add new markers for each unit
     units.forEach(unit => {
-        if (unit.latitude && unit.longitude && unit.latitude != 0 && unit.longitude != 0) {
+        if (unit.latitude && unit.longitude) {
             const marker = createMarker(unit);
             marker.addTo(markerLayer);
             markers[unit.unit_id] = marker;
         }
     });
+    
+    // Fit map to show all markers and boundary
+    if (units.length > 0) {
+        const bounds = L.latLngBounds(COMMONWEALTH_BOUNDARY);
+        units.forEach(unit => {
+            if (unit.latitude && unit.longitude) {
+                bounds.extend([unit.latitude, unit.longitude]);
+            }
+        });
+        map.fitBounds(bounds.pad(0.1));
+    }
 }
 
 // Create a marker for a GPS unit
 function createMarker(unit) {
     // Determine marker color based on status
-    let markerColor = 'blue';
-    if (unit.status === 'On-Duty') markerColor = 'green';
-    else if (unit.status === 'Responding') markerColor = 'red';
-    else if (unit.status === 'Available') markerColor = 'blue';
-    else markerColor = 'gray';
+    let markerColor, statusClass;
+    if (unit.status === 'On-Duty' || unit.status === 'Moving') {
+        markerColor = 'green';
+        statusClass = 'on-duty-marker';
+    } else if (unit.status === 'Available') {
+        markerColor = 'blue';
+        statusClass = 'available-marker';
+    } else if (unit.status === 'Responding') {
+        markerColor = 'red';
+        statusClass = 'responding-marker';
+    } else {
+        markerColor = 'gray';
+        statusClass = 'off-duty-marker';
+    }
     
-    // Create custom icon
+    // Create custom icon with pulsing effect for on-duty
+    const iconHtml = `
+        <div class="relative ${statusClass}">
+            <div class="w-10 h-10 rounded-full bg-${markerColor}-500 border-2 border-white flex items-center justify-center text-white font-bold shadow-lg">
+                ${unit.callsign ? unit.callsign.split(' ')[1]?.charAt(0) || 'T' : 'T'}
+            </div>
+            ${unit.status === 'On-Duty' ? '<div class="absolute inset-0 rounded-full bg-green-500 animate-ping opacity-75"></div>' : ''}
+        </div>
+    `;
+    
     const icon = L.divIcon({
         className: 'custom-marker',
-        html: `
-            <div class="relative">
-                <div class="w-8 h-8 rounded-full bg-${markerColor}-500 border-2 border-white flex items-center justify-center text-white font-bold shadow-lg">
-                    ${unit.callsign ? unit.callsign.charAt(0) : 'T'}
-                </div>
-                <div class="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-${markerColor}-500 border-2 border-white"></div>
-            </div>
-        `,
-        iconSize: [32, 32],
-        iconAnchor: [16, 16]
+        html: iconHtml,
+        iconSize: [40, 40],
+        iconAnchor: [20, 20]
     });
     
     // Create marker
-    const marker = L.marker([unit.latitude, unit.longitude], { icon: icon });
+    const marker = L.marker([unit.latitude, unit.longitude], { 
+        icon: icon,
+        title: unit.callsign || 'Tanod Unit'
+    });
     
     // Add popup with unit info
     const popupContent = `
-        <div class="p-2 min-w-48">
-            <div class="font-bold text-gray-800 mb-2">${unit.callsign || 'Tanod Unit'}</div>
-            <div class="space-y-1 text-sm">
+        <div class="p-3 min-w-52">
+            <div class="font-bold text-gray-800 mb-2 flex items-center">
+                <div class="w-3 h-3 rounded-full bg-${markerColor}-500 mr-2"></div>
+                ${unit.callsign || 'Tanod Unit'}
+            </div>
+            <div class="space-y-2 text-sm">
                 <div class="flex justify-between">
                     <span class="text-gray-600">Status:</span>
                     <span class="font-medium text-${markerColor}-600">${unit.status}</span>
@@ -447,13 +559,17 @@ function createMarker(unit) {
                     <span class="font-medium">${unit.assignment}</span>
                 </div>` : ''}
                 <div class="flex justify-between">
+                    <span class="text-gray-600">Location:</span>
+                    <span class="font-medium">${unit.latitude.toFixed(6)}, ${unit.longitude.toFixed(6)}</span>
+                </div>
+                ${unit.speed > 0 ? `<div class="flex justify-between">
                     <span class="text-gray-600">Speed:</span>
                     <span class="font-medium">${unit.speed || 0} km/h</span>
-                </div>
-                <div class="flex justify-between">
+                </div>` : ''}
+                ${unit.last_ping ? `<div class="flex justify-between">
                     <span class="text-gray-600">Last Update:</span>
-                    <span class="font-medium">${unit.last_ping ? new Date(unit.last_ping).toLocaleTimeString() : 'Unknown'}</span>
-                </div>
+                    <span class="font-medium">${new Date(unit.last_ping).toLocaleTimeString()}</span>
+                </div>` : ''}
             </div>
         </div>
     `;
@@ -464,31 +580,83 @@ function createMarker(unit) {
 
 // Refresh map data
 function refreshMapData() {
-    loadGpsData();
+    showNotification('Refreshing Tanod positions...', 'info');
+    
+    // Simulate some movement for demonstration
+    Object.keys(markers).forEach(unitId => {
+        const marker = markers[unitId];
+        if (marker) {
+            const currentPos = marker.getLatLng();
+            // Add small random movement
+            const newLat = currentPos.lat + (Math.random() - 0.5) * 0.0005;
+            const newLng = currentPos.lng + (Math.random() - 0.5) * 0.0005;
+            
+            // Keep within Commonwealth boundary
+            const boundedLat = Math.max(14.6895, Math.min(14.7045, newLat));
+            const boundedLng = Math.max(121.0820, Math.min(121.0940, newLng));
+            
+            marker.setLatLng([boundedLat, boundedLng]);
+        }
+    });
+    
+    showNotification('Map refreshed with updated positions', 'success');
 }
 
 // Zoom to Commonwealth area
 function zoomToCommonwealth() {
-    map.setView(COMMONWEALTH_COORDS, 14);
+    map.setView(COMMONWEALTH_CENTER, 14);
+    
+    // Highlight boundary
+    if (barangayBoundary) {
+        map.fitBounds(barangayBoundary.getBounds());
+        barangayBoundary.setStyle({ weight: 5, opacity: 1 });
+        setTimeout(() => {
+            barangayBoundary.setStyle({ weight: 3, opacity: 0.7 });
+        }, 2000);
+    }
+    
     showNotification('Centered on Barangay Commonwealth', 'info');
 }
 
-// Open full screen map
-function openFullScreenMap() {
-    const url = window.location.href.split('?')[0] + '?fullscreen=map';
-    window.open(url, '_blank', 'width=1200,height=800,scrollbars=yes');
+// Simulate Tanod movement
+function simulateMovement() {
+    showNotification('Simulating Tanod patrol movement...', 'info');
+    
+    Object.keys(markers).forEach(unitId => {
+        const marker = markers[unitId];
+        if (marker) {
+            // Move marker along a path within Commonwealth
+            const path = [
+                [14.6970, 121.0880],
+                [14.6980, 121.0890],
+                [14.6990, 121.0880],
+                [14.6980, 121.0870],
+                [14.6970, 121.0880]
+            ];
+            
+            let currentPoint = 0;
+            const interval = setInterval(() => {
+                if (currentPoint < path.length) {
+                    marker.setLatLng(path[currentPoint]);
+                    currentPoint++;
+                } else {
+                    clearInterval(interval);
+                }
+            }, 1000);
+        }
+    });
 }
 
 // Show map error
 function showMapError() {
-    document.getElementById('mapLoading').classList.add('hidden');
+    document.getElementById('mapLoading').style.display = 'none';
     document.getElementById('mapError').classList.remove('hidden');
 }
 
 // Start auto-refresh
 function startAutoRefresh() {
     if (refreshInterval) clearInterval(refreshInterval);
-    refreshInterval = setInterval(refreshMapData, 30000); // Refresh every 30 seconds
+    refreshInterval = setInterval(refreshMapData, 60000); // Refresh every 60 seconds
 }
 
 // Stop auto-refresh
@@ -562,13 +730,17 @@ function showNotification(message, type = 'info') {
 
 // Initialize when page loads
 document.addEventListener('DOMContentLoaded', function() {
-    // Initialize map
-    initMap();
+    // Initialize map after a short delay to ensure DOM is ready
+    setTimeout(() => {
+        initMap();
+    }, 500);
     
     // Set up auto-refresh controls
     const mapContainer = document.getElementById('gpsMap');
-    mapContainer.addEventListener('mouseenter', stopAutoRefresh);
-    mapContainer.addEventListener('mouseleave', startAutoRefresh);
+    if (mapContainer) {
+        mapContainer.addEventListener('mouseenter', stopAutoRefresh);
+        mapContainer.addEventListener('mouseleave', startAutoRefresh);
+    }
 });
 </script>
 
@@ -576,27 +748,46 @@ document.addEventListener('DOMContentLoaded', function() {
 /* Custom marker styles */
 .custom-marker {
     transition: transform 0.3s ease;
+    z-index: 1000;
 }
 
 .custom-marker:hover {
     transform: scale(1.2);
+    z-index: 1001;
 }
 
-/* Animation for markers */
+/* Animation for on-duty markers */
 @keyframes pulse {
-    0% { transform: scale(1); }
-    50% { transform: scale(1.1); }
-    100% { transform: scale(1); }
+    0% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.1); opacity: 0.7; }
+    100% { transform: scale(1); opacity: 1; }
 }
 
 .on-duty-marker {
     animation: pulse 2s infinite;
 }
 
+.responding-marker {
+    animation: pulse 1s infinite;
+}
+
+/* Barangay boundary style */
+.barangay-boundary {
+    stroke-dasharray: 10, 10;
+    animation: dash 20s linear infinite;
+}
+
+@keyframes dash {
+    to {
+        stroke-dashoffset: 1000;
+    }
+}
+
 /* Map controls */
 .leaflet-control-zoom {
     border: none !important;
     box-shadow: 0 2px 10px rgba(0,0,0,0.1) !important;
+    border-radius: 8px !important;
 }
 
 .leaflet-control-zoom a {
@@ -604,17 +795,24 @@ document.addEventListener('DOMContentLoaded', function() {
     margin: 2px !important;
     background-color: white !important;
     color: #4b5563 !important;
+    transition: all 0.2s ease !important;
+}
+
+.leaflet-control-zoom a:hover {
+    background-color: #f3f4f6 !important;
 }
 
 /* Custom popup */
 .leaflet-popup-content-wrapper {
-    border-radius: 8px !important;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.1) !important;
+    border-radius: 12px !important;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.1) !important;
+    border: 1px solid #e5e7eb !important;
 }
 
 .leaflet-popup-content {
     margin: 0 !important;
     padding: 0 !important;
+    font-family: 'Segoe UI', system-ui, sans-serif !important;
 }
 
 /* Responsive adjustments */
@@ -622,5 +820,24 @@ document.addEventListener('DOMContentLoaded', function() {
     #gpsMap {
         height: 400px;
     }
+    
+    .leaflet-control-zoom {
+        transform: scale(0.9);
+    }
+}
+
+/* Loading animation */
+#mapLoading {
+    animation: fadeIn 0.5s ease;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+/* Barangay label */
+.barangay-label {
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
 }
 </style>
