@@ -7,16 +7,15 @@ $filter_type = $_GET['type'] ?? 'all';
 $filter_date_from = $_GET['date_from'] ?? date('Y-m-01');
 $filter_date_to = $_GET['date_to'] ?? date('Y-m-d');
 
-// Build query with filters (FIXED: removed hearing_cases reference)
+// Replace lines 9-16 in your query with this:
 $cases_query = "SELECT r.*, rt.type_name as incident_type,
                        CONCAT(u.first_name, ' ', u.last_name) as complainant_name,
                        CONCAT(ut.first_name, ' ', ut.last_name) as tanod_name,
-                       c.complainant_contact
+                       u.contact_number as complainant_contact  -- Changed this line
                 FROM reports r
                 LEFT JOIN report_types rt ON r.report_type_id = rt.id
                 LEFT JOIN users u ON r.user_id = u.id
                 LEFT JOIN users ut ON r.assigned_tanod = ut.id
-                LEFT JOIN complainants c ON r.complainant_id = c.id
                 WHERE r.status != 'draft' 
                 AND r.status != 'pending_field_verification'";
 
