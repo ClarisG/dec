@@ -1,25 +1,7 @@
 <!-- Dashboard Overview -->
 <div class="space-y-8">
     <!-- Welcome Banner -->
-    <div class="bg-gradient-to-r from-blue-600 to-blue-800 rounded-xl p-6 text-white mb-8">
-        <div class="flex flex-col md:flex-row md:items-center justify-between">
-            <div>
-                <h1 class="text-2xl font-bold mb-2">Welcome, <?php echo htmlspecialchars($_SESSION['first_name']); ?>!</h1>
-                <p class="opacity-90">Your central hub for managing barangay cases, documents, and referrals.</p>
-            </div>
-            <div class="mt-4 md:mt-0">
-                <div class="flex items-center space-x-2 bg-white bg-opacity-20 backdrop-blur-sm rounded-lg p-3">
-                    <div class="w-10 h-10 rounded-full bg-white bg-opacity-30 flex items-center justify-center">
-                        <i class="fas fa-landmark"></i>
-                    </div>
-                    <div>
-                        <p class="text-sm opacity-90">Secretary Office</p>
-                        <p class="font-semibold"><?php echo htmlspecialchars($user_address ?? 'Barangay Hall'); ?></p>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
+    
     
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
         <!-- Left Column -->
