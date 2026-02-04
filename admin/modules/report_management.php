@@ -17,17 +17,48 @@ $reports_stmt->execute();
 $raw_reports = $reports_stmt->fetchAll(PDO::FETCH_ASSOC);
 
 // Get routing log
-$routing_log_query = "SELECT rl.*, u1.first_name as from_user, u2.first_name as to_user, 
-                             r.report_number
-                      FROM report_routing_logs rl
-                      LEFT JOIN users u1 ON rl.routed_by = u1.id
-                      LEFT JOIN users u2 ON rl.routed_to = u2.id
-                      LEFT JOIN reports r ON rl.report_id = r.id
-                      ORDER BY rl.routed_at DESC 
-                      LIMIT 20";
-$routing_log_stmt = $conn->prepare($routing_log_query);
-$routing_log_stmt->execute();
-$routing_logs = $routing_log_stmt->fetchAll(PDO::FETCH_ASSOC);
+try {
+    $routing_log_query = "SELECT rl.*, u1.first_name as from_user, u2.first_name as to_user, 
+                                 r.report_number
+                          FROM report_routing_logs rl
+                          LEFT JOIN users u1 ON rl.routed_by = u1.id
+                          LEFT JOIN users u2 ON rl.routed_to = u2.id
+                          LEFT JOIN reports r ON rl.report_id = r.id
+                          ORDER BY rl.routed_at DESC 
+                          LIMIT 20";
+    $routing_log_stmt = $conn->prepare($routing_log_query);
+    $routing_log_stmt->execute();
+    $routing_logs = $routing_log_stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+    // Debug: Check if we got results
+    if (empty($routing_logs)) {
+        error_log("Routing logs query executed but returned empty results");
+    }
+} catch (PDOException $e) {
+    // Log the detailed error
+    error_log("Routing log query failed: " . $e->getMessage());
+    
+    // Try a simpler query to debug
+    try {
+        $simple_query = "SELECT COUNT(*) as count FROM report_routing_logs";
+        $simple_stmt = $conn->prepare($simple_query);
+        $simple_stmt->execute();
+        $count = $simple_stmt->fetch(PDO::FETCH_ASSOC);
+        error_log("Table exists with " . $count['count'] . " records");
+        
+        // Try to get table structure
+        $structure_query = "SHOW COLUMNS FROM report_routing_logs";
+        $structure_stmt = $conn->prepare($structure_query);
+        $structure_stmt->execute();
+        $columns = $structure_stmt->fetchAll(PDO::FETCH_ASSOC);
+        error_log("Table columns: " . print_r($columns, true));
+    } catch (PDOException $e2) {
+        error_log("Even simple query failed: " . $e2->getMessage());
+    }
+    
+    // Set empty array to prevent fatal error
+    $routing_logs = [];
+}
 
 // Get user roles for routing
 $roles_query = "SELECT id, first_name, last_name, role FROM users 
