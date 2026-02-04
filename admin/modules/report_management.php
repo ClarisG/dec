@@ -70,7 +70,7 @@ $available_users = $roles_stmt->fetchAll(PDO::FETCH_ASSOC);
 
 // Get statistics for charts
 $chart_stats_query = "SELECT 
-    DATE(created_at) as report_date,
+    DATE(r.created_at) as report_date,
     COUNT(*) as count,
     rp.type_name,
     rp.jurisdiction
