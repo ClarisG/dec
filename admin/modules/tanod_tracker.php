@@ -4,7 +4,7 @@
 // Get active Tanods with their status
 $tanods_query = "SELECT u.id, u.first_name, u.last_name, u.contact_number,
                         ts.status as duty_status, ts.last_updated,
-                        td.clock_in, td.clock_out, td.location_lat, td.location_lng
+                        td.clock_in, td.clock_out
                  FROM users u
                  LEFT JOIN tanod_status ts ON u.id = ts.user_id
                  LEFT JOIN tanod_duty_logs td ON u.id = td.user_id AND DATE(td.clock_in) = CURDATE()
@@ -24,6 +24,45 @@ $assignments_query = "SELECT r.*, u.first_name, u.last_name
 $assignments_stmt = $conn->prepare($assignments_query);
 $assignments_stmt->execute();
 $active_assignments = $assignments_stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Fetch GPS data from API
+$gps_data = [];
+try {
+    $api_url = 'https://cpas.jampzdev.com/admin/api/gps_data.php?api_key=TEST_KEY_123';
+    $api_response = file_get_contents($api_url);
+    
+    if ($api_response !== false) {
+        $gps_data = json_decode($api_response, true);
+        
+        // If the API returns an error or empty data
+        if (json_last_error() !== JSON_ERROR_NONE || !is_array($gps_data)) {
+            $gps_data = [];
+            error_log("GPS API returned invalid JSON or empty data");
+        }
+    } else {
+        error_log("Failed to fetch GPS data from API");
+    }
+} catch (Exception $e) {
+    error_log("GPS API error: " . $e->getMessage());
+    $gps_data = [];
+}
+
+// Merge GPS data with tanod information
+foreach ($tanods as &$tanod) {
+    $tanod['location_lat'] = null;
+    $tanod['location_lng'] = null;
+    $tanod['last_gps_update'] = null;
+    
+    // Find matching GPS data for this tanod
+    foreach ($gps_data as $gps) {
+        if (isset($gps['user_id']) && $gps['user_id'] == $tanod['id']) {
+            $tanod['location_lat'] = $gps['latitude'] ?? null;
+            $tanod['location_lng'] = $gps['longitude'] ?? null;
+            $tanod['last_gps_update'] = $gps['timestamp'] ?? null;
+            break;
+        }
+    }
+}
 
 // Barangay Commonwealth boundary coordinates (approximate polygon)
 $barangay_boundary = [
@@ -101,12 +140,16 @@ $key_locations = [
                     <div class="w-3 h-3 rounded-full bg-purple-500 mr-2"></div>
                     <span class="text-sm text-gray-600">Key Locations</span>
                 </div>
+                <div class="flex items-center">
+                    <div class="w-3 h-3 rounded-full bg-yellow-500 mr-2"></div>
+                    <span class="text-sm text-gray-600">No GPS Signal</span>
+                </div>
             </div>
         </div>
         
         <div id="tanodMap" style="height: 500px; width: 100%;" class="mb-6 rounded-lg border border-gray-300"></div>
         
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
             <div class="text-center p-4 bg-green-50 rounded-lg">
                 <p class="text-sm text-gray-600 mb-1">On Patrol</p>
                 <p class="text-2xl font-bold text-gray-800">
@@ -129,6 +172,12 @@ $key_locations = [
                 <p class="text-sm text-gray-600 mb-1">Assigned Incidents</p>
                 <p class="text-2xl font-bold text-gray-800">
                     <?php echo count($active_assignments); ?>
+                </p>
+            </div>
+            <div class="text-center p-4 bg-yellow-50 rounded-lg">
+                <p class="text-sm text-gray-600 mb-1">GPS Active</p>
+                <p class="text-2xl font-bold text-gray-800">
+                    <?php echo count(array_filter($tanods, fn($t) => $t['location_lat'] && $t['location_lng'])); ?>
                 </p>
             </div>
         </div>
@@ -170,7 +219,14 @@ $key_locations = [
                             <?php endif; ?>
                             <?php if ($tanod['location_lat'] && $tanod['location_lng']): ?>
                                 <p class="text-xs text-green-600">
-                                    <i class="fas fa-satellite"></i> Live Location
+                                    <i class="fas fa-satellite"></i> Live GPS
+                                    <?php if ($tanod['last_gps_update']): ?>
+                                        <span class="text-gray-500">(<?php echo date('H:i', strtotime($tanod['last_gps_update'])); ?>)</span>
+                                    <?php endif; ?>
+                                </p>
+                            <?php else: ?>
+                                <p class="text-xs text-yellow-600">
+                                    <i class="fas fa-satellite"></i> No GPS Signal
                                 </p>
                             <?php endif; ?>
                         </div>
@@ -371,7 +427,7 @@ function initTanodMap() {
             `);
     <?php endforeach; ?>
     
-    // Add Tanod markers from database
+    // Add Tanod markers from API GPS data
     <?php foreach($tanods as $tanod): ?>
         <?php if ($tanod['location_lat'] && $tanod['location_lng']): ?>
             const tanodIcon<?php echo $tanod['id']; ?> = L.divIcon({
@@ -411,6 +467,12 @@ function initTanodMap() {
                             <p class="text-sm">
                                 <span class="font-medium">On Duty Since:</span> 
                                 <span class="text-gray-600"><?php echo date('H:i', strtotime($tanod['clock_in'])); ?></span>
+                            </p>
+                        <?php endif; ?>
+                        <?php if ($tanod['last_gps_update']): ?>
+                            <p class="text-sm">
+                                <span class="font-medium">GPS Updated:</span> 
+                                <span class="text-gray-600"><?php echo date('H:i', strtotime($tanod['last_gps_update'])); ?></span>
                             </p>
                         <?php endif; ?>
                     </div>
@@ -458,12 +520,53 @@ document.addEventListener('DOMContentLoaded', function() {
     setTimeout(initTanodMap, 100);
 });
 
-// Auto-refresh every 30 seconds
-setInterval(() => {
-    // Refresh the page to get updated locations
-    // In production, you would use AJAX to update markers only
-    console.log('Auto-refresh at: ' + new Date().toLocaleTimeString());
-}, 30000);
+// Function to fetch updated GPS data and refresh map
+function refreshGPSTracker() {
+    fetch('https://cpas.jampzdev.com/admin/api/gps_data.php?api_key=TEST_KEY_123')
+        .then(response => response.json())
+        .then(gpsData => {
+            console.log('GPS data refreshed at:', new Date().toLocaleTimeString());
+            // In a real implementation, you would update the map markers here
+            // For now, we'll just log the data
+            console.log('GPS Data:', gpsData);
+            
+            // Show notification if GPS data was updated
+            if (Array.isArray(gpsData) && gpsData.length > 0) {
+                showNotification('GPS locations updated', 'success');
+            }
+        })
+        .catch(error => {
+            console.error('Error fetching GPS data:', error);
+            showNotification('Failed to update GPS data', 'error');
+        });
+}
+
+// Auto-refresh GPS data every 30 seconds
+setInterval(refreshGPSTracker, 30000);
+
+// Function to show notifications
+function showNotification(message, type = 'info') {
+    // Create notification element
+    const notification = document.createElement('div');
+    notification.className = `fixed top-4 right-4 z-50 p-4 rounded-lg shadow-lg text-white ${
+        type === 'success' ? 'bg-green-500' : 
+        type === 'error' ? 'bg-red-500' : 'bg-blue-500'
+    }`;
+    notification.innerHTML = `
+        <div class="flex items-center">
+            <i class="fas fa-${type === 'success' ? 'check-circle' : type === 'error' ? 'exclamation-circle' : 'info-circle'} mr-2"></i>
+            <span>${message}</span>
+        </div>
+    `;
+    
+    // Add to document
+    document.body.appendChild(notification);
+    
+    // Remove after 3 seconds
+    setTimeout(() => {
+        notification.remove();
+    }, 3000);
+}
 </script>
 
 <style>
