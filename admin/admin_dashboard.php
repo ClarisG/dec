@@ -3,7 +3,6 @@
 session_start();
 require_once __DIR__ . '/../config/database.php';
 
-
 // Check if user is logged in and is admin
 if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'admin') {
     header("Location: ../login.php");
@@ -191,7 +190,7 @@ $main_modules = [
     ['id' => 'patrol_scheduling', 'name' => 'Patrol Scheduling', 'icon' => 'fa-route', 'color' => 'module-4'],
     ['id' => 'report_management', 'name' => 'Report Management', 'icon' => 'fa-inbox', 'color' => 'module-5'],
     ['id' => 'evidence_tracking', 'name' => 'Evidence Tracking', 'icon' => 'fa-boxes', 'color' => 'module-6'],
-    ['id' => 'profile', 'name' => 'Profile Settings', 'icon' => 'fa-user-cog', 'color' => 'module-purple'],
+    ['id' => 'profile', 'name' => 'Profile Settings', 'icon' => 'fa-user-cog', 'color' => 'module-blue'],
 ];
 ?>
 <!DOCTYPE html>
@@ -213,15 +212,19 @@ $main_modules = [
         }
         
         :root {
-            --primary-purple: #f3e8ff;
-            --secondary-purple: #e9d5ff;
-            --accent-purple: #8b5cf6;
-            --dark-purple: #6d28d9;
-            --light-purple: #faf5ff;
+            --primary-blue: #e3f2fd;
+            --secondary-blue: #bbdefb;
+            --accent-blue: #2196f3;
+            --dark-blue: #0d47a1;
+            --light-blue: #f5fbff;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --info: #3b82f6;
         }
         
         body {
-            background: linear-gradient(135deg, #faf5ff 0%, #f3e8ff 100%);
+            background: linear-gradient(135deg, #f5fbff 0%, #e3f2fd 100%);
             min-height: 100vh;
         }
         
@@ -233,19 +236,21 @@ $main_modules = [
         
         .module-card {
             transition: all 0.3s ease;
-            border-left: 4px solid var(--accent-purple);
+            border-left: 4px solid var(--accent-blue);
         }
-        .module-purple { background: linear-gradient(135deg, #8b5cf6, #7c3aed); color: white; 
+        .module-blue { 
+            background: linear-gradient(135deg, #2196f3, #0d47a1); 
+            color: white; 
         }
         .module-card:hover {
             transform: translateY(-5px);
-            box-shadow: 0 10px 25px rgba(139, 92, 246, 0.1);
-            border-left-color: var(--dark-purple);
+            box-shadow: 0 10px 25px rgba(33, 150, 243, 0.1);
+            border-left-color: var(--dark-blue);
         }
         
         .stat-card {
-            background: linear-gradient(135deg, #ffffff 0%, #f8f0ff 100%);
-            border: 1px solid #f3e8ff;
+            background: linear-gradient(135deg, #ffffff 0%, #f0f9ff 100%);
+            border: 1px solid #e0f2fe;
         }
         
         .urgent {
@@ -269,7 +274,7 @@ $main_modules = [
         }
         
         .sidebar {
-            background: linear-gradient(180deg, #4c1d95 0%, #5b21b6 100%);
+            background: linear-gradient(180deg, #1e3a8a 0%, #0d47a1 100%);
             box-shadow: 4px 0 15px rgba(0, 0, 0, 0.1);
         }
         
@@ -280,12 +285,12 @@ $main_modules = [
         
         .sidebar-link:hover {
             background: rgba(255, 255, 255, 0.1);
-            border-left-color: #a78bfa;
+            border-left-color: #60a5fa;
         }
         
         .sidebar-link.active {
             background: rgba(255, 255, 255, 0.15);
-            border-left-color: #8b5cf6;
+            border-left-color: #3b82f6;
         }
         
         .case-table tr {
@@ -304,8 +309,8 @@ $main_modules = [
         }
         
         .badge-admin {
-            background-color: #ede9fe;
-            color: #6d28d9;
+            background-color: #dbeafe;
+            color: #1e40af;
         }
         
         .badge-system {
@@ -324,8 +329,8 @@ $main_modules = [
         }
         
         .badge-integration {
-            background-color: #f3e8ff;
-            color: #5b21b6;
+            background-color: #e0f2fe;
+            color: #0c4a6e;
         }
         
         .animate-pulse {
@@ -397,7 +402,7 @@ $main_modules = [
             }
             
             .mobile-nav-active {
-                color: #8b5cf6;
+                color: #2196f3;
                 position: relative;
             }
             
@@ -409,7 +414,7 @@ $main_modules = [
                 transform: translateX(-50%);
                 width: 6px;
                 height: 6px;
-                background: #8b5cf6;
+                background: #2196f3;
                 border-radius: 50%;
             }
         }
@@ -436,12 +441,12 @@ $main_modules = [
             margin-bottom: 15px;
         }
         
-        .module-1 { background: linear-gradient(135deg, #8b5cf6, #7c3aed); color: white; }
-        .module-2 { background: linear-gradient(135deg, #3b82f6, #2563eb); color: white; }
-        .module-3 { background: linear-gradient(135deg, #10b981, #059669); color: white; }
+        .module-1 { background: linear-gradient(135deg, #2196f3, #0d47a1); color: white; }
+        .module-2 { background: linear-gradient(135deg, #3b82f6, #1d4ed8); color: white; }
+        .module-3 { background: linear-gradient(135deg, #10b981, #047857); color: white; }
         .module-4 { background: linear-gradient(135deg, #f59e0b, #d97706); color: white; }
-        .module-5 { background: linear-gradient(135deg, #8b5cf6, #7c3aed); color: white; }
-        .module-6 { background: linear-gradient(135deg, #3b82f6, #2563eb); color: white; }
+        .module-5 { background: linear-gradient(135deg, #2196f3, #0d47a1); color: white; }
+        .module-6 { background: linear-gradient(135deg, #3b82f6, #1d4ed8); color: white; }
         
         /* Active status animation */
         .active-status {
@@ -466,6 +471,7 @@ $main_modules = [
             height: 100%;
             border-radius: 4px;
             transition: width 0.5s ease;
+            background: linear-gradient(90deg, #2196f3, #0d47a1);
         }
         
         /* Map container */
@@ -482,8 +488,8 @@ $main_modules = [
         }
         
         .config-card:hover {
-            border-color: #8b5cf6;
-            box-shadow: 0 4px 12px rgba(139, 92, 246, 0.1);
+            border-color: #2196f3;
+            box-shadow: 0 4px 12px rgba(33, 150, 243, 0.1);
         }
         
         /* System health indicators */
@@ -502,15 +508,15 @@ $main_modules = [
         /* Keyword tags */
         .keyword-tag {
             display: inline-block;
-            background: #ede9fe;
-            color: #6d28d9;
+            background: #dbeafe;
+            color: #1e40af;
             padding: 2px 8px;
             border-radius: 4px;
             font-size: 0.75rem;
             margin: 2px;
         }
         
-        /* Scrollable sidebar - FIXED VERSION */
+        /* Scrollable sidebar - FIXED VERSION (keeping the same as before) */
         .sidebar-scroll {
             height: calc(100vh - 180px);
             overflow-y: auto;
@@ -566,14 +572,14 @@ $main_modules = [
     <div class="sidebar w-64 min-h-screen fixed left-0 top-0 z-40 hidden md:block">
         <div class="sidebar-container">
             <div class="sidebar-top p-6">
-                <!-- LEIR Logo -->
-                <div class="flex items-center space-x-3 mb-8 pb-4 border-b border-purple-400/30">
+                <!-- LEIR Logo with white shadow -->
+                <div class="flex items-center space-x-3 mb-8 pb-4 border-b border-blue-400/30">
                     <div class="w-10 h-10 flex items-center justify-center">
-                        <img src="../images/10213.png" alt="Logo" class="w-19 h-22 object-contain">
+                        <img src="../images/10213.png" alt="Logo" class="w-19 h-22 object-contain drop-shadow-[0_0_15px_rgba(255,255,255,0.9)] drop-shadow-[0_0_30px_rgba(255,255,255,0.7)] drop-shadow-[0_0_60px_rgba(255,255,255,0.5)] transition-filter duration-300">
                     </div>
                     <div>
                         <h1 class="text-xl font-bold text-white">LEIR</h1>
-                        <p class="text-purple-200 text-sm">Admin System</p>
+                        <p class="text-blue-200 text-sm">Admin System</p>
                     </div>
                 </div>
                 
@@ -588,7 +594,7 @@ $main_modules = [
                                 <img src="<?php echo $profile_pic_path; ?>" 
                                      alt="Profile" class="w-10 h-10 rounded-full object-cover border-2 border-white shadow-sm">
                             <?php else: ?>
-                                <div class="w-10 h-10 rounded-full bg-gradient-to-r from-purple-600 to-purple-500 flex items-center justify-center text-white font-bold">
+                                <div class="w-10 h-10 rounded-full bg-gradient-to-r from-blue-600 to-blue-500 flex items-center justify-center text-white font-bold">
                                     <?php echo strtoupper(substr($_SESSION['first_name'], 0, 1)); ?>
                                 </div>
                             <?php endif; ?>
@@ -596,11 +602,11 @@ $main_modules = [
                         </div>
                         <div>
                             <p class="text-white font-medium truncate"><?php echo htmlspecialchars($user_name); ?></p>
-                            <p class="text-purple-200 text-sm">System Administrator</p>
+                            <p class="text-blue-200 text-sm">System Administrator</p>
                         </div>
                     </div>
                     <div class="mt-3 ml-3">
-                        <p class="text-sm text-purple-200 flex items-center">
+                        <p class="text-sm text-blue-200 flex items-center">
                             <i class="fas fa-shield-alt mr-2 text-xs"></i>
                             <span class="truncate">Master Auditor Access</span>
                         </p>
@@ -612,7 +618,7 @@ $main_modules = [
             <div class="sidebar-scroll px-6 pb-4 module-navigation">
                 <!-- Main Navigation -->
                 <div class="mb-6">
-                    <p class="text-xs text-purple-300 uppercase tracking-wider mb-3">MAIN</p>
+                    <p class="text-xs text-blue-300 uppercase tracking-wider mb-3">MAIN</p>
                     <nav class="space-y-2 mb-8">
                         <a href="?module=dashboard" class="sidebar-link block p-3 text-white rounded-lg <?php echo $module == 'dashboard' ? 'active' : ''; ?>">
                             <i class="fas fa-tachometer-alt mr-3"></i>
@@ -621,7 +627,7 @@ $main_modules = [
                         
                     </nav>
                     
-                    <p class="text-xs text-purple-300 uppercase tracking-wider mb-3">SYSTEM MODULES</p>
+                    <p class="text-xs text-blue-300 uppercase tracking-wider mb-3">SYSTEM MODULES</p>
                     <nav class="space-y-2">
                         <!-- Reordered modules as requested -->
                         <a href="?module=classification" class="sidebar-link block p-3 text-white rounded-lg <?php echo $module == 'classification' ? 'active' : ''; ?>">
@@ -691,7 +697,7 @@ $main_modules = [
                         <!-- Notifications -->
                         <div class="relative">
                             <button onclick="toggleNotifications()" class="relative">
-                                <i class="fas fa-bell text-gray-600 text-xl cursor-pointer hover:text-purple-600"></i>
+                                <i class="fas fa-bell text-gray-600 text-xl cursor-pointer hover:text-blue-600"></i>
                                 <span class="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full animate-pulse"></span>
                             </button>
                         </div>
@@ -706,7 +712,7 @@ $main_modules = [
                                     <img src="<?php echo $profile_pic_path; ?>" 
                                          alt="Profile" class="w-10 h-10 rounded-full object-cover border-2 border-white shadow-sm">
                                 <?php else: ?>
-                                    <div class="w-10 h-10 rounded-full bg-gradient-to-r from-purple-600 to-purple-500 flex items-center justify-center text-white font-semibold">
+                                    <div class="w-10 h-10 rounded-full bg-gradient-to-r from-blue-600 to-blue-500 flex items-center justify-center text-white font-semibold">
                                         <?php echo strtoupper(substr($_SESSION['first_name'], 0, 1)); ?>
                                     </div>
                                 <?php endif; ?>
@@ -725,7 +731,7 @@ $main_modules = [
                                             <img src="<?php echo $profile_pic_path; ?>" 
                                                  alt="Profile" class="w-10 h-10 rounded-full object-cover">
                                         <?php else: ?>
-                                            <div class="w-10 h-10 rounded-full bg-gradient-to-r from-purple-600 to-purple-500 flex items-center justify-center text-white font-bold">
+                                            <div class="w-10 h-10 rounded-full bg-gradient-to-r from-blue-600 to-blue-500 flex items-center justify-center text-white font-bold">
                                                 <?php echo strtoupper(substr($user_name, 0, 1)); ?>
                                             </div>
                                         <?php endif; ?>
@@ -788,7 +794,7 @@ $main_modules = [
                         <?php echo getModuleSubtitle($mod['id']); ?>
                     </p>
                     <div class="mt-4 flex justify-end">
-                        <span class="text-purple-600 font-medium flex items-center">
+                        <span class="text-blue-600 font-medium flex items-center">
                             Access Module <i class="fas fa-arrow-right ml-2"></i>
                         </span>
                     </div>
@@ -919,7 +925,7 @@ $main_modules = [
             </div>
         </div>
         <div class="p-4 text-center border-t">
-            <a href="?module=report_management" class="text-sm text-purple-600 hover:text-purple-800 font-medium">
+            <a href="?module=report_management" class="text-sm text-blue-600 hover:text-blue-800 font-medium">
                 View All Reports
             </a>
         </div>
@@ -1012,7 +1018,7 @@ $main_modules = [
                 ];
                 
                 L.polyline(patrolRoute, {
-                    color: '#8b5cf6',
+                    color: '#2196f3',
                     weight: 3,
                     opacity: 0.7,
                     dashArray: '5, 10'
@@ -1098,7 +1104,7 @@ $main_modules = [
                                         </span>
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                        <button onclick="editRule(${rule.id})" class="text-purple-600 hover:text-purple-900 mr-3">
+                                        <button onclick="editRule(${rule.id})" class="text-blue-600 hover:text-blue-900 mr-3">
                                             <i class="fas fa-edit"></i>
                                         </button>
                                         <button onclick="deleteRule(${rule.id})" class="text-red-600 hover:text-red-900">
