@@ -25,7 +25,7 @@ $assignments_stmt = $conn->prepare($assignments_query);
 $assignments_stmt->execute();
 $active_assignments = $assignments_stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Fetch GPS data from API
+// Fetch GPS data from API (for stats only, since map is embedded)
 $gps_data = [];
 try {
     $api_url = 'https://cpas.jampzdev.com/admin/api/gps_data.php?api_key=TEST_KEY_123';
@@ -47,7 +47,7 @@ try {
     $gps_data = [];
 }
 
-// Merge GPS data with tanod information
+// Merge GPS data with tanod information for stats display
 foreach ($tanods as &$tanod) {
     $tanod['location_lat'] = null;
     $tanod['location_lng'] = null;
@@ -63,60 +63,6 @@ foreach ($tanods as &$tanod) {
         }
     }
 }
-
-// Barangay Commonwealth boundary coordinates (approximate polygon)
-$barangay_boundary = [
-    [14.6990, 121.0750], // Northwest corner
-    [14.6995, 121.0790], 
-    [14.6970, 121.0830],
-    [14.6935, 121.0860], // Northeast corner
-    [14.6900, 121.0850],
-    [14.6870, 121.0820],
-    [14.6860, 121.0780], // Southeast corner
-    [14.6880, 121.0740],
-    [14.6920, 121.0720], // Southwest corner
-    [14.6960, 121.0730],
-    [14.6990, 121.0750]  // Closing point
-];
-
-// Key locations within Barangay Commonwealth
-$key_locations = [
-    [
-        'name' => 'Barangay Hall',
-        'lat' => 14.6955,
-        'lng' => 121.0795,
-        'type' => 'government',
-        'address' => 'Commonwealth Ave, Brgy. Commonwealth, Quezon City'
-    ],
-    [
-        'name' => 'Commonwealth Market',
-        'lat' => 14.6930,
-        'lng' => 121.0805,
-        'type' => 'commercial',
-        'address' => 'Market Drive, Brgy. Commonwealth'
-    ],
-    [
-        'name' => 'Commonwealth Elementary School',
-        'lat' => 14.6970,
-        'lng' => 121.0765,
-        'type' => 'school',
-        'address' => 'Don Mariano Marcos Ave, Commonwealth'
-    ],
-    [
-        'name' => 'QC Police Station 6',
-        'lat' => 14.6915,
-        'lng' => 121.0775,
-        'type' => 'police',
-        'address' => 'Commonwealth Ave cor. Luzon Ave'
-    ],
-    [
-        'name' => 'Commonwealth Health Center',
-        'lat' => 14.6940,
-        'lng' => 121.0820,
-        'type' => 'hospital',
-        'address' => 'Health Center Road, Commonwealth'
-    ]
-];
 ?>
 <div class="space-y-6">
     <!-- Real-time Map View -->
@@ -137,17 +83,37 @@ $key_locations = [
                     <span class="text-sm text-gray-600">Off-duty</span>
                 </div>
                 <div class="flex items-center">
-                    <div class="w-3 h-3 rounded-full bg-purple-500 mr-2"></div>
-                    <span class="text-sm text-gray-600">Key Locations</span>
-                </div>
-                <div class="flex items-center">
                     <div class="w-3 h-3 rounded-full bg-yellow-500 mr-2"></div>
-                    <span class="text-sm text-gray-600">No GPS Signal</span>
+                    <span class="text-sm text-gray-600">GPS Active</span>
                 </div>
             </div>
         </div>
         
-        <div id="tanodMap" style="height: 500px; width: 100%;" class="mb-6 rounded-lg border border-gray-300"></div>
+        <!-- EMBED DIRECT GPS DATA API IN IFRAME -->
+        <iframe 
+            id="gpsMapFrame"
+            src="https://cpas.jampzdev.com/admin/api/gps_data.php?api_key=TEST_KEY_123" 
+            style="height: 500px; width: 100%; border: 1px solid #e5e7eb;" 
+            class="mb-6 rounded-lg"
+            title="Tanod GPS Tracker Map"
+            frameborder="0"
+            scrolling="no"
+            onload="resizeIframe(this)"
+        ></iframe>
+        
+        <!-- Alternative if the API doesn't load properly -->
+        <div id="mapFallback" class="hidden mb-6 rounded-lg border border-gray-300" style="height: 500px; width: 100%;">
+            <div class="h-full w-full flex flex-col items-center justify-center bg-gray-100">
+                <i class="fas fa-map-marked-alt text-4xl text-gray-400 mb-4"></i>
+                <p class="text-gray-600 font-medium mb-2">Unable to load GPS map</p>
+                <p class="text-gray-500 text-sm mb-4">The GPS data API is not displaying properly</p>
+                <a href="https://cpas.jampzdev.com/admin/api/gps_data.php?api_key=TEST_KEY_123" 
+                   target="_blank" 
+                   class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm">
+                   <i class="fas fa-external-link-alt mr-2"></i>Open GPS Data in New Tab
+                </a>
+            </div>
+        </div>
         
         <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
             <div class="text-center p-4 bg-green-50 rounded-lg">
@@ -179,6 +145,22 @@ $key_locations = [
                 <p class="text-2xl font-bold text-gray-800">
                     <?php echo count(array_filter($tanods, fn($t) => $t['location_lat'] && $t['location_lng'])); ?>
                 </p>
+            </div>
+        </div>
+        
+        <!-- Refresh Controls -->
+        <div class="mt-4 flex justify-between items-center">
+            <div class="text-sm text-gray-500">
+                <i class="fas fa-info-circle mr-1"></i>
+                Map data loaded from: https://cpas.jampzdev.com/admin/api/gps_data.php
+            </div>
+            <div class="flex space-x-2">
+                <button onclick="refreshMap()" class="px-3 py-1 bg-blue-100 text-blue-700 rounded-lg text-sm hover:bg-blue-200">
+                    <i class="fas fa-sync-alt mr-1"></i>Refresh Map
+                </button>
+                <button onclick="openMapInNewTab()" class="px-3 py-1 bg-gray-100 text-gray-700 rounded-lg text-sm hover:bg-gray-200">
+                    <i class="fas fa-external-link-alt mr-1"></i>Open Full Screen
+                </button>
             </div>
         </div>
     </div>
@@ -329,9 +311,6 @@ $key_locations = [
     </div>
 </div>
 
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-
 <script>
 function assignQuickIncident() {
     const reportId = document.getElementById('quickIncident').value;
@@ -369,180 +348,64 @@ function assignQuickIncident() {
     });
 }
 
-// Initialize map with Philippines and Barangay Commonwealth focus
-function initTanodMap() {
-    // Center on Barangay Commonwealth, Quezon City
-    const map = L.map('tanodMap', {
-        center: [14.6945, 121.0790],
-        zoom: 15,
-        minZoom: 12,
-        maxZoom: 18
-    });
-    
-    // Use OpenStreetMap tiles
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '© OpenStreetMap contributors | Barangay Commonwealth, Quezon City',
-        maxZoom: 19
-    }).addTo(map);
-    
-    // Draw Barangay Commonwealth boundary with highlighted border
-    const barangayBoundary = L.polygon(<?php echo json_encode($barangay_boundary); ?>, {
-        color: '#dc2626',
-        weight: 4,
-        opacity: 1,
-        fillColor: '#1d4ed8',
-        fillOpacity: 0.1
-    }).addTo(map);
-    
-    // Add highlight for the outer line
-    const barangayOuterLine = L.polyline(<?php echo json_encode($barangay_boundary); ?>, {
-        color: '#ef4444',
-        weight: 8,
-        opacity: 0.3,
-        fill: false
-    }).addTo(map);
-    
-    // Add label for Barangay Commonwealth
-    L.marker([14.6945, 121.0790]).addTo(map)
-        .bindPopup(`
-            <div class="p-2">
-                <h3 class="font-bold text-lg text-blue-700">Barangay Commonwealth</h3>
-                <p class="text-sm">Quezon City, Metro Manila, Philippines</p>
-                <p class="text-xs text-gray-600">Area: ~5.3 sq km | Population: ~200,000</p>
-            </div>
-        `);
-    
-    // Add key locations markers
-    <?php foreach($key_locations as $location): ?>
-        L.marker([<?php echo $location['lat']; ?>, <?php echo $location['lng']; ?>])
-            .addTo(map)
-            .bindPopup(`
-                <div class="p-2">
-                    <h4 class="font-bold text-purple-700"><?php echo $location['name']; ?></h4>
-                    <p class="text-sm text-gray-600"><?php echo $location['address']; ?></p>
-                    <p class="text-xs text-gray-500 mt-1">
-                        <i class="fas fa-tag mr-1"></i><?php echo ucfirst($location['type']); ?> Location
-                    </p>
-                </div>
-            `);
-    <?php endforeach; ?>
-    
-    // Add Tanod markers from API GPS data
-    <?php foreach($tanods as $tanod): ?>
-        <?php if ($tanod['location_lat'] && $tanod['location_lng']): ?>
-            const tanodIcon<?php echo $tanod['id']; ?> = L.divIcon({
-                html: `<div class="bg-<?php echo $tanod['duty_status'] === "On-Duty" ? "green" : 
-                                          ($tanod['duty_status'] === "Available" ? "blue" : "gray"); ?>-500 
-                              w-8 h-8 rounded-full border-2 border-white shadow-lg flex items-center justify-center">
-                         <i class="fas fa-shield-alt text-white text-xs"></i>
-                       </div>`,
-                className: 'custom-div-icon',
-                iconSize: [32, 32],
-                iconAnchor: [16, 16]
-            });
-            
-            L.marker([<?php echo $tanod['location_lat']; ?>, <?php echo $tanod['location_lng']; ?>], { 
-                icon: tanodIcon<?php echo $tanod['id']; ?>
-            }).addTo(map)
-              .bindPopup(`
-                <div class="p-3">
-                    <div class="flex items-center space-x-3 mb-2">
-                        <div class="w-10 h-10 bg-gradient-to-r from-blue-600 to-blue-500 rounded-full flex items-center justify-center text-white font-bold">
-                            <?php echo strtoupper(substr($tanod['first_name'], 0, 1)); ?>
-                        </div>
-                        <div>
-                            <h4 class="font-bold text-gray-800"><?php echo addslashes($tanod['first_name'] . ' ' . $tanod['last_name']); ?></h4>
-                            <p class="text-sm text-gray-600"><?php echo $tanod['contact_number']; ?></p>
-                        </div>
-                    </div>
-                    <div class="space-y-1">
-                        <p class="text-sm">
-                            <span class="font-medium">Status:</span> 
-                            <span class="<?php echo $tanod['duty_status'] === 'On-Duty' ? 'text-green-600' : 
-                                            ($tanod['duty_status'] === 'Available' ? 'text-blue-600' : 'text-gray-500'); ?>">
-                                <?php echo $tanod['duty_status']; ?>
-                            </span>
-                        </p>
-                        <?php if ($tanod['clock_in']): ?>
-                            <p class="text-sm">
-                                <span class="font-medium">On Duty Since:</span> 
-                                <span class="text-gray-600"><?php echo date('H:i', strtotime($tanod['clock_in'])); ?></span>
-                            </p>
-                        <?php endif; ?>
-                        <?php if ($tanod['last_gps_update']): ?>
-                            <p class="text-sm">
-                                <span class="font-medium">GPS Updated:</span> 
-                                <span class="text-gray-600"><?php echo date('H:i', strtotime($tanod['last_gps_update'])); ?></span>
-                            </p>
-                        <?php endif; ?>
-                    </div>
-                </div>
-              `);
-        <?php endif; ?>
-    <?php endforeach; ?>
-    
-    // Add legend
-    const legend = L.control({position: 'topright'});
-    legend.onAdd = function() {
-        const div = L.DomUtil.create('div', 'bg-white p-4 rounded-lg shadow-lg border border-gray-300');
-        div.innerHTML = `
-            <h4 class="font-bold text-gray-800 mb-2">Map Legend</h4>
-            <div class="space-y-2">
-                <div class="flex items-center">
-                    <div class="w-4 h-4 rounded-full bg-green-500 mr-2"></div>
-                    <span class="text-sm">Tanod On Patrol</span>
-                </div>
-                <div class="flex items-center">
-                    <div class="w-4 h-4 rounded-full bg-blue-500 mr-2"></div>
-                    <span class="text-sm">Tanod Available</span>
-                </div>
-                <div class="flex items-center">
-                    <div class="w-4 h-4 rounded-full bg-gray-400 mr-2"></div>
-                    <span class="text-sm">Tanod Off-duty</span>
-                </div>
-                <div class="flex items-center">
-                    <div class="w-4 h-4 rounded-full bg-purple-500 mr-2"></div>
-                    <span class="text-sm">Key Locations</span>
-                </div>
-                <div class="flex items-center">
-                    <div class="w-4 h-4 border-4 border-red-600 bg-transparent mr-2"></div>
-                    <span class="text-sm">Barangay Boundary</span>
-                </div>
-            </div>
-        `;
-        return div;
-    };
-    legend.addTo(map);
+// Function to resize iframe if needed
+function resizeIframe(iframe) {
+    // Check if iframe loaded successfully
+    try {
+        const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+        if (iframeDoc && iframeDoc.body) {
+            // If iframe has content, hide fallback
+            document.getElementById('mapFallback').classList.add('hidden');
+        }
+    } catch (e) {
+        // Cross-origin error - can't access iframe content
+        console.log('Iframe loaded (cross-origin):', iframe.src);
+        // Show fallback if iframe appears empty
+        setTimeout(() => {
+            checkIframeContent();
+        }, 2000);
+    }
 }
 
-// Initialize map when module loads
-document.addEventListener('DOMContentLoaded', function() {
-    setTimeout(initTanodMap, 100);
-});
-
-// Function to fetch updated GPS data and refresh map
-function refreshGPSTracker() {
+// Check if iframe has content
+function checkIframeContent() {
+    const iframe = document.getElementById('gpsMapFrame');
+    const fallback = document.getElementById('mapFallback');
+    
+    // Try to detect if iframe is showing JSON (API response) instead of a map
     fetch('https://cpas.jampzdev.com/admin/api/gps_data.php?api_key=TEST_KEY_123')
-        .then(response => response.json())
-        .then(gpsData => {
-            console.log('GPS data refreshed at:', new Date().toLocaleTimeString());
-            // In a real implementation, you would update the map markers here
-            // For now, we'll just log the data
-            console.log('GPS Data:', gpsData);
-            
-            // Show notification if GPS data was updated
-            if (Array.isArray(gpsData) && gpsData.length > 0) {
-                showNotification('GPS locations updated', 'success');
+        .then(response => response.text())
+        .then(text => {
+            // If response is JSON (starts with { or [), it's not a map
+            const trimmed = text.trim();
+            if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+                console.log('API returns JSON, not HTML map');
+                iframe.classList.add('hidden');
+                fallback.classList.remove('hidden');
             }
         })
-        .catch(error => {
-            console.error('Error fetching GPS data:', error);
-            showNotification('Failed to update GPS data', 'error');
+        .catch(err => {
+            console.error('Error checking API response:', err);
         });
 }
 
-// Auto-refresh GPS data every 30 seconds
-setInterval(refreshGPSTracker, 30000);
+// Refresh the embedded map
+function refreshMap() {
+    const iframe = document.getElementById('gpsMapFrame');
+    const currentSrc = iframe.src;
+    
+    // Add timestamp to prevent caching
+    const separator = currentSrc.includes('?') ? '&' : '?';
+    iframe.src = currentSrc + separator + '_t=' + new Date().getTime();
+    
+    // Show refresh notification
+    showNotification('Refreshing GPS map...', 'info');
+}
+
+// Open map in new tab
+function openMapInNewTab() {
+    window.open('https://cpas.jampzdev.com/admin/api/gps_data.php?api_key=TEST_KEY_123', '_blank');
+}
 
 // Function to show notifications
 function showNotification(message, type = 'info') {
@@ -567,9 +430,36 @@ function showNotification(message, type = 'info') {
         notification.remove();
     }, 3000);
 }
+
+// Auto-refresh map every 60 seconds
+let mapRefreshInterval;
+function startMapAutoRefresh() {
+    // Clear existing interval
+    if (mapRefreshInterval) {
+        clearInterval(mapRefreshInterval);
+    }
+    
+    // Start new interval
+    mapRefreshInterval = setInterval(() => {
+        refreshMap();
+    }, 60000); // Refresh every 60 seconds
+}
+
+// Initialize when page loads
+document.addEventListener('DOMContentLoaded', function() {
+    // Start auto-refresh
+    startMapAutoRefresh();
+    
+    // Check iframe content after page loads
+    setTimeout(() => {
+        checkIframeContent();
+    }, 3000);
+});
 </script>
 
 <style>
+/* Remove old Leaflet styles - keeping only minimal custom styles */
+
 .animate-pulse {
     animation: pulse 2s infinite;
 }
@@ -580,21 +470,12 @@ function showNotification(message, type = 'info') {
     100% { transform: scale(1); }
 }
 
-.leaflet-popup-content {
-    min-width: 200px;
+/* Custom iframe styling */
+#iframe {
+    transition: all 0.3s ease;
 }
 
-/* Custom map controls */
-.leaflet-control-zoom a {
-    width: 36px !important;
-    height: 36px !important;
-    line-height: 36px !important;
-    font-size: 18px !important;
-    background-color: white !important;
-    border: 1px solid #e5e7eb !important;
-}
-
-.leaflet-control-zoom a:hover {
-    background-color: #f3f4f6 !important;
+#iframe:hover {
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
 }
 </style>
