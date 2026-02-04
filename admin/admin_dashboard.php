@@ -579,7 +579,6 @@ $main_modules = [
                     </div>
                     <div>
                         <h1 class="text-xl font-bold text-white">LEIR</h1>
-                        <p class="text-blue-200 text-sm">Admin System</p>
                     </div>
                 </div>
                 
