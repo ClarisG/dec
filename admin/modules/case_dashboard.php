@@ -311,13 +311,13 @@ $report_types = $types_stmt->fetchAll(PDO::FETCH_COLUMN);
         <div class="space-y-3">
             <?php
             // CORRECTED QUERY HERE
-            $recent_updates_query = "SELECT al.*, u.first_name, u.last_name, r.report_number 
-                                    FROM activity_logs al
-                                    LEFT JOIN users u ON al.user_id = u.id
-                                    LEFT JOIN reports r ON al.affected_id = r.id
-                                    WHERE al.affected_type = 'reports' 
-                                    ORDER BY al.created_at DESC 
-                                    LIMIT 5";
+$recent_updates_query = "SELECT al.*, u.first_name, u.last_name,
+                                COALESCE(r.report_number, 'System Activity') as report_number
+                         FROM activity_logs al
+                         LEFT JOIN users u ON al.user_id = u.id
+                         LEFT JOIN reports r ON al.affected_id = r.id AND al.affected_type = 'reports'
+                         ORDER BY al.created_at DESC 
+                         LIMIT 5";
             $recent_updates_stmt = $conn->prepare($recent_updates_query);
             $recent_updates_stmt->execute();
             $recent_updates = $recent_updates_stmt->fetchAll(PDO::FETCH_ASSOC);
