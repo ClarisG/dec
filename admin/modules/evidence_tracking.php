@@ -43,7 +43,6 @@ $evidence_stats_stmt->execute();
 $evidence_stats = $evidence_stats_stmt->fetch(PDO::FETCH_ASSOC);
 
 // Get recent evidence handovers
-// Get recent evidence handovers
 $handovers_query = "SELECT eh.*, u1.first_name as tanod_name, u1.last_name as tanod_last, 
                            u2.first_name as recipient_name, u2.last_name as recipient_last,
                            r.report_number, f.original_name, f.file_path,
@@ -51,8 +50,8 @@ $handovers_query = "SELECT eh.*, u1.first_name as tanod_name, u1.last_name as ta
                    FROM evidence_handovers eh
                    LEFT JOIN users u1 ON eh.tanod_id = u1.id
                    LEFT JOIN users u2 ON eh.handover_to = u2.id
-                   LEFT JOIN file_encryption_logs f ON eh.file_id = f.id
-                   LEFT JOIN reports r ON f.report_id = r.id
+                   LEFT JOIN reports r ON eh.report_id = r.id
+                   LEFT JOIN file_encryption_logs f ON eh.report_id = f.report_id
                    ORDER BY eh.created_at DESC 
                    LIMIT 10";
 $handovers_stmt = $conn->prepare($handovers_query);
