@@ -274,70 +274,158 @@ $report_types = $types_stmt->fetchAll(PDO::FETCH_COLUMN);
         </div>
 
         <?php
-        // Fetch full audit logs
+        // Pagination for Audit Log
+        $audit_page = isset($_GET['audit_page']) ? (int)$_GET['audit_page'] : 1;
+        $audit_per_page = 10;
+        $audit_offset = ($audit_page - 1) * $audit_per_page;
+
+        // Count total records
+        $count_sql = "SELECT COUNT(*) FROM activity_logs";
+        $total_audit_records = $conn->query($count_sql)->fetchColumn();
+        $total_audit_pages = ceil($total_audit_records / $audit_per_page);
+
+        // Fetch paginated audit logs
         $audit_query = "SELECT al.*, u.first_name, u.last_name, u.role 
                         FROM activity_logs al 
                         LEFT JOIN users u ON al.user_id = u.id 
                         ORDER BY al.created_at DESC 
-                        LIMIT 100";
+                        LIMIT :limit OFFSET :offset";
         $audit_stmt = $conn->prepare($audit_query);
+        $audit_stmt->bindValue(':limit', $audit_per_page, PDO::PARAM_INT);
+        $audit_stmt->bindValue(':offset', $audit_offset, PDO::PARAM_INT);
         $audit_stmt->execute();
         $full_audit_logs = $audit_stmt->fetchAll(PDO::FETCH_ASSOC);
         ?>
 
-        <div class="overflow-x-auto">
-            <table class="min-w-full divide-y divide-gray-200">
+        <div class="w-full">
+            <table class="w-full divide-y divide-gray-200 table-fixed">
                 <thead>
                     <tr>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Timestamp</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">IP Address</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-32">Timestamp</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-40">User</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-24">Action</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-32">IP Address</th>
                     </tr>
                 </thead>
                 <tbody class="bg-white divide-y divide-gray-200">
                     <?php if (!empty($full_audit_logs)): ?>
                         <?php foreach($full_audit_logs as $log): ?>
                             <tr class="hover:bg-gray-50">
-                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                    <?php echo date('M d, Y H:i:s', strtotime($log['created_at'])); ?>
+                                <td class="px-4 py-4 text-sm text-gray-500 break-words">
+                                    <div class="font-medium text-gray-700"><?php echo date('M d, Y', strtotime($log['created_at'])); ?></div>
+                                    <div class="text-xs text-gray-400"><?php echo date('H:i:s', strtotime($log['created_at'])); ?></div>
                                 </td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                                    <?php echo htmlspecialchars($log['first_name'] . ' ' . $log['last_name']); ?>
+                                <td class="px-4 py-4 text-sm text-gray-900 break-words">
+                                    <div class="font-medium"><?php echo htmlspecialchars($log['first_name'] . ' ' . $log['last_name']); ?></div>
+                                    <div class="text-xs text-gray-500 uppercase tracking-wider"><?php echo ucfirst($log['role']); ?></div>
                                 </td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">
-                                        <?php echo ucfirst($log['role']); ?>
-                                    </span>
-                                </td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
+                                <td class="px-4 py-4 break-words">
+                                    <span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full 
                                         <?php echo strpos($log['action'], 'delete') !== false ? 'bg-red-100 text-red-800' : 
                                                (strpos($log['action'], 'update') !== false ? 'bg-blue-100 text-blue-800' : 
                                                (strpos($log['action'], 'create') !== false ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800')); ?>">
                                         <?php echo htmlspecialchars($log['action']); ?>
                                     </span>
                                 </td>
-                                <td class="px-6 py-4 text-sm text-gray-500">
+                                <td class="px-4 py-4 text-sm text-gray-600 break-words">
                                     <?php echo htmlspecialchars($log['description']); ?>
                                 </td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-mono">
+                                <td class="px-4 py-4 text-sm text-gray-500 font-mono break-words">
                                     <?php echo htmlspecialchars($log['ip_address']); ?>
                                 </td>
                             </tr>
                         <?php endforeach; ?>
                     <?php else: ?>
                         <tr>
-                            <td colspan="6" class="px-6 py-4 text-center text-sm text-gray-500">
-                                No audit logs found
+                            <td colspan="5" class="px-6 py-8 text-center text-sm text-gray-500">
+                                <div class="flex flex-col items-center justify-center">
+                                    <i class="fas fa-history text-3xl mb-2 text-gray-300"></i>
+                                    <p>No audit logs found</p>
+                                </div>
                             </td>
                         </tr>
                     <?php endif; ?>
                 </tbody>
             </table>
         </div>
+
+        <!-- Pagination Controls -->
+        <?php if ($total_audit_pages > 1): ?>
+        <div class="flex items-center justify-between border-t border-gray-200 bg-white px-4 py-3 sm:px-6 mt-4">
+            <div class="flex flex-1 justify-between sm:hidden">
+                <?php if ($audit_page > 1): ?>
+                    <a href="?module=case_dashboard&audit_page=<?php echo $audit_page - 1; ?>#audit-log-section" class="relative inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Previous</a>
+                <?php else: ?>
+                    <span class="relative inline-flex items-center rounded-md border border-gray-300 bg-gray-100 px-4 py-2 text-sm font-medium text-gray-400 cursor-not-allowed">Previous</span>
+                <?php endif; ?>
+                
+                <?php if ($audit_page < $total_audit_pages): ?>
+                    <a href="?module=case_dashboard&audit_page=<?php echo $audit_page + 1; ?>#audit-log-section" class="relative ml-3 inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Next</a>
+                <?php else: ?>
+                    <span class="relative ml-3 inline-flex items-center rounded-md border border-gray-300 bg-gray-100 px-4 py-2 text-sm font-medium text-gray-400 cursor-not-allowed">Next</span>
+                <?php endif; ?>
+            </div>
+            <div class="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
+                <div>
+                    <p class="text-sm text-gray-700">
+                        Showing
+                        <span class="font-medium"><?php echo $audit_offset + 1; ?></span>
+                        to
+                        <span class="font-medium"><?php echo min($audit_offset + $audit_per_page, $total_audit_records); ?></span>
+                        of
+                        <span class="font-medium"><?php echo $total_audit_records; ?></span>
+                        results
+                    </p>
+                </div>
+                <div>
+                    <nav class="isolate inline-flex -space-x-px rounded-md shadow-sm" aria-label="Pagination">
+                        <!-- Previous Page -->
+                        <?php if ($audit_page > 1): ?>
+                            <a href="?module=case_dashboard&audit_page=<?php echo $audit_page - 1; ?>#audit-log-section" class="relative inline-flex items-center rounded-l-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0">
+                                <span class="sr-only">Previous</span>
+                                <i class="fas fa-chevron-left h-5 w-5"></i>
+                            </a>
+                        <?php else: ?>
+                            <span class="relative inline-flex items-center rounded-l-md px-2 py-2 text-gray-300 ring-1 ring-inset ring-gray-300 cursor-not-allowed">
+                                <span class="sr-only">Previous</span>
+                                <i class="fas fa-chevron-left h-5 w-5"></i>
+                            </span>
+                        <?php endif; ?>
+
+                        <!-- Page Numbers -->
+                        <?php
+                        $range = 2;
+                        for ($i = 1; $i <= $total_audit_pages; $i++):
+                            if ($i == 1 || $i == $total_audit_pages || ($i >= $audit_page - $range && $i <= $audit_page + $range)):
+                        ?>
+                            <?php if ($i == $audit_page): ?>
+                                <span aria-current="page" class="relative z-10 inline-flex items-center bg-purple-600 px-4 py-2 text-sm font-semibold text-white focus:z-20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-purple-600"><?php echo $i; ?></span>
+                            <?php else: ?>
+                                <a href="?module=case_dashboard&audit_page=<?php echo $i; ?>#audit-log-section" class="relative inline-flex items-center px-4 py-2 text-sm font-semibold text-gray-900 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0"><?php echo $i; ?></a>
+                            <?php endif; ?>
+                        <?php elseif ($i == $audit_page - $range - 1 || $i == $audit_page + $range + 1): ?>
+                            <span class="relative inline-flex items-center px-4 py-2 text-sm font-semibold text-gray-700 ring-1 ring-inset ring-gray-300 focus:outline-offset-0">...</span>
+                        <?php endif; ?>
+                        <?php endfor; ?>
+
+                        <!-- Next Page -->
+                        <?php if ($audit_page < $total_audit_pages): ?>
+                            <a href="?module=case_dashboard&audit_page=<?php echo $audit_page + 1; ?>#audit-log-section" class="relative inline-flex items-center rounded-r-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0">
+                                <span class="sr-only">Next</span>
+                                <i class="fas fa-chevron-right h-5 w-5"></i>
+                            </a>
+                        <?php else: ?>
+                            <span class="relative inline-flex items-center rounded-r-md px-2 py-2 text-gray-300 ring-1 ring-inset ring-gray-300 cursor-not-allowed">
+                                <span class="sr-only">Next</span>
+                                <i class="fas fa-chevron-right h-5 w-5"></i>
+                            </span>
+                        <?php endif; ?>
+                    </nav>
+                </div>
+            </div>
+        </div>
+        <?php endif; ?>
     </div>
 </div>
 <!-- Audit Trail Modal -->
