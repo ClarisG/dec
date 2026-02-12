@@ -917,10 +917,11 @@ function viewReportDetails(reportId) {
                 
                 <div>
                     <h4 class="font-bold text-gray-800 mb-2">Current Status</h4>
-                    <div class="flex space-x-4">
-                        <span class="px-3 py-1 rounded-full text-xs font-medium ${report.needs_verification ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800'}">
-                            ${report.needs_verification ? 'Needs Verification' : 'Verified'}
-                        </span>
+                    <div class="flex items-center space-x-4">
+                        <select id="modalStatusSelect" class="p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
+                            <option value="1" ${report.needs_verification == 1 ? 'selected' : ''}>Pending Verification</option>
+                            <option value="0" ${report.needs_verification == 0 ? 'selected' : ''}>Verified</option>
+                        </select>
                         <span class="px-3 py-1 rounded-full text-xs font-medium ${report.status === 'pending' ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800'}">
                             ${report.status || 'Not Routed'}
                         </span>
@@ -928,8 +929,8 @@ function viewReportDetails(reportId) {
                 </div>
                 
                 <div class="flex justify-end space-x-3 mt-6">
-                    <button onclick="verifyReport(${reportId})" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">
-                        <i class="fas fa-check mr-1"></i>Mark as Verified
+                    <button onclick="saveReportStatus(${reportId})" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                        <i class="fas fa-save mr-1"></i>Save
                     </button>
                 </div>
             `;
@@ -942,6 +943,41 @@ function viewReportDetails(reportId) {
             console.error('Error fetching report details:', error);
             alert('Error loading report details. Please try again.');
         });
+}
+
+function saveReportStatus(reportId) {
+    const statusSelect = document.getElementById('modalStatusSelect');
+    const statusValue = statusSelect.value;
+    const statusText = statusSelect.options[statusSelect.selectedIndex].text;
+
+    if (confirm(`Update report status to "${statusText}"?`)) {
+        const formData = new FormData();
+        formData.append('report_id', reportId);
+        formData.append('verify_report', '1');
+        formData.append('status_value', statusValue); // 0 for Verified, 1 for Pending
+        
+        fetch('handlers/verify_report.php', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => {
+            if (!response.ok) throw new Error('Network response was not ok');
+            return response.json();
+        })
+        .then(data => {
+            if (data.success) {
+                alert('Report status updated successfully!');
+                closeReportModal();
+                location.reload();
+            } else {
+                alert('Error: ' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error updating report status:', error);
+            alert('Error updating report status. Please try again.');
+        });
+    }
 }
 
 function verifyReport(reportId) {
