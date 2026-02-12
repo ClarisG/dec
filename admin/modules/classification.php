@@ -96,32 +96,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_rule'])) {
     }
 }
 
-// Handle delete rule
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_rule'])) {
-    try {
-        $rule_id = $_POST['rule_id'];
-        $delete_query = "DELETE FROM report_types WHERE id = :id";
-        $stmt = $conn->prepare($delete_query);
-        $stmt->execute([':id' => $rule_id]);
-        
-        $_SESSION['success'] = "Rule deleted successfully!";
-        
-        // Preserve search query in redirect
-        $redirect_url = "?module=classification";
-        if (!empty($q)) {
-            $redirect_url .= "&q=" . urlencode($q);
-        }
-        if ($page > 1) {
-            $redirect_url .= "&page=" . $page;
-        }
-        
-        header("Location: $redirect_url");
-        exit();
-    } catch (PDOException $e) {
-        $_SESSION['error'] = "Error deleting rule: " . $e->getMessage();
-    }
-}
-
 // Get threshold configuration
 $threshold_query = "SELECT config_value FROM system_config WHERE config_key = 'classification_threshold'";
 $threshold_stmt = $conn->prepare($threshold_query);
@@ -220,10 +194,6 @@ $threshold = $threshold_stmt->fetchColumn() ?: 0.7;
                                             class="text-purple-600 hover:text-purple-900 mr-3 px-2 py-1 hover:bg-purple-50 rounded edit-rule-btn"
                                             data-rule-id="<?php echo $rule['id']; ?>">
                                         <i class="fas fa-edit"></i> Edit
-                                    </button>
-                                    <button onclick="deleteRule(<?php echo $rule['id']; ?>)" 
-                                            class="text-red-600 hover:text-red-900 px-2 py-1 hover:bg-red-50 rounded">
-                                        <i class="fas fa-trash"></i> Delete
                                     </button>
                                 </td>
                             </tr>
@@ -456,57 +426,6 @@ document.addEventListener('DOMContentLoaded', function() {
         } else {
             console.warn('Rule data not found for ID:', ruleId);
             alert('Error loading rule data. Please refresh the page and try again.');
-        }
-    }
-
-    window.deleteRule = function(ruleId) {
-        if (confirm('Are you sure you want to delete this classification rule?')) {
-            // Create a form to submit the delete request
-            const deleteForm = document.createElement('form');
-            deleteForm.method = 'POST';
-            deleteForm.action = '';
-            
-            // Add CSRF token if exists
-            const csrfToken = document.querySelector('meta[name="csrf-token"]');
-            if (csrfToken) {
-                const csrfInput = document.createElement('input');
-                csrfInput.type = 'hidden';
-                csrfInput.name = '_token';
-                csrfInput.value = csrfToken.getAttribute('content');
-                deleteForm.appendChild(csrfInput);
-            }
-            
-            const deleteInput = document.createElement('input');
-            deleteInput.type = 'hidden';
-            deleteInput.name = 'delete_rule';
-            deleteInput.value = '1';
-            deleteForm.appendChild(deleteInput);
-
-            const idInput = document.createElement('input');
-            idInput.type = 'hidden';
-            idInput.name = 'rule_id';
-            idInput.value = ruleId;
-            deleteForm.appendChild(idInput);
-
-            // Preserve search and pagination
-            if (currentQuery) {
-                const qInput = document.createElement('input');
-                qInput.type = 'hidden';
-                qInput.name = 'q';
-                qInput.value = currentQuery;
-                deleteForm.appendChild(qInput);
-            }
-            
-            if (currentPage > 1) {
-                const pageInput = document.createElement('input');
-                pageInput.type = 'hidden';
-                pageInput.name = 'page';
-                pageInput.value = currentPage;
-                deleteForm.appendChild(pageInput);
-            }
-
-            document.body.appendChild(deleteForm);
-            deleteForm.submit();
         }
     }
 

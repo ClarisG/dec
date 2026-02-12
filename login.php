@@ -1,10 +1,57 @@
 <?php
 // login.php - Simplified design matching your uploaded image
+// MODIFIED: Personnel now receive a 4-digit OTP via email instead of using database master_code
 
 // Include database configuration
 require_once __DIR__ . '/config/config.php';
 require_once __DIR__ . '/config/database.php';
 require_once __DIR__ . '/config/session.php';
+
+/**
+ * Send OTP code to user's email
+ * @param string $email Recipient email
+ * @param string $name  Recipient full name
+ * @param string $otp   4-digit code
+ * @return bool True if sent successfully
+ */
+function sendOtpEmail($email, $name, $otp) {
+    // -----------------------------------------------------------------
+    // !!! IMPORTANT !!!
+    // Replace this with your project's actual email sending logic.
+    // Example: if you use PHPMailer, call your existing mailer function here.
+    // -----------------------------------------------------------------
+    $subject = "Your Login OTP - LEIR System";
+    $message = "
+    <html>
+    <head>
+        <title>LEIR Login OTP</title>
+    </head>
+    <body style='font-family: Arial, sans-serif;'>
+        <h2>Hello, $name</h2>
+        <p>You requested to log in to your LEIR account.</p>
+        <p style='font-size: 24px; font-weight: bold; color: #1e40af;'>$otp</p>
+        <p>This code is valid for 10 minutes.</p>
+        <p>If you did not attempt to log in, please ignore this email or contact support.</p>
+        <hr>
+        <p style='color: #666;'>LEIR – Barangay Incident Reporting System</p>
+    </body>
+    </html>
+    ";
+
+    // Headers for HTML email
+    $headers = "MIME-Version: 1.0\r\n";
+    $headers .= "Content-type: text/html; charset=UTF-8\r\n";
+    $headers .= "From: no-reply@leir-system.local\r\n"; // CHANGE TO YOUR SENDER
+
+    if (mail($email, $subject, $message, $headers)) {
+        error_log("OTP email sent to $email");
+        return true;
+    } else {
+        error_log("Failed to send OTP email to $email");
+        return false;
+    }
+    // -----------------------------------------------------------------
+}
 
 // Helper function for redirection
 function redirectUser($role) {
@@ -30,7 +77,7 @@ $error = '';
 $success = '';
 $showPinModal = false;
 
-// Debug: Check what's in POST
+// Debug logging
 error_log("=== LOGIN DEBUG START ===");
 error_log("POST data: " . print_r($_POST, true));
 error_log("SERVER REQUEST METHOD: " . $_SERVER['REQUEST_METHOD']);
@@ -42,42 +89,61 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     try {
         $conn = getDbConnection();
         
-        // Check if this is a PIN verification request
+        // ---------- OTP VERIFICATION ----------
         if (isset($_POST['verify_pin']) && $_POST['verify_pin'] == '1') {
-            error_log("Processing PIN verification");
-            // Master code verification process
-            $entered_code = isset($_POST['pin']) ? trim($_POST['pin']) : '';
-            $tempUserId = isset($_POST['temp_user_id']) ? $_POST['temp_user_id'] : '';
+            error_log("Processing OTP verification");
             
-            error_log("Entered PIN: $entered_code, Temp User ID: $tempUserId");
+            $entered_otp = isset($_POST['fullPin']) ? trim($_POST['fullPin']) : '';
+            // Fallback for older browsers
+            if (empty($entered_otp) && isset($_POST['pin']) && is_array($_POST['pin'])) {
+                $entered_otp = implode('', $_POST['pin']);
+            }
             
-            if (empty($entered_code)) {
-                $error = "Please enter your 4-digit Master Code.";
+            error_log("Entered OTP: $entered_otp");
+            
+            // Check if OTP session exists and is valid
+            if (!isset($_SESSION['login_otp']) || !isset($_SESSION['login_otp_expires'])) {
+                $error = "OTP session expired. Please login again.";
+                $showPinModal = false;
+                unset($_SESSION['temp_user_id'], $_SESSION['login_otp'], $_SESSION['login_otp_expires']);
+                error_log("OTP session missing");
+            } elseif (time() > $_SESSION['login_otp_expires']) {
+                $error = "OTP has expired. Please login again.";
+                $showPinModal = false;
+                unset($_SESSION['temp_user_id'], $_SESSION['login_otp'], $_SESSION['login_otp_expires']);
+                error_log("OTP expired");
+            } elseif (empty($entered_otp)) {
+                $error = "Please enter the 4-digit OTP sent to your email.";
                 $showPinModal = true;
-                error_log("PIN is empty");
-            } else if (strlen($entered_code) != 4 || !is_numeric($entered_code)) {
-                $error = "Master Code must be a 4-digit number.";
+                error_log("OTP empty");
+            } elseif (strlen($entered_otp) != 4 || !is_numeric($entered_otp)) {
+                $error = "OTP must be a 4-digit number.";
                 $showPinModal = true;
-                error_log("Invalid PIN format: $entered_code");
+                error_log("Invalid OTP format: $entered_otp");
+            } elseif ($entered_otp != $_SESSION['login_otp']) {
+                $error = "Invalid OTP. Please try again.";
+                $showPinModal = true;
+                error_log("OTP mismatch");
             } else {
-                // Get user data from database to verify master code
-                $query = "SELECT * FROM users WHERE id = :id";
-                $stmt = $conn->prepare($query);
-                $stmt->bindParam(':id', $tempUserId);
-                $stmt->execute();
+                // OTP correct – log the user in
+                error_log("OTP verification successful!");
                 
-                if ($stmt->rowCount() == 1) {
-                    $user = $stmt->fetch(PDO::FETCH_ASSOC);
+                $user_id = $_SESSION['temp_user_id'] ?? null;
+                if (!$user_id) {
+                    $error = "Session error. Please login again.";
+                    $showPinModal = false;
+                    unset($_SESSION['temp_user_id'], $_SESSION['login_otp'], $_SESSION['login_otp_expires']);
+                } else {
+                    // Fetch full user data from database
+                    $query = "SELECT * FROM users WHERE id = :id";
+                    $stmt = $conn->prepare($query);
+                    $stmt->bindParam(':id', $user_id);
+                    $stmt->execute();
                     
-                    error_log("User found for PIN verification: " . $user['username']);
-                    error_log("Stored master code: " . $user['master_code']);
-                    error_log("Master code used status: " . $user['is_master_code_used']);
-                    
-                    // Verify master code - use loose comparison
-                    if (!empty($user['master_code']) && $entered_code == $user['master_code']) {
-                        // Master code is correct
-                        error_log("PIN verification successful!");
+                    if ($stmt->rowCount() == 1) {
+                        $user = $stmt->fetch(PDO::FETCH_ASSOC);
                         
+                        // Set permanent session variables
                         $_SESSION['user_id'] = $user['id'];
                         $_SESSION['username'] = $user['username'];
                         $_SESSION['email'] = $user['email'];
@@ -86,9 +152,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                         $_SESSION['role'] = $user['role'];
                         $_SESSION['barangay'] = $user['barangay'];
                         $_SESSION['phone'] = $user['contact_number'];
-                        $_SESSION['master_code_verified'] = true;
+                        $_SESSION['otp_verified'] = true;  // optional flag
                         
-                        // Update last login only (master code is required every time)
+                        // Update last login
                         $update_query = "UPDATE users SET last_login = NOW() WHERE id = :id";
                         $update_stmt = $conn->prepare($update_query);
                         $update_stmt->bindParam(':id', $user['id']);
@@ -106,37 +172,34 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                             error_log("Could not update barangay_personnel_registrations: " . $e->getMessage());
                         }
                         
+                        // Clean up OTP session data
+                        unset($_SESSION['temp_user_id'], $_SESSION['temp_role'], $_SESSION['temp_username'], $_SESSION['temp_name'], $_SESSION['temp_email']);
+                        unset($_SESSION['login_otp'], $_SESSION['login_otp_expires']);
+                        
                         // Redirect to appropriate dashboard
                         redirectUser($user['role']);
                     } else {
-                        $error = "Invalid Master Code. Please try again.";
-                        $showPinModal = true;
-                        $_SESSION['temp_user_id'] = $tempUserId;
-                        error_log("Invalid PIN entered");
+                        $error = "User not found. Please login again.";
+                        $showPinModal = false;
+                        unset($_SESSION['temp_user_id'], $_SESSION['login_otp'], $_SESSION['login_otp_expires']);
+                        error_log("User not found for ID: $user_id");
                     }
-                } else {
-                    $error = "User not found. Please login again.";
-                    unset($_SESSION['temp_user_id']);
-                    error_log("User not found for ID: $tempUserId");
                 }
             }
         } else {
-            // Regular login process
+            // ---------- REGULAR LOGIN (username/password) ----------
             error_log("Processing regular login");
             
-            // Get username/email and password from POST
             $username = isset($_POST['username']) ? trim($_POST['username']) : '';
             $password = isset($_POST['password']) ? trim($_POST['password']) : '';
             
             error_log("Username input: " . ($username ?: 'EMPTY'));
             error_log("Password input: " . ($password ? 'PROVIDED' : 'EMPTY'));
             
-            // Basic validation
             if (empty($username) || empty($password)) {
                 $error = "Please enter both username/email and password.";
                 error_log("Validation failed - empty fields");
             } else {
-                // Check if user exists with username or email
                 $query = "SELECT * FROM users WHERE (username = :username OR email = :email)";
                 $stmt = $conn->prepare($query);
                 $stmt->bindParam(':username', $username);
@@ -148,53 +211,66 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     if ($stmt->rowCount() == 1) {
                         $user = $stmt->fetch(PDO::FETCH_ASSOC);
                         
-                        error_log("User found: ID=" . $user['id'] . ", Username=" . $user['username'] . ", Email=" . $user['email'] . ", Role=" . $user['role'] . ", Status=" . $user['status'] . ", Email_verified=" . $user['email_verified']);
+                        error_log("User found: ID=" . $user['id'] . ", Username=" . $user['username'] . ", Email=" . $user['email'] . ", Role=" . $user['role'] . ", Status=" . $user['status']);
                         
-                        // Verify password
                         if (password_verify($password, $user['password'])) {
                             error_log("Password verification successful!");
                             
-                            // Allow both 'active' and 'pending' status for personnel
                             if ($user['is_active'] && ($user['status'] == 'active' || $user['status'] == 'pending')) {
-                                // Check if user is personnel (requires master code)
+                                // Check if user is personnel (requires OTP)
                                 $personnel_roles = ['tanod', 'secretary', 'admin', 'captain', 'lupon', 'super_admin'];
                                 
                                 if (in_array($user['role'], $personnel_roles)) {
                                     error_log("User is personnel with role: " . $user['role']);
-                                    error_log("Master code in DB: " . ($user['master_code'] ?: 'NOT SET'));
                                     
-                                    // ALWAYS require master code for personnel (every login)
-                                    if (!empty($user['master_code'])) {
-                                        // Store user data temporarily for master code verification
-                                        $_SESSION['temp_user_id'] = $user['id'];
-                                        $_SESSION['temp_role'] = $user['role'];
-                                        $_SESSION['temp_username'] = $user['username'];
-                                        $_SESSION['temp_name'] = $user['first_name'] . ' ' . $user['last_name'];
+                                    // --- Generate and send OTP via email ---
+                                    // 1. Generate 4-digit OTP
+                                    $otp = sprintf("%04d", rand(0, 9999));
+                                    error_log("Generated OTP: $otp");
+                                    
+                                    // 2. Store OTP and expiry in session (10 minutes)
+                                    $_SESSION['login_otp'] = $otp;
+                                    $_SESSION['login_otp_expires'] = time() + 600; // 10 minutes
+                                    
+                                    // 3. Store user data temporarily for OTP verification
+                                    $_SESSION['temp_user_id'] = $user['id'];
+                                    $_SESSION['temp_role'] = $user['role'];
+                                    $_SESSION['temp_username'] = $user['username'];
+                                    $_SESSION['temp_name'] = $user['first_name'] . ' ' . $user['last_name'];
+                                    $_SESSION['temp_email'] = $user['email']; // for resend if needed
+                                    
+                                    // 4. Send OTP via email
+                                    $fullName = $user['first_name'] . ' ' . $user['last_name'];
+                                    $emailSent = sendOtpEmail($user['email'], $fullName, $otp);
+                                    
+                                    if ($emailSent) {
                                         $showPinModal = true;
-                                        error_log("Showing PIN modal for personnel (master code required every login)");
+                                        error_log("OTP sent successfully, showing PIN modal");
                                     } else {
-                                        // No master code set
-                                        $error = "No master code assigned. Please contact administrator.";
-                                        error_log("No master code assigned for personnel");
+                                        $error = "Failed to send OTP email. Please try again or contact administrator.";
+                                        $showPinModal = false;
+                                        // Clear partial session data
+                                        unset($_SESSION['login_otp'], $_SESSION['login_otp_expires'], 
+                                              $_SESSION['temp_user_id'], $_SESSION['temp_role'], 
+                                              $_SESSION['temp_username'], $_SESSION['temp_name'], $_SESSION['temp_email']);
+                                        error_log("OTP email sending failed");
                                     }
+                                    // ------------------------------------------------
+                                    
                                 } else {
-                                    // Check if citizen has verified email - IMPROVED LOGIC
+                                    // ---------- CITIZEN LOGIN (unchanged from original) ----------
+                                    error_log("User is citizen, checking email verification");
                                     error_log("=== EMAIL VERIFICATION DEBUG ===");
                                     error_log("Email verified field value: " . var_export($user['email_verified'], true));
                                     error_log("Email verified field type: " . gettype($user['email_verified']));
                                     
-                                    // Initialize email_verified as false
                                     $email_verified = false;
-                                    
                                     if (isset($user['email_verified'])) {
                                         $ev = $user['email_verified'];
                                         
-                                        // Handle different data types
                                         if (is_string($ev)) {
                                             $ev = trim($ev);
                                             error_log("String value: '$ev'");
-                                            
-                                            // Check if it's a valid timestamp or non-empty string
                                             if (!empty($ev) && $ev !== '0' && $ev !== '0000-00-00 00:00:00' && strtolower($ev) !== 'false' && strtolower($ev) !== 'no') {
                                                 $email_verified = true;
                                                 error_log("String indicates VERIFIED");
@@ -213,7 +289,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                                             error_log("NULL value");
                                             $email_verified = false;
                                         } else {
-                                            // Any other non-null value means verified
                                             error_log("Other non-null type");
                                             $email_verified = true;
                                         }
@@ -248,12 +323,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                                     } else {
                                         $error = "Please verify your email address before logging in. Check your inbox (and spam folder) for the verification email.";
                                         error_log("Citizen login failed - email not verified. Raw value: " . var_export($user['email_verified'], true));
-                                        
-                                        // Debug: Show what the actual value is
-                                        if (isset($user['email_verified'])) {
-                                            error_log("email_verified is set to: " . $user['email_verified']);
-                                        }
                                     }
+                                    // ------------------------------------------------
                                 }
                             } else {
                                 // Account is not active or pending
@@ -282,7 +353,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         }
     } catch(PDOException $e) {
         $error = "Database error: " . $e->getMessage();
-        // Log the error for debugging
         error_log("Login Error: " . $e->getMessage());
     }
 }
@@ -302,6 +372,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="icon" type="image/png" href="images/10213.png">
 <style>
+    /* ---- ALL ORIGINAL CSS REMAINS EXACTLY THE SAME ---- */
     * {
         margin: 0;
         padding: 0;
@@ -723,7 +794,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         font-size: 18px;
     }
     
-    /* PIN Modal */
+    /* PIN Modal - updated text only */
     .pin-modal-overlay {
         display: none;
         position: fixed;
@@ -942,12 +1013,13 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 </head>
 <body>
     
+    <!-- ==================== OTP MODAL (formerly PIN Modal) ==================== -->
     <div class="pin-modal-overlay" id="pinModal" style="<?php echo $showPinModal ? 'display: flex;' : 'display: none;'; ?>">
         <div class="pin-modal">
             <div class="pin-modal-header">
-                <i class="fas fa-shield-alt"></i>
-                <h3>Master Code Required</h3>
-                <p>Enter your 4-digit Master Code to continue</p>
+                <i class="fas fa-envelope"></i> <!-- Changed icon -->
+                <h3>OTP Verification</h3>        <!-- Updated title -->
+                <p>Enter the 4-digit code sent to your email</p>  <!-- Updated description -->
                 <?php if (isset($_SESSION['temp_name'])): ?>
                     <p style="font-size: 12px; color: #718096; margin-top: 5px;">
                         Logging in as: <?php echo htmlspecialchars($_SESSION['temp_name']); ?>
@@ -966,7 +1038,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     <input type="text" name="pin[]" class="pin-input" maxlength="1" pattern="[0-9]" inputmode="numeric" required>
                 </div>
                 
-                <input type="hidden" id="fullPin" name="pin" value="">
+                <input type="hidden" id="fullPin" name="fullPin" value="">
                 
                 <?php if ($error && $showPinModal): ?>
                     <div class="alert alert-error">
@@ -976,21 +1048,25 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 <?php endif; ?>
                 
                 <button type="submit" class="btn-pin">
-                    <i class="fas fa-lock"></i> Verify Master Code
+                    <i class="fas fa-check-circle"></i> Verify OTP
                 </button>
                 
                 <button type="button" class="btn-pin pin-cancel" onclick="cancelPin()">
                     <i class="fas fa-times"></i> Cancel
                 </button>
+                
+                <!-- Optional: Resend OTP link can be added here -->
             </form>
         </div>
     </div>
     
+    <!-- Loading Overlay (unchanged) -->
     <div class="loading-overlay" id="loadingOverlay">
         <div class="spinner"></div>
         <p class="text-gray-600 font-medium">Logging in...</p>
     </div>
     
+    <!-- Desktop Container (unchanged) -->
     <div class="login-container hidden md:flex">
         <div class="left-section">
             <a href="index.php" class="back-home">
@@ -1088,6 +1164,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         </div>
     </div>
     
+    <!-- Mobile Container (unchanged) -->
     <div class="mobile-container md:hidden">
         <div class="mobile-header">
             <div class="mobile-logo-circle">
@@ -1183,7 +1260,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     </div>
 
     <script>
-        // Toggle password visibility
+        // Toggle password visibility (unchanged)
         function togglePasswordVisibility(inputId, toggleBtnId) {
             const passwordInput = document.getElementById(inputId);
             const toggleBtn = document.getElementById(toggleBtnId);
@@ -1197,7 +1274,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             }
         }
         
-        // PIN input handling
+        // PIN input handling (unchanged, but used for OTP digits)
         function handlePinInput() {
             const pinInputs = document.querySelectorAll('.pin-input');
             const fullPinInput = document.getElementById('fullPin');
@@ -1227,7 +1304,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             });
         }
         
-        // Cancel PIN verification
+        // Cancel OTP verification
         function cancelPin() {
             document.getElementById('pinModal').style.display = 'none';
             // Clear PIN inputs
@@ -1242,11 +1319,12 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 errorAlert.remove();
             }
             
-            // Clear temporary session
+            // Clear temporary session (including OTP) 
+            // IMPORTANT: You MUST update clear_temp_session.php to also unset $_SESSION['login_otp'] and $_SESSION['login_otp_expires']
             fetch('config/clear_temp_session.php').catch(console.error);
         }
         
-        // Form submission handling
+        // Form submission handling (unchanged)
         function handleFormSubmit(formId) {
             const form = document.getElementById(formId);
             if (!form) return;
