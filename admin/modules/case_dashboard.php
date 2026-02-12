@@ -185,70 +185,67 @@ $report_types = $types_stmt->fetchAll(PDO::FETCH_COLUMN);
             </div>
         </div>
         
-        <div class="overflow-x-auto">
-            <table class="min-w-full divide-y divide-gray-200">
+        <div class="w-full">
+            <table class="w-full divide-y divide-gray-200 table-fixed">
                 <thead>
                     <tr>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-32">Case #</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Complainant</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Assigned Tanod</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Priority</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last Update</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Audit Trail</th>
+                        <th class="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-24">Case #</th>
+                        <th class="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/5">Complainant</th>
+                        <th class="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
+                        <th class="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Assigned Tanod</th>
+                        <th class="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-24">Status</th>
+                        <th class="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-20">Priority</th>
+                        <th class="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-24">Last Update</th>
+                        <th class="px-2 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-20">Action</th>
                     </tr>
                 </thead>
                 <tbody class="bg-white divide-y divide-gray-200">
                     <?php foreach($cases as $case): ?>
                         <tr class="hover:bg-gray-50">
-                            <td class="px-6 py-4 text-sm font-medium text-gray-900">
+                            <td class="px-2 py-4 text-sm font-medium text-gray-900 break-words">
                                 <?php echo htmlspecialchars($case['report_number']); ?>
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            <td class="px-2 py-4 text-sm text-gray-500 break-words">
                                 <div class="flex items-center">
-                                    <div class="flex-shrink-0 h-8 w-8 bg-gray-100 rounded-full flex items-center justify-center">
+                                    <div class="flex-shrink-0 h-8 w-8 bg-gray-100 rounded-full flex items-center justify-center mr-2">
                                         <span class="text-gray-600 font-medium text-xs">
                                             <?php echo strtoupper(substr($case['complainant_name'] ?? 'C', 0, 1)); ?>
                                         </span>
                                     </div>
-                                    <div class="ml-3">
-                                        <div class="text-sm font-medium text-gray-900">
+                                    <div class="min-w-0">
+                                        <div class="text-sm font-medium text-gray-900 truncate">
                                             <?php echo htmlspecialchars($case['complainant_name'] ?? 'N/A'); ?>
-                                        </div>
-                                        <div class="text-xs text-gray-500">
-                                            <?php echo htmlspecialchars($case['complainant_contact'] ?? 'N/A'); ?>
                                         </div>
                                     </div>
                                 </div>
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            <td class="px-2 py-4 text-sm text-gray-500 break-words">
                                 <?php echo htmlspecialchars($case['incident_type'] ?? 'Unknown'); ?>
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            <td class="px-2 py-4 text-sm text-gray-500 break-words">
                                 <?php echo htmlspecialchars($case['tanod_name'] ?? 'Not assigned'); ?>
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap">
-                                <span class="px-3 py-1 rounded-full text-xs font-medium 
+                            <td class="px-2 py-4">
+                                <span class="px-2 py-1 rounded-full text-xs font-medium 
                                     <?php echo $case['status'] === 'closed' ? 'bg-green-100 text-green-800' : 
                                            ($case['status'] === 'referred' ? 'bg-yellow-100 text-yellow-800' : 
                                            ($case['status'] === 'investigating' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800')); ?>">
                                     <?php echo ucfirst($case['status']); ?>
                                 </span>
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            <td class="px-2 py-4 text-sm text-gray-500">
                                 <span class="font-medium <?php echo $case['priority'] === 'high' ? 'text-red-600' : 
                                                                  ($case['priority'] === 'critical' ? 'text-red-800' : 'text-green-600'); ?>">
                                     <?php echo ucfirst($case['priority']); ?>
                                 </span>
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                <?php echo date('M d, H:i', strtotime($case['updated_at'] ?? $case['created_at'])); ?>
+                            <td class="px-2 py-4 text-sm text-gray-500">
+                                <?php echo date('M d', strtotime($case['updated_at'] ?? $case['created_at'])); ?>
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                            <td class="px-2 py-4 text-right text-sm font-medium">
                                 <button onclick="viewAuditTrail(<?php echo $case['id']; ?>)" 
-                                        class="text-purple-600 hover:text-purple-900 px-2 py-1 hover:bg-purple-50 rounded">
-                                    <i class="fas fa-history"></i> View
+                                        class="text-purple-600 hover:text-purple-900">
+                                    <i class="fas fa-history"></i>
                                 </button>
                             </td>
                         </tr>

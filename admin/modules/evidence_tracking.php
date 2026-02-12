@@ -146,59 +146,58 @@ $key_audits = $key_audit_stmt->fetchAll(PDO::FETCH_ASSOC);
             </div>
         <?php endif; ?>
         
-        <div class="overflow-x-auto">
-            <table class="min-w-full divide-y divide-gray-200">
+        <div class="w-full">
+            <table class="w-full divide-y divide-gray-200 table-fixed">
                 <thead>
                     <tr>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Evidence ID</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Report #</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Item Description</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Handover From</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Handover To</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                        <th class="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-24">Evidence ID</th>
+                        <th class="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-24">Report #</th>
+                        <th class="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/4">Item Description</th>
+                        <th class="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Handover From</th>
+                        <th class="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Handover To</th>
+                        <th class="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-24">Date</th>
+                        <th class="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-24">Status</th>
+                        <th class="px-2 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-24">Actions</th>
                     </tr>
                 </thead>
                 <tbody class="bg-white divide-y divide-gray-200">
                     <?php foreach($recent_handovers as $handover): ?>
                         <tr class="hover:bg-gray-50">
-                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                            <td class="px-2 py-4 text-sm font-medium text-gray-900 break-words">
                                 EVD-<?php echo str_pad($handover['id'], 6, '0', STR_PAD_LEFT); ?>
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            <td class="px-2 py-4 text-sm text-gray-500 break-words">
                                 <?php echo htmlspecialchars($handover['report_number'] ?? 'N/A'); ?>
                             </td>
-                            <td class="px-6 py-4 text-sm text-gray-500">
-                                <?php echo htmlspecialchars(substr($handover['item_description'] ?? 'No description', 0, 50)); ?>
-                                <?php if (strlen($handover['item_description'] ?? '') > 50): ?>...<?php endif; ?>
+                            <td class="px-2 py-4 text-sm text-gray-500 break-words">
+                                <?php echo htmlspecialchars($handover['item_description'] ?? 'No description'); ?>
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            <td class="px-2 py-4 text-sm text-gray-500 break-words">
                                 <?php echo htmlspecialchars(($handover['tanod_name'] ?? 'Unknown') . ' ' . ($handover['tanod_last'] ?? '')); ?>
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            <td class="px-2 py-4 text-sm text-gray-500 break-words">
                                 <?php echo htmlspecialchars(($handover['recipient_name'] ?? 'Not Assigned') . ' ' . ($handover['recipient_last'] ?? '')); ?>
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            <td class="px-2 py-4 text-sm text-gray-500 break-words">
                                 <?php echo $handover['handover_date'] ? date('M d, H:i', strtotime($handover['handover_date'])) : 'Pending'; ?>
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap">
-                                <span class="px-3 py-1 rounded-full text-xs font-medium 
+                            <td class="px-2 py-4">
+                                <span class="px-2 py-1 rounded-full text-xs font-medium 
                                     <?php echo $handover['recipient_acknowledged'] ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'; ?>">
                                     <?php echo $handover['recipient_acknowledged'] ? 'Confirmed' : 'Pending'; ?>
                                 </span>
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                            <td class="px-2 py-4 text-right text-sm font-medium">
                                 <button onclick="viewEvidenceDetails(<?php echo $handover['id']; ?>)" 
-                                        class="text-purple-600 hover:text-purple-900 mr-3 px-2 py-1 hover:bg-purple-50 rounded">
-                                    <i class="fas fa-eye"></i> View
+                                        class="text-purple-600 hover:text-purple-900">
+                                    <i class="fas fa-eye"></i>
                                 </button>
                                 <?php if (!$handover['recipient_acknowledged']): ?>
-                                    <form method="POST" action="" class="inline-block">
+                                    <form method="POST" action="" class="inline-block ml-2">
                                         <input type="hidden" name="handover_id" value="<?php echo $handover['id']; ?>">
                                         <button type="submit" name="approve_evidence" 
-                                                class="text-green-600 hover:text-green-900 px-2 py-1 hover:bg-green-50 rounded">
-                                            <i class="fas fa-check"></i> Approve
+                                                class="text-green-600 hover:text-green-900">
+                                            <i class="fas fa-check"></i>
                                         </button>
                                     </form>
                                 <?php endif; ?>
@@ -207,43 +206,6 @@ $key_audits = $key_audit_stmt->fetchAll(PDO::FETCH_ASSOC);
                     <?php endforeach; ?>
                 </tbody>
             </table>
-        </div>
-    </div>
-    
-    <!-- Encryption Key Audit -->
-    <div class="bg-white rounded-xl p-6 shadow-sm">
-        <h3 class="text-lg font-bold text-gray-800 mb-4">Encryption Key Access Audit</h3>
-        
-        <div class="space-y-4">
-            <?php if (!empty($key_audits)): ?>
-                <?php foreach($key_audits as $audit): ?>
-                    <div class="p-4 border border-gray-200 rounded-lg hover:bg-gray-50">
-                        <div class="flex justify-between items-start mb-2">
-                            <div>
-                                <span class="font-medium text-gray-800"><?php echo htmlspecialchars($audit['report_number']); ?></span>
-                                <p class="text-sm text-gray-600 truncate"><?php echo htmlspecialchars($audit['original_name']); ?></p>
-                            </div>
-                            <span class="text-sm font-medium text-gray-700">
-                                <?php echo $audit['decryption_count']; ?> access<?php echo $audit['decryption_count'] > 1 ? 'es' : ''; ?>
-                            </span>
-                        </div>
-                        <div class="flex justify-between items-center text-sm text-gray-500">
-                            <div>
-                                <i class="fas fa-user mr-1"></i>
-                                <?php echo htmlspecialchars($audit['first_name'] . ' ' . $audit['last_name']); ?>
-                            </div>
-                            <div>
-                                Last accessed: <?php echo $audit['last_decrypted'] ? date('M d, H:i', strtotime($audit['last_decrypted'])) : 'Never'; ?>
-                            </div>
-                        </div>
-                    </div>
-                <?php endforeach; ?>
-            <?php else: ?>
-                <div class="text-center py-8 text-gray-500">
-                    <i class="fas fa-lock text-3xl mb-2"></i>
-                    <p>No encryption key access logs found</p>
-                </div>
-            <?php endif; ?>
         </div>
     </div>
 </div>

@@ -4,10 +4,11 @@
 // Handle new patrol schedule submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['assign_patrol'])) {
     try {
-        $insert = $conn->prepare("INSERT INTO tanod_schedules (user_id, schedule_date, shift_start, shift_end, patrol_route, notes)
-            VALUES (:user_id, :schedule_date, :shift_start, :shift_end, :patrol_route, :notes)");
+        $insert = $conn->prepare("INSERT INTO tanod_schedules (user_id, vehicle_id, schedule_date, shift_start, shift_end, patrol_route, notes)
+            VALUES (:user_id, :vehicle_id, :schedule_date, :shift_start, :shift_end, :patrol_route, :notes)");
         $insert->execute([
             ':user_id' => $_POST['tanod_id'],
+            ':vehicle_id' => $_POST['vehicle_id'] ?: null,
             ':schedule_date' => $_POST['schedule_date'],
             ':shift_start' => $_POST['shift_start'],
             ':shift_end' => $_POST['shift_end'],
@@ -30,6 +31,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_route'])) {
         $estimated_duration = $_POST['estimated_duration'];
         $checkpoint_count = $_POST['checkpoint_count'];
         $route_coordinates = $_POST['route_coordinates'];
+        
+        // Ensure route_coordinates is valid JSON or empty
+        if (empty($route_coordinates)) {
+            $route_coordinates = '[]';
+        }
+
         $route_id = $_POST['route_id'] ?? null;
         
         if ($route_id) {
@@ -102,15 +109,31 @@ $tanods_stmt = $conn->prepare($tanods_query);
 $tanods_stmt->execute();
 $all_tanods = $tanods_stmt->fetchAll(PDO::FETCH_ASSOC);
 
+// Get all Patrol Vehicles
+$vehicles = [];
+try {
+    $table_check = $conn->query("SHOW TABLES LIKE 'patrol_vehicles'");
+    if ($table_check->rowCount() > 0) {
+        $v_query = "SELECT * FROM patrol_vehicles WHERE status = 'Active'";
+        $v_stmt = $conn->prepare($v_query);
+        $v_stmt->execute();
+        $vehicles = $v_stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+} catch (Exception $e) {
+    // Ignore if table missing
+}
+
 // Get patrol schedules for the week (support navigation)
 $baseDate = isset($_GET['week']) ? $_GET['week'] : date('Y-m-d');
 $start_of_week = date('Y-m-d', strtotime('monday this week', strtotime($baseDate)));
 $end_of_week = date('Y-m-d', strtotime('sunday this week', strtotime($baseDate)));
 
 $schedules_query = "SELECT ts.*, u.first_name, u.last_name,
-                           CONCAT(u.first_name, ' ', u.last_name) as tanod_name
+                           CONCAT(u.first_name, ' ', u.last_name) as tanod_name,
+                           pv.vehicle_name
                     FROM tanod_schedules ts
                     LEFT JOIN users u ON ts.user_id = u.id
+                    LEFT JOIN patrol_vehicles pv ON ts.vehicle_id = pv.id
                     WHERE ts.schedule_date BETWEEN :start_date AND :end_date
                     ORDER BY ts.schedule_date, ts.shift_start";
 $schedules_stmt = $conn->prepare($schedules_query);
@@ -132,17 +155,17 @@ $patrol_routes = $routes_stmt->fetchAll(PDO::FETCH_ASSOC);
         <div class="stat-card rounded-xl p-6">
             <div class="flex items-center justify-between mb-4">
                 <div>
-                    <p class="text-sm font-medium text-gray-500">Active Tanods</p>
+                    <p class="text-sm font-medium text-gray-500">Active Vehicles</p>
                     <h3 class="text-3xl font-bold text-gray-800">
-                        <?php echo count(array_filter($all_tanods, fn($t) => $t['is_active'])); ?>
+                        <?php echo count($vehicles); ?>
                     </h3>
                 </div>
                 <div class="p-3 bg-blue-100 rounded-lg">
-                    <i class="fas fa-user-shield text-blue-600 text-xl"></i>
+                    <i class="fas fa-car text-blue-600 text-xl"></i>
                 </div>
             </div>
             <div class="text-sm text-gray-600">
-                Available for scheduling
+                Ready for deployment
             </div>
         </div>
         
@@ -210,12 +233,13 @@ $patrol_routes = $routes_stmt->fetchAll(PDO::FETCH_ASSOC);
             </div>
         <?php endif; ?>
         
-        <div class="overflow-x-auto">
-            <table class="min-w-full divide-y divide-gray-200">
+        <div class="w-full">
+            <table class="w-full divide-y divide-gray-200">
                 <thead>
                     <tr>
                         <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
-                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tanod</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Assigned Vehicle</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Driver (Tanod)</th>
                         <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Shift Time</th>
                         <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Patrol Route</th>
                         <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
@@ -231,16 +255,17 @@ $patrol_routes = $routes_stmt->fetchAll(PDO::FETCH_ASSOC);
                             <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
                                 <div class="flex items-center">
                                     <div class="flex-shrink-0 h-8 w-8 bg-blue-100 rounded-full flex items-center justify-center">
-                                        <span class="text-blue-800 font-medium text-xs">
-                                            <?php echo strtoupper(substr($schedule['first_name'], 0, 1)); ?>
-                                        </span>
+                                        <i class="fas fa-car text-blue-800"></i>
                                     </div>
                                     <div class="ml-3">
                                         <div class="text-sm font-medium text-gray-900">
-                                            <?php echo htmlspecialchars($schedule['tanod_name']); ?>
+                                            <?php echo htmlspecialchars($schedule['vehicle_name'] ?? 'Unassigned'); ?>
                                         </div>
                                     </div>
                                 </div>
+                            </td>
+                            <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
+                                <?php echo htmlspecialchars($schedule['tanod_name']); ?>
                             </td>
                             <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
                                 <?php echo date('h:i A', strtotime($schedule['shift_start'])) . ' - ' . 
@@ -282,7 +307,20 @@ $patrol_routes = $routes_stmt->fetchAll(PDO::FETCH_ASSOC);
                 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Select Tanod *</label>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Select Patrol Vehicle *</label>
+                        <select name="vehicle_id" required 
+                                class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
+                            <option value="">Choose Vehicle...</option>
+                            <?php foreach($vehicles as $vehicle): ?>
+                                <option value="<?php echo $vehicle['id']; ?>">
+                                    <?php echo htmlspecialchars($vehicle['vehicle_name'] . ' (' . $vehicle['plate_number'] . ')'); ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Assign Driver (Tanod) *</label>
                         <select name="tanod_id" required 
                                 class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
                             <option value="">Choose Tanod...</option>
@@ -295,13 +333,13 @@ $patrol_routes = $routes_stmt->fetchAll(PDO::FETCH_ASSOC);
                             <?php endforeach; ?>
                         </select>
                     </div>
-                    
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Schedule Date *</label>
-                        <input type="date" name="schedule_date" required 
-                               min="<?php echo date('Y-m-d'); ?>"
-                               class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
-                    </div>
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Schedule Date *</label>
+                    <input type="date" name="schedule_date" required 
+                           min="<?php echo date('Y-m-d'); ?>"
+                           class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
                 </div>
                 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
