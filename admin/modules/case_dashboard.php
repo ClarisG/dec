@@ -137,7 +137,7 @@ $report_types = $types_stmt->fetchAll(PDO::FETCH_COLUMN);
     <!-- Case Dashboard -->
     <div class="bg-white rounded-xl p-6 shadow-sm">
         <div class="flex flex-col md:flex-row md:items-center justify-between mb-6 space-y-4 md:space-y-0">
-            <h2 class="text-xl font-bold text-gray-800">Barangay Case Dashboard</h2>
+            <div></div> <!-- Spacer for flex layout -->
             
             <!-- Filters -->
             <div class="flex flex-wrap gap-3">
@@ -189,7 +189,7 @@ $report_types = $types_stmt->fetchAll(PDO::FETCH_COLUMN);
             <table class="min-w-full divide-y divide-gray-200">
                 <thead>
                     <tr>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Case #</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-32">Case #</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Complainant</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Assigned Tanod</th>
@@ -202,7 +202,7 @@ $report_types = $types_stmt->fetchAll(PDO::FETCH_COLUMN);
                 <tbody class="bg-white divide-y divide-gray-200">
                     <?php foreach($cases as $case): ?>
                         <tr class="hover:bg-gray-50">
-                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                            <td class="px-6 py-4 text-sm font-medium text-gray-900">
                                 <?php echo htmlspecialchars($case['report_number']); ?>
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
@@ -263,97 +263,6 @@ $report_types = $types_stmt->fetchAll(PDO::FETCH_COLUMN);
                 <p>No cases found with the selected filters</p>
             </div>
         <?php endif; ?>
-    </div>
-    
-<!-- Case Status Distribution -->
-<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-    <div class="bg-white rounded-xl p-6 shadow-sm">
-        <h3 class="text-lg font-bold text-gray-800 mb-4">Case Status Distribution</h3>
-        
-        <div class="space-y-4">
-            <?php
-            $status_dist_query = "SELECT 
-                status, COUNT(*) as count 
-                FROM reports 
-                WHERE status NOT IN ('draft', 'pending_field_verification')
-                GROUP BY status 
-                ORDER BY count DESC";
-            $status_dist_stmt = $conn->prepare($status_dist_query);
-            $status_dist_stmt->execute();
-            $status_dist = $status_dist_stmt->fetchAll(PDO::FETCH_ASSOC);
-            
-            $total_cases = array_sum(array_column($status_dist, 'count'));
-            ?>
-            
-            <?php foreach($status_dist as $status): 
-                $percentage = $total_cases > 0 ? ($status['count'] / $total_cases) * 100 : 0;
-            ?>
-                <div>
-                    <div class="flex justify-between mb-1">
-                        <span class="text-sm font-medium text-gray-700 capitalize">
-                            <?php echo htmlspecialchars($status['status']); ?>
-                        </span>
-                        <span class="text-sm font-medium text-gray-700">
-                            <?php echo $status['count']; ?> (<?php echo round($percentage, 1); ?>%)
-                        </span>
-                    </div>
-                    <div class="w-full bg-gray-200 rounded-full h-2">
-                        <div class="bg-purple-500 h-2 rounded-full" style="width: <?php echo $percentage; ?>%"></div>
-                    </div>
-                </div>
-            <?php endforeach; ?>
-        </div>
-    </div>
-    
-    <div class="bg-white rounded-xl p-6 shadow-sm">
-        <h3 class="text-lg font-bold text-gray-800 mb-4">Recent Case Updates</h3>
-        
-        <div class="space-y-3">
-            <?php
-            // CORRECTED QUERY HERE
-$recent_updates_query = "SELECT al.*, u.first_name, u.last_name,
-                                COALESCE(r.report_number, 'System Activity') as report_number
-                         FROM activity_logs al
-                         LEFT JOIN users u ON al.user_id = u.id
-                         LEFT JOIN reports r ON al.affected_id = r.id AND al.affected_type = 'reports'
-                         ORDER BY al.created_at DESC 
-                         LIMIT 5";
-            $recent_updates_stmt = $conn->prepare($recent_updates_query);
-            $recent_updates_stmt->execute();
-            $recent_updates = $recent_updates_stmt->fetchAll(PDO::FETCH_ASSOC);
-            ?>
-            
-            <?php if (!empty($recent_updates)): ?>
-                <?php foreach($recent_updates as $update): ?>
-                    <div class="p-3 border border-gray-200 rounded-lg hover:bg-gray-50">
-                        <div class="flex justify-between items-start mb-2">
-                            <div>
-                                <span class="font-medium text-gray-800"><?php echo htmlspecialchars($update['report_number']); ?></span>
-                                <p class="text-sm text-gray-600 truncate"><?php echo htmlspecialchars($update['description']); ?></p>
-                            </div>
-                            <span class="text-xs text-gray-500">
-                                <?php echo date('H:i', strtotime($update['created_at'])); ?>
-                            </span>
-                        </div>
-                        <div class="flex justify-between items-center text-xs text-gray-500">
-                            <div>
-                                <i class="fas fa-user mr-1"></i>
-                                <?php echo htmlspecialchars($update['first_name'] . ' ' . $update['last_name']); ?>
-                            </div>
-                            <span class="px-2 py-1 rounded text-xs 
-                                <?php echo strpos($update['action'], 'update') !== false ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'; ?>">
-                                <?php echo htmlspecialchars($update['action']); ?>
-                            </span>
-                        </div>
-                    </div>
-                <?php endforeach; ?>
-            <?php else: ?>
-                <div class="text-center py-8 text-gray-500">
-                    <i class="fas fa-history text-3xl mb-2"></i>
-                    <p>No recent case updates</p>
-                </div>
-            <?php endif; ?>
-        </div>
     </div>
 </div>
 <!-- Audit Trail Modal -->

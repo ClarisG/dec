@@ -155,7 +155,7 @@ function getModuleTitle($module) {
     $titles = [
         'dashboard' => 'Dashboard Overview',
         'classification' => 'Incident Classification',
-        'case_dashboard' => 'Case Status Dashboard',
+        'case_dashboard' => 'Case Status',
         'tanod_tracker' => 'Tanod Assignment Tracker',
         'patrol_scheduling' => 'Patrol Scheduling',
         'report_management' => 'Report Management',
@@ -185,7 +185,7 @@ function getModuleSubtitle($module) {
 // Define the 6 main modules for navigation in the requested order
 $main_modules = [
     ['id' => 'classification', 'name' => 'Incident Classification', 'icon' => 'fa-robot', 'color' => 'module-1'],
-    ['id' => 'case_dashboard', 'name' => 'Case Status Dashboard', 'icon' => 'fa-gavel', 'color' => 'module-2'],
+    ['id' => 'case_dashboard', 'name' => 'Case Status', 'icon' => 'fa-gavel', 'color' => 'module-2'],
     ['id' => 'tanod_tracker', 'name' => 'Tanod Tracker', 'icon' => 'fa-map-marker-alt', 'color' => 'module-3'],
     ['id' => 'patrol_scheduling', 'name' => 'Patrol Scheduling', 'icon' => 'fa-route', 'color' => 'module-4'],
     ['id' => 'report_management', 'name' => 'Report Management', 'icon' => 'fa-inbox', 'color' => 'module-5'],
@@ -636,7 +636,7 @@ $main_modules = [
                         
                         <a href="?module=case_dashboard" class="sidebar-link block p-3 text-white rounded-lg <?php echo $module == 'case_dashboard' ? 'active' : ''; ?>">
                             <i class="fas fa-gavel mr-3"></i>
-                            Case Status Dashboard
+                            Case Status
                         </a>
                         
                         <a href="?module=tanod_tracker" class="sidebar-link block p-3 text-white rounded-lg <?php echo $module == 'tanod_tracker' ? 'active' : ''; ?>">
