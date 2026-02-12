@@ -778,30 +778,7 @@ $main_modules = [
         <?php unset($_SESSION['error']); ?>
         <?php endif; ?>
 
-        <!-- Module Quick Access Cards (Only on Dashboard) -->
-        <?php if ($module == 'dashboard'): ?>
-        <div class="mb-8">
-            <h2 class="text-xl font-bold text-gray-800 mb-4">Quick Access Modules</h2>
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                <?php foreach ($main_modules as $mod): ?>
-                <a href="?module=<?php echo $mod['id']; ?>" class="module-card bg-white rounded-xl p-6 shadow-sm hover:shadow-md transition">
-                    <div class="<?php echo $mod['color']; ?> module-icon">
-                        <i class="fas <?php echo $mod['icon']; ?>"></i>
-                    </div>
-                    <h3 class="text-lg font-bold text-gray-800 mb-2"><?php echo $mod['name']; ?></h3>
-                    <p class="text-gray-600 text-sm">
-                        <?php echo getModuleSubtitle($mod['id']); ?>
-                    </p>
-                    <div class="mt-4 flex justify-end">
-                        <span class="text-blue-600 font-medium flex items-center">
-                            Access Module <i class="fas fa-arrow-right ml-2"></i>
-                        </span>
-                    </div>
-                </a>
-                <?php endforeach; ?>
-            </div>
-        </div>
-        <?php endif; ?>
+
 
         <!-- Load Module Content -->
         <?php
