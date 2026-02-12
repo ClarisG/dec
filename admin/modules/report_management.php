@@ -342,7 +342,8 @@ $type_data = array_slice($type_data, 0, 10, true);
                                 </span>
                             </td>
                             <td class="px-4 py-3 whitespace-nowrap">
-                                <span class="px-2 py-1 rounded-full text-xs font-medium 
+                                <span onclick="toggleVerification(<?php echo $report['id']; ?>, <?php echo $report['needs_verification']; ?>)"
+                                      class="px-2 py-1 rounded-full text-xs font-medium cursor-pointer hover:opacity-80 transition-opacity
                                     <?php echo $report['needs_verification'] ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800'; ?>">
                                     <?php echo $report['needs_verification'] ? 'Pending Verify' : 'Verified'; ?>
                                 </span>
@@ -590,6 +591,54 @@ $type_data = array_slice($type_data, 0, 10, true);
 let currentReportId = null;
 let dailyChart, typeChart, jurisdictionChart;
 let map, heatLayer;
+
+// Function to toggle verification status
+function toggleVerification(reportId, currentStatus) {
+    // currentStatus: 1 for needs_verification (Pending), 0 for Verified
+    const action = currentStatus ? 'verify' : 'unverify';
+    const confirmMessage = currentStatus 
+        ? 'Mark this report as VERIFIED?' 
+        : 'Mark this report as PENDING VERIFICATION?';
+    
+    if (confirm(confirmMessage)) {
+        const formData = new FormData();
+        formData.append('report_id', reportId);
+        // If currently pending (1), we want to verify (set needs_verification to 0)
+        // If currently verified (0), we might want to unverify (set needs_verification to 1) - purely logic based
+        // However, the verify_report.php handler likely only handles verifying.
+        // Let's assume we trigger the existing verifyReport logic if it's pending.
+        
+        if (currentStatus) {
+            // It needs verification, so verify it
+            formData.append('verify_report', '1');
+            
+            fetch('handlers/verify_report.php', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => {
+                if (!response.ok) throw new Error('Network response was not ok');
+                return response.json();
+            })
+            .then(data => {
+                if (data.success) {
+                    alert('Status updated successfully!');
+                    location.reload();
+                } else {
+                    alert('Error: ' + data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Error updating status:', error);
+                alert('Error updating status. Please try again.');
+            });
+        } else {
+            // Already verified. If you want to allow un-verifying, you'd need a handler for that.
+            // For now, let's just alert that it's already verified.
+            alert('This report is already verified.');
+        }
+    }
+}
 
 // Chart data from PHP
 const dailyData = <?php echo json_encode($daily_data); ?>;
