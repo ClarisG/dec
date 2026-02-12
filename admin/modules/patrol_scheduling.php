@@ -16,7 +16,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['assign_patrol'])) {
             ':notes' => $_POST['schedule_notes'] ?? '',
         ]);
         $_SESSION['success'] = "Patrol scheduled successfully";
-        header("Location: ?module=patrol_scheduling");
+        echo "<script>window.location.href='?module=patrol_scheduling';</script>";
         exit();
     } catch (Exception $e) {
         $_SESSION['error'] = "Error scheduling patrol: " . $e->getMessage();
@@ -77,7 +77,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_route'])) {
             $_SESSION['success'] = "Route added successfully!";
         }
         
-        header("Location: ?module=patrol_scheduling");
+        echo "<script>window.location.href='?module=patrol_scheduling';</script>";
         exit();
     } catch (PDOException $e) {
         $_SESSION['error'] = "Error saving route: " . $e->getMessage();
@@ -93,7 +93,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_route'])) {
         $stmt->execute([':id' => $route_id]);
         
         $_SESSION['success'] = "Route deleted successfully!";
-        header("Location: ?module=patrol_scheduling");
+        echo "<script>window.location.href='?module=patrol_scheduling';</script>";
         exit();
     } catch (PDOException $e) {
         $_SESSION['error'] = "Error deleting route: " . $e->getMessage();
