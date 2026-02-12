@@ -191,7 +191,7 @@ $threshold = $threshold_stmt->fetchColumn() ?: 0.7;
                                 </td>
                                 <td class="px-4 py-4 whitespace-nowrap text-right text-sm font-medium">
                                     <button onclick="editRule(<?php echo $rule['id']; ?>)" 
-                                            class="text-purple-600 hover:text-purple-900 mr-3 px-2 py-1 hover:bg-purple-50 rounded edit-rule-btn"
+                                            class="text-purple-600 hover:text-purple-900 px-2 py-1 hover:bg-purple-50 rounded edit-rule-btn"
                                             data-rule-id="<?php echo $rule['id']; ?>">
                                         <i class="fas fa-edit"></i> Edit
                                     </button>
