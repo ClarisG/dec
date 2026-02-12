@@ -75,7 +75,7 @@
     <div class="bg-white rounded-xl p-6 shadow-sm">
         <div class="flex items-center justify-between mb-6">
             <h2 class="text-xl font-bold text-gray-800">Recent System Activity</h2>
-            <a href="?module=audit" class="text-sm text-purple-600 hover:text-purple-800 font-medium">
+            <a href="?module=case_dashboard#audit-log-section" class="text-sm text-purple-600 hover:text-purple-800 font-medium">
                 View Full Audit Log →
             </a>
         </div>

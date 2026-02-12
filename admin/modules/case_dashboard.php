@@ -261,6 +261,84 @@ $report_types = $types_stmt->fetchAll(PDO::FETCH_COLUMN);
             </div>
         <?php endif; ?>
     </div>
+
+    <!-- Full Audit Log Section -->
+    <div id="audit-log-section" class="bg-white rounded-xl p-6 shadow-sm">
+        <div class="flex items-center justify-between mb-6">
+            <h2 class="text-xl font-bold text-gray-800">Full System Audit Log</h2>
+            <div class="flex space-x-2">
+                 <button onclick="window.print()" class="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-50">
+                    <i class="fas fa-print mr-1"></i> Print
+                </button>
+            </div>
+        </div>
+
+        <?php
+        // Fetch full audit logs
+        $audit_query = "SELECT al.*, u.first_name, u.last_name, u.role 
+                        FROM activity_logs al 
+                        LEFT JOIN users u ON al.user_id = u.id 
+                        ORDER BY al.created_at DESC 
+                        LIMIT 100";
+        $audit_stmt = $conn->prepare($audit_query);
+        $audit_stmt->execute();
+        $full_audit_logs = $audit_stmt->fetchAll(PDO::FETCH_ASSOC);
+        ?>
+
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead>
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Timestamp</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">IP Address</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    <?php if (!empty($full_audit_logs)): ?>
+                        <?php foreach($full_audit_logs as $log): ?>
+                            <tr class="hover:bg-gray-50">
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                    <?php echo date('M d, Y H:i:s', strtotime($log['created_at'])); ?>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                    <?php echo htmlspecialchars($log['first_name'] . ' ' . $log['last_name']); ?>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">
+                                        <?php echo ucfirst($log['role']); ?>
+                                    </span>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
+                                        <?php echo strpos($log['action'], 'delete') !== false ? 'bg-red-100 text-red-800' : 
+                                               (strpos($log['action'], 'update') !== false ? 'bg-blue-100 text-blue-800' : 
+                                               (strpos($log['action'], 'create') !== false ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800')); ?>">
+                                        <?php echo htmlspecialchars($log['action']); ?>
+                                    </span>
+                                </td>
+                                <td class="px-6 py-4 text-sm text-gray-500">
+                                    <?php echo htmlspecialchars($log['description']); ?>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-mono">
+                                    <?php echo htmlspecialchars($log['ip_address']); ?>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                    <?php else: ?>
+                        <tr>
+                            <td colspan="6" class="px-6 py-4 text-center text-sm text-gray-500">
+                                No audit logs found
+                            </td>
+                        </tr>
+                    <?php endif; ?>
+                </tbody>
+            </table>
+        </div>
+    </div>
 </div>
 <!-- Audit Trail Modal -->
 <div id="auditTrailModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50 p-4">
