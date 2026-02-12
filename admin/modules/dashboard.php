@@ -71,48 +71,6 @@
         </div>
     </div>
     
-    <!-- Quick Actions -->
-    <div class="bg-white rounded-xl p-6 shadow-sm">
-        <div class="flex items-center justify-between mb-6">
-            <h2 class="text-xl font-bold text-gray-800">Quick Actions</h2>
-            <span class="text-sm text-gray-500">System Control Panel</span>
-        </div>
-        
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <a href="?module=classification" class="module-card bg-white border rounded-lg p-4 text-center hover:shadow-lg transition-shadow">
-                <div class="module-icon module-1 mx-auto">
-                    <i class="fas fa-robot"></i>
-                </div>
-                <h3 class="font-medium text-gray-800 mb-1">AI Classification</h3>
-                <p class="text-sm text-gray-600">Configure Transformer Model</p>
-            </a>
-            
-            <a href="?module=tanod_tracker" class="module-card bg-white border rounded-lg p-4 text-center hover:shadow-lg transition-shadow">
-                <div class="module-icon module-2 mx-auto">
-                    <i class="fas fa-map-marker-alt"></i>
-                </div>
-                <h3 class="font-medium text-gray-800 mb-1">Tanod Tracker</h3>
-                <p class="text-sm text-gray-600">Real-time GPS monitoring</p>
-            </a>
-            
-            <a href="?module=evidence_tracking" class="module-card bg-white border rounded-lg p-4 text-center hover:shadow-lg transition-shadow">
-                <div class="module-icon module-3 mx-auto">
-                    <i class="fas fa-boxes"></i>
-                </div>
-                <h3 class="font-medium text-gray-800 mb-1">Evidence Tracking</h3>
-                <p class="text-sm text-gray-600">Chain of custody audit</p>
-            </a>
-            
-            <a href="?module=integration" class="module-card bg-white border rounded-lg p-4 text-center hover:shadow-lg transition-shadow">
-                <div class="module-icon module-4 mx-auto">
-                    <i class="fas fa-exchange-alt"></i>
-                </div>
-                <h3 class="font-medium text-gray-800 mb-1">API Integration</h3>
-                <p class="text-sm text-gray-600">External system links</p>
-            </a>
-        </div>
-    </div>
-    
     <!-- Recent Activity -->
     <div class="bg-white rounded-xl p-6 shadow-sm">
         <div class="flex items-center justify-between mb-6">
@@ -179,85 +137,6 @@
                     <?php endif; ?>
                 </tbody>
             </table>
-        </div>
-    </div>
-    
-    <!-- System Health Indicators -->
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div class="bg-white rounded-xl p-6 shadow-sm">
-            <h3 class="text-lg font-bold text-gray-800 mb-4">System Performance</h3>
-            <div class="space-y-4">
-                <div>
-                    <div class="flex justify-between mb-1">
-                        <span class="text-sm font-medium text-gray-700">CPU Usage</span>
-                        <span class="text-sm font-medium text-gray-700">68%</span>
-                    </div>
-                    <div class="progress-bar">
-                        <div class="progress-fill bg-blue-500" style="width: 68%"></div>
-                    </div>
-                </div>
-                <div>
-                    <div class="flex justify-between mb-1">
-                        <span class="text-sm font-medium text-gray-700">Memory Usage</span>
-                        <span class="text-sm font-medium text-gray-700">45%</span>
-                    </div>
-                    <div class="progress-bar">
-                        <div class="progress-fill bg-green-500" style="width: 45%"></div>
-                    </div>
-                </div>
-                <div>
-                    <div class="flex justify-between mb-1">
-                        <span class="text-sm font-medium text-gray-700">Database Storage</span>
-                        <span class="text-sm font-medium text-gray-700">82%</span>
-                    </div>
-                    <div class="progress-bar">
-                        <div class="progress-fill bg-yellow-500" style="width: 82%"></div>
-                    </div>
-                </div>
-                <div>
-                    <div class="flex justify-between mb-1">
-                        <span class="text-sm font-medium text-gray-700">Network Latency</span>
-                        <span class="text-sm font-medium text-gray-700">24ms</span>
-                    </div>
-                    <div class="progress-bar">
-                        <div class="progress-fill bg-purple-500" style="width: 24%"></div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <div class="bg-white rounded-xl p-6 shadow-sm">
-            <h3 class="text-lg font-bold text-gray-800 mb-4">Today's Overview</h3>
-            <div class="space-y-3">
-                <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                    <div class="flex items-center">
-                        <i class="fas fa-file-import text-blue-500 mr-3"></i>
-                        <span class="text-sm text-gray-700">New Reports Today</span>
-                    </div>
-                    <span class="font-bold text-gray-800"><?php echo $system_health['today_reports'] ?? 0; ?></span>
-                </div>
-                <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                    <div class="flex items-center">
-                        <i class="fas fa-history text-purple-500 mr-3"></i>
-                        <span class="text-sm text-gray-700">System Logs Today</span>
-                    </div>
-                    <span class="font-bold text-gray-800"><?php echo $system_health['today_logs'] ?? 0; ?></span>
-                </div>
-                <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                    <div class="flex items-center">
-                        <i class="fas fa-unlock text-green-500 mr-3"></i>
-                        <span class="text-sm text-gray-700">Evidence Decryptions</span>
-                    </div>
-                    <span class="font-bold text-gray-800"><?php echo $system_health['total_decryptions'] ?? 0; ?></span>
-                </div>
-                <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                    <div class="flex items-center">
-                        <i class="fas fa-robot text-yellow-500 mr-3"></i>
-                        <span class="text-sm text-gray-700">AI Classifications</span>
-                    </div>
-                    <span class="font-bold text-gray-800">14</span>
-                </div>
-            </div>
         </div>
     </div>
 </div>
