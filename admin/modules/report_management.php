@@ -92,59 +92,93 @@ $roles_stmt = $conn->prepare($roles_query);
 $roles_stmt->execute();
 $available_users = $roles_stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Get statistics for charts
+// Get statistics for charts (Last 12 months for comprehensive data)
 $chart_stats_query = "SELECT 
     DATE(r.created_at) as report_date,
+    YEARWEEK(r.created_at) as report_week,
+    DATE_FORMAT(r.created_at, '%Y-%m') as report_month,
     COUNT(*) as count,
     rp.type_name,
-    rp.jurisdiction
+    rp.jurisdiction,
+    r.latitude,
+    r.longitude
     FROM reports r
     LEFT JOIN report_types rp ON r.report_type_id = rp.id
-    WHERE r.created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
-    GROUP BY DATE(r.created_at), rp.type_name, rp.jurisdiction
-    ORDER BY r.created_at DESC";
+    WHERE r.created_at >= DATE_SUB(NOW(), INTERVAL 12 MONTH)
+    GROUP BY r.created_at
+    ORDER BY r.created_at ASC";
 $chart_stats_stmt = $conn->prepare($chart_stats_query);
 $chart_stats_stmt->execute();
-$chart_data = $chart_stats_stmt->fetchAll(PDO::FETCH_ASSOC);
+$all_stats_data = $chart_stats_stmt->fetchAll(PDO::FETCH_ASSOC);
 
 // Prepare data for charts
 $daily_data = [];
+$weekly_data = [];
+$monthly_data = [];
 $type_data = [];
 $jurisdiction_data = [];
+$map_data = [];
 
-foreach ($chart_data as $row) {
+// Helper to get start of week date
+function getStartOfWeek($yearWeek) {
+    $year = substr($yearWeek, 0, 4);
+    $week = substr($yearWeek, 4);
+    $dto = new DateTime();
+    $dto->setISODate($year, $week);
+    return $dto->format('M d');
+}
+
+foreach ($all_stats_data as $row) {
     $date = $row['report_date'];
+    $week = $row['report_week'];
+    $month = $row['report_month'];
     $type = $row['type_name'] ?: 'Unknown';
     $jurisdiction = $row['jurisdiction'] ?: 'Unknown';
     
-    // Daily data
-    if (!isset($daily_data[$date])) {
-        $daily_data[$date] = 0;
+    // Daily data (Last 30 days)
+    if (strtotime($date) >= strtotime('-30 days')) {
+        if (!isset($daily_data[$date])) $daily_data[$date] = 0;
+        $daily_data[$date] += 1;
     }
-    $daily_data[$date] += $row['count'];
     
-    // Type data
-    if (!isset($type_data[$type])) {
-        $type_data[$type] = 0;
-    }
-    $type_data[$type] += $row['count'];
+    // Weekly data (Last 12 weeks)
+    // Simple week grouping
+    $weekLabel = getStartOfWeek($week);
+    if (!isset($weekly_data[$weekLabel])) $weekly_data[$weekLabel] = 0;
+    $weekly_data[$weekLabel] += 1;
     
-    // Jurisdiction data
-    if (!isset($jurisdiction_data[$jurisdiction])) {
-        $jurisdiction_data[$jurisdiction] = 0;
+    // Monthly data
+    $monthLabel = date('M Y', strtotime($month . '-01'));
+    if (!isset($monthly_data[$monthLabel])) $monthly_data[$monthLabel] = 0;
+    $monthly_data[$monthLabel] += 1;
+    
+    // Type data (Overall)
+    if (!isset($type_data[$type])) $type_data[$type] = 0;
+    $type_data[$type] += 1;
+    
+    // Jurisdiction data (Overall)
+    if (!isset($jurisdiction_data[$jurisdiction])) $jurisdiction_data[$jurisdiction] = 0;
+    $jurisdiction_data[$jurisdiction] += 1;
+
+    // Map Data (Heatmap)
+    if (!empty($row['latitude']) && !empty($row['longitude'])) {
+        $map_data[] = [$row['latitude'], $row['longitude'], 1]; // lat, lng, intensity
     }
-    $jurisdiction_data[$jurisdiction] += $row['count'];
 }
 
-// Sort data
-krsort($daily_data);
+// Slice weekly data to last 12 weeks
+$weekly_data = array_slice($weekly_data, -12, 12, true);
+
+// Slice monthly data to last 12 months
+$monthly_data = array_slice($monthly_data, -12, 12, true);
+
+// Sort type/jurisdiction for better visualization
 arsort($type_data);
 arsort($jurisdiction_data);
-
-// Take top 10 types for readability
 $type_data = array_slice($type_data, 0, 10, true);
 ?>
-<!-- Add CSS for responsive table -->
+<!-- Leaflet CSS -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <style>
     @media (max-width: 1024px) {
         .responsive-table-container {
@@ -406,12 +440,24 @@ $type_data = array_slice($type_data, 0, 10, true);
             </div>
         </div>
         
-        <div class="mt-8 bg-gray-50 rounded-xl p-4 border border-gray-100 shadow-sm">
-            <h4 class="font-bold text-gray-700 mb-4 flex items-center">
-                <i class="fas fa-map-marked-alt text-green-500 mr-2"></i> Jurisdiction Distribution
-            </h4>
-            <div class="chart-container relative h-64 w-full max-w-2xl mx-auto">
-                <canvas id="jurisdictionChart"></canvas>
+        <div class="mt-8 grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div class="lg:col-span-1 bg-gray-50 rounded-xl p-4 border border-gray-100 shadow-sm">
+                <h4 class="font-bold text-gray-700 mb-4 flex items-center">
+                    <i class="fas fa-map-marked-alt text-green-500 mr-2"></i> Jurisdiction Distribution
+                </h4>
+                <div class="chart-container relative h-64 w-full max-w-2xl mx-auto">
+                    <canvas id="jurisdictionChart"></canvas>
+                </div>
+            </div>
+            
+            <div class="lg:col-span-2 bg-gray-50 rounded-xl p-4 border border-gray-100 shadow-sm">
+                <h4 class="font-bold text-gray-700 mb-4 flex items-center">
+                    <i class="fas fa-map-marker-alt text-red-500 mr-2"></i> Incident Heatmap (Epicenter)
+                </h4>
+                <div id="heatmapContainer" style="height: 300px; width: 100%; border-radius: 0.75rem;"></div>
+                <div class="mt-2 text-xs text-gray-500 text-center">
+                    Visualizing report density in Barangay Commonwealth
+                </div>
             </div>
         </div>
     </div>
@@ -538,9 +584,20 @@ $type_data = array_slice($type_data, 0, 10, true);
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
 <script>
 let currentReportId = null;
 let dailyChart, typeChart, jurisdictionChart;
+let map, heatLayer;
+
+// Chart data from PHP
+const dailyData = <?php echo json_encode($daily_data); ?>;
+const weeklyData = <?php echo json_encode($weekly_data); ?>;
+const monthlyData = <?php echo json_encode($monthly_data); ?>;
+const typeData = <?php echo json_encode($type_data); ?>;
+const jurisdictionData = <?php echo json_encode($jurisdiction_data); ?>;
+const mapData = <?php echo json_encode($map_data); ?>;
 
 function printReportCharts() {
     const printWindow = window.open('', '_blank');
@@ -570,7 +627,7 @@ function printReportCharts() {
                 </div>
             </div>
             <div class="chart-container">
-                <h3>Daily Reports Trend</h3>
+                <h3>Submission Trend</h3>
                 <img src="${document.getElementById('dailyReportsChart').toDataURL()}" width="800" height="400">
             </div>
             <div class="chart-container">
@@ -592,7 +649,7 @@ function printReportCharts() {
     }, 500);
 }
 
-function initializeCharts() {
+function initializeCharts(range = 'daily') {
     const dailyCtx = document.getElementById('dailyReportsChart').getContext('2d');
     const typeCtx = document.getElementById('reportTypesChart').getContext('2d');
     const jurisdictionCtx = document.getElementById('jurisdictionChart').getContext('2d');
@@ -602,17 +659,29 @@ function initializeCharts() {
     if (typeChart) typeChart.destroy();
     if (jurisdictionChart) jurisdictionChart.destroy();
     
-    // Daily Reports Chart
-    const dailyLabels = Object.keys(dailyData).slice(0, 15).reverse();
-    const dailyValues = dailyLabels.map(date => dailyData[date]);
+    // Select data based on range
+    let chartData, chartLabels, chartLabelText;
+    if (range === 'weekly') {
+        chartLabels = Object.keys(weeklyData);
+        chartData = Object.values(weeklyData);
+        chartLabelText = 'Weekly Reports';
+    } else if (range === 'monthly') {
+        chartLabels = Object.keys(monthlyData);
+        chartData = Object.values(monthlyData);
+        chartLabelText = 'Monthly Reports';
+    } else {
+        chartLabels = Object.keys(dailyData);
+        chartData = Object.values(dailyData);
+        chartLabelText = 'Daily Reports';
+    }
     
     dailyChart = new Chart(dailyCtx, {
         type: 'bar',
         data: {
-            labels: dailyLabels,
+            labels: chartLabels,
             datasets: [{
-                label: 'Number of Reports',
-                data: dailyValues,
+                label: chartLabelText,
+                data: chartData,
                 backgroundColor: '#7c3aed',
                 borderColor: '#6d28d9',
                 borderWidth: 1
@@ -632,6 +701,9 @@ function initializeCharts() {
                     title: {
                         display: true,
                         text: 'Number of Reports'
+                    },
+                    ticks: {
+                        stepSize: 1
                     }
                 },
                 x: {
@@ -649,7 +721,7 @@ function initializeCharts() {
     const typeValues = Object.values(typeData);
     
     typeChart = new Chart(typeCtx, {
-        type: 'pie',
+        type: 'doughnut',
         data: {
             labels: typeLabels,
             datasets: [{
@@ -677,7 +749,7 @@ function initializeCharts() {
         }
     });
     
-    // Jurisdiction Chart - Made consistent with other charts
+    // Jurisdiction Chart
     const jurisdictionLabels = Object.keys(jurisdictionData);
     const jurisdictionValues = Object.values(jurisdictionData);
     
@@ -708,31 +780,58 @@ function initializeCharts() {
     });
 }
 
-// Chart data from PHP
-const dailyData = <?php echo json_encode($daily_data); ?>;
-const typeData = <?php echo json_encode($type_data); ?>;
-const jurisdictionData = <?php echo json_encode($jurisdiction_data); ?>;
+function initializeMap() {
+    if (!document.getElementById('heatmapContainer')) return;
+    
+    // Center on Barangay Commonwealth
+    map = L.map('heatmapContainer').setView([14.7000, 121.0900], 14);
+    
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+        maxZoom: 19
+    }).addTo(map);
+    
+    // Add heatmap layer if data exists
+    if (mapData && mapData.length > 0) {
+        heatLayer = L.heatLayer(mapData, {
+            radius: 25,
+            blur: 15,
+            maxZoom: 17,
+            max: 1.0,
+            gradient: {
+                0.4: 'blue',
+                0.6: 'cyan',
+                0.7: 'lime',
+                0.8: 'yellow',
+                1.0: 'red'
+            }
+        }).addTo(map);
+        
+        // Fit bounds to show all data points
+        const bounds = L.latLngBounds(mapData.map(p => [p[0], p[1]]));
+        map.fitBounds(bounds.pad(0.1));
+    }
+}
 
 // Initialize charts when page loads
 document.addEventListener('DOMContentLoaded', function() {
     initializeCharts();
+    initializeMap();
     
     // Handle chart range change
     document.getElementById('chartRange').addEventListener('change', function(e) {
-        // In a real application, you would fetch new data based on the selected range
-        console.log('Selected range:', e.target.value);
-        // For now, just reinitialize with current data
-        initializeCharts();
+        initializeCharts(e.target.value);
     });
     
     // Add responsive behavior to table on window resize
     window.addEventListener('resize', function() {
         // Charts will automatically resize due to Chart.js responsive option
+        if(map) map.invalidateSize();
     });
 });
 
 function viewReportDetails(reportId) {
-    fetch(`ajax/get_report_details.php?id=${reportId}`)
+    fetch(`handlers/get_report_details.php?id=${reportId}`)
         .then(response => {
             if (!response.ok) throw new Error('Network response was not ok');
             return response.json();
