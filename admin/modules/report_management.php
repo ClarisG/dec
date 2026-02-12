@@ -1,6 +1,27 @@
 <?php
 // admin/modules/report_management.php - WITNESS AND COMMUNITY REPORT MANAGEMENT MODULE
 
+// Pagination
+$per_page = 10;
+$page = max(1, (int)($_GET['page'] ?? 1));
+$offset = ($page - 1) * $per_page;
+
+// Count total records for pagination
+$count_query = "SELECT COUNT(*) FROM reports r 
+                LEFT JOIN users u ON r.user_id = u.id 
+                WHERE r.needs_verification = 1 
+                OR r.status IN ('pending', 'pending_field_verification')";
+$count_stmt = $conn->prepare($count_query);
+$count_stmt->execute();
+$total_records = (int)$count_stmt->fetchColumn();
+$total_pages = max(1, (int)ceil($total_records / $per_page));
+
+// Adjust page if out of bounds
+if ($page > $total_pages && $total_records > 0) {
+    $page = $total_pages;
+    $offset = ($page - 1) * $per_page;
+}
+
 // Get raw citizen reports pending verification (FIXED: removed urgency_level reference)
 $reports_query = "SELECT r.*, u.first_name as reporter_first, u.last_name as reporter_last,
                          u.contact_number as reporter_contact,
@@ -11,8 +32,11 @@ $reports_query = "SELECT r.*, u.first_name as reporter_first, u.last_name as rep
                   LEFT JOIN report_types rt ON r.report_type_id = rt.id
                   WHERE r.needs_verification = 1 
                   OR r.status IN ('pending', 'pending_field_verification')
-                  ORDER BY r.priority DESC, r.created_at DESC";
+                  ORDER BY r.priority DESC, r.created_at DESC
+                  LIMIT :limit OFFSET :offset";
 $reports_stmt = $conn->prepare($reports_query);
+$reports_stmt->bindValue(':limit', $per_page, PDO::PARAM_INT);
+$reports_stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
 $reports_stmt->execute();
 $raw_reports = $reports_stmt->fetchAll(PDO::FETCH_ASSOC);
 
@@ -286,7 +310,7 @@ $type_data = array_slice($type_data, 0, 10, true);
                             <td class="px-4 py-3 whitespace-nowrap">
                                 <span class="px-2 py-1 rounded-full text-xs font-medium 
                                     <?php echo $report['needs_verification'] ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800'; ?>">
-                                    <?php echo $report['needs_verification'] ? 'Needs Verify' : 'Verified'; ?>
+                                    <?php echo $report['needs_verification'] ? 'Pending Verify' : 'Verified'; ?>
                                 </span>
                             </td>
                             <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
@@ -314,41 +338,80 @@ $type_data = array_slice($type_data, 0, 10, true);
                 </tbody>
             </table>
         </div>
+        
+        <!-- Pagination Controls -->
+        <div class="flex items-center justify-between mt-4">
+            <div class="text-sm text-gray-600">
+                Showing <?php echo min($per_page, count($raw_reports)); ?> of <?php echo $total_records; ?> entries
+            </div>
+            <div class="flex items-center gap-1">
+                <?php if ($page > 1): ?>
+                    <a href="?module=report_management&page=1" class="px-2 py-1 border rounded hover:bg-gray-50 text-sm">First</a>
+                    <a href="?module=report_management&page=<?php echo $page - 1; ?>" class="px-2 py-1 border rounded hover:bg-gray-50 text-sm">Prev</a>
+                <?php else: ?>
+                    <span class="px-2 py-1 border rounded opacity-50 cursor-not-allowed text-sm">First</span>
+                    <span class="px-2 py-1 border rounded opacity-50 cursor-not-allowed text-sm">Prev</span>
+                <?php endif; ?>
+                
+                <span class="px-3 py-1 border rounded bg-purple-50 text-purple-700 font-medium text-sm">
+                    Page <?php echo $page; ?> of <?php echo max(1, $total_pages); ?>
+                </span>
+                
+                <?php if ($page < $total_pages): ?>
+                    <a href="?module=report_management&page=<?php echo $page + 1; ?>" class="px-2 py-1 border rounded hover:bg-gray-50 text-sm">Next</a>
+                    <a href="?module=report_management&page=<?php echo $total_pages; ?>" class="px-2 py-1 border rounded hover:bg-gray-50 text-sm">Last</a>
+                <?php else: ?>
+                    <span class="px-2 py-1 border rounded opacity-50 cursor-not-allowed text-sm">Next</span>
+                    <span class="px-2 py-1 border rounded opacity-50 cursor-not-allowed text-sm">Last</span>
+                <?php endif; ?>
+            </div>
+        </div>
     </div>
     
     <!-- Reports Analytics -->
     <div class="bg-white rounded-xl p-6 shadow-sm">
-        <div class="flex items-center justify-between mb-6">
-            <h3 class="text-lg font-bold text-gray-800">Reports Analytics</h3>
+        <div class="flex flex-col md:flex-row items-center justify-between mb-6 space-y-4 md:space-y-0">
+            <h3 class="text-xl font-bold text-gray-800 flex items-center">
+                <i class="fas fa-chart-line text-purple-600 mr-2"></i> Reports Analytics
+            </h3>
             <div class="flex flex-wrap gap-2">
-                <select id="chartRange" class="p-2 border border-gray-300 rounded-lg text-sm">
+                <select id="chartRange" class="p-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500 shadow-sm">
                     <option value="daily">Daily (Last 30 days)</option>
                     <option value="weekly">Weekly</option>
                     <option value="monthly">Monthly</option>
                 </select>
-                <button onclick="printReportCharts()" class="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm">
-                    <i class="fas fa-print mr-1"></i>Print Report
+                <button onclick="printReportCharts()" class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-sm shadow-md transition-all duration-200 flex items-center">
+                    <i class="fas fa-print mr-2"></i>Generate Report
                 </button>
             </div>
         </div>
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div>
-                <h4 class="font-bold text-gray-700 mb-2">Daily Reports Trend</h4>
-                <div class="chart-container">
-                    <canvas id="dailyReportsChart" height="200"></canvas>
+        
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <div class="bg-gray-50 rounded-xl p-4 border border-gray-100 shadow-sm">
+                <h4 class="font-bold text-gray-700 mb-4 flex items-center">
+                    <i class="fas fa-calendar-alt text-blue-500 mr-2"></i> Submission Trend
+                </h4>
+                <div class="chart-container relative h-64 w-full">
+                    <canvas id="dailyReportsChart"></canvas>
                 </div>
             </div>
-            <div>
-                <h4 class="font-bold text-gray-700 mb-2">Report Types Distribution</h4>
-                <div class="chart-container">
-                    <canvas id="reportTypesChart" height="200"></canvas>
+            
+            <div class="bg-gray-50 rounded-xl p-4 border border-gray-100 shadow-sm">
+                <h4 class="font-bold text-gray-700 mb-4 flex items-center">
+                    <i class="fas fa-chart-pie text-pink-500 mr-2"></i> Report Categories
+                </h4>
+                <div class="chart-container relative h-64 w-full">
+                    <canvas id="reportTypesChart"></canvas>
                 </div>
             </div>
         </div>
-        <div class="mt-6">
-            <h4 class="font-bold text-gray-700 mb-2">Jurisdiction Distribution</h4>
-            <div class="chart-container max-w-md mx-auto">
-                <canvas id="jurisdictionChart" height="200"></canvas>
+        
+        <div class="mt-8 bg-gray-50 rounded-xl p-4 border border-gray-100 shadow-sm">
+            <h4 class="font-bold text-gray-700 mb-4 flex items-center">
+                <i class="fas fa-map-marked-alt text-green-500 mr-2"></i> Jurisdiction Distribution
+            </h4>
+            <div class="chart-container relative h-64 w-full max-w-2xl mx-auto">
+                <canvas id="jurisdictionChart"></canvas>
             </div>
         </div>
     </div>
