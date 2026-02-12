@@ -312,26 +312,26 @@ $report_types = $types_stmt->fetchAll(PDO::FETCH_COLUMN);
                     <?php if (!empty($full_audit_logs)): ?>
                         <?php foreach($full_audit_logs as $log): ?>
                             <tr class="hover:bg-gray-50">
-                                <td class="px-4 py-4 text-sm text-gray-500 break-words">
+                                <td class="px-4 py-4 text-sm text-gray-500 align-top">
                                     <div class="font-medium text-gray-700"><?php echo date('M d, Y', strtotime($log['created_at'])); ?></div>
                                     <div class="text-xs text-gray-400"><?php echo date('H:i:s', strtotime($log['created_at'])); ?></div>
                                 </td>
-                                <td class="px-4 py-4 text-sm text-gray-900 break-words">
+                                <td class="px-4 py-4 text-sm text-gray-900 align-top break-words">
                                     <div class="font-medium"><?php echo htmlspecialchars($log['first_name'] . ' ' . $log['last_name']); ?></div>
-                                    <div class="text-xs text-gray-500 uppercase tracking-wider"><?php echo ucfirst($log['role']); ?></div>
+                                    <div class="text-xs text-gray-500 uppercase tracking-wider mt-1"><?php echo ucfirst($log['role']); ?></div>
                                 </td>
-                                <td class="px-4 py-4 break-words">
-                                    <span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full 
+                                <td class="px-4 py-4 align-top">
+                                    <span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full break-words
                                         <?php echo strpos($log['action'], 'delete') !== false ? 'bg-red-100 text-red-800' : 
                                                (strpos($log['action'], 'update') !== false ? 'bg-blue-100 text-blue-800' : 
                                                (strpos($log['action'], 'create') !== false ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800')); ?>">
                                         <?php echo htmlspecialchars($log['action']); ?>
                                     </span>
                                 </td>
-                                <td class="px-4 py-4 text-sm text-gray-600 break-words">
+                                <td class="px-4 py-4 text-sm text-gray-600 align-top whitespace-normal break-words">
                                     <?php echo htmlspecialchars($log['description']); ?>
                                 </td>
-                                <td class="px-4 py-4 text-sm text-gray-500 font-mono break-words">
+                                <td class="px-4 py-4 text-sm text-gray-500 font-mono align-top break-all">
                                     <?php echo htmlspecialchars($log['ip_address']); ?>
                                 </td>
                             </tr>
